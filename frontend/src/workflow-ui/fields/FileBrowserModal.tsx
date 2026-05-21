@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Clock, FileText, Info, X } from 'lucide-react';
 import type { FileFilter } from '../../tauri-dialog';
 
 type Props = {
@@ -124,7 +125,7 @@ export default function FileBrowserModal({
                         onClick={onCancel}
                         aria-label="Close"
                     >
-                        ×
+                        <X size={16} />
                     </button>
                 </div>
 
@@ -178,20 +179,7 @@ export default function FileBrowserModal({
                                         onClick={() => setPath(p)}
                                         title={p}
                                     >
-                                        <svg
-                                            width="14"
-                                            height="14"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.6"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            aria-hidden="true"
-                                        >
-                                            <path d="M12 2v6m0 0l3-3m-3 3L9 5" />
-                                            <circle cx="12" cy="14" r="8" />
-                                        </svg>
+                                        <Clock size={13} aria-hidden="true" />
                                         <span className="modal-recent-path">{p}</span>
                                     </button>
                                 ))}
@@ -209,9 +197,7 @@ export default function FileBrowserModal({
                     ) : null}
 
                     <div className="modal-tip">
-                        <span className="modal-tip-icon" aria-hidden="true">
-                            ⌘
-                        </span>
+                        <Info size={14} className="modal-tip-icon" aria-hidden="true" />
                         <span>
                             <b>Desktop mode</b> opens a native OS dialog with full filesystem
                             access. In browser, paste or type the full path manually.

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
 import type { RepoItem } from '../repo-types';
 
 export type PipelineTemplate = 'empty' | 'sample-csv-to-parquet' | 'from-sql';
@@ -114,7 +115,7 @@ export default function NewPipelineModal(props: Props) {
                         onClick={onCancel}
                         aria-label="Close"
                     >
-                        ×
+                        <X size={16} />
                     </button>
                 </div>
 

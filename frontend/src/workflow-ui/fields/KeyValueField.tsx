@@ -1,3 +1,5 @@
+import { X } from 'lucide-react';
+
 type Pair = { key: string; value: string };
 
 type Props = {
@@ -47,7 +49,7 @@ export function KeyValueField({ value, onChange }: Props) {
                         onClick={() => remove(i)}
                         aria-label="Remove"
                     >
-                        ×
+                        <X size={12} />
                     </button>
                 </div>
             ))}

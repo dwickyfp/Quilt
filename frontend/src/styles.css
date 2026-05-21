@@ -1,43 +1,62 @@
 :root {
-    /* Slightly warmer, more cinematic dark palette */
-    --bg-0: #0a0d12;
-    --bg-1: #10151c;
-    --bg-2: #171d26;
-    --bg-3: #212833;
-    --bg-4: #2a3240;
-    --border: #232a35;
-    --border-strong: #353e4d;
+    /* Calm, disciplined dark palette — Linear / Vercel inspired */
+    --bg-0: #0b0d11;
+    --bg-1: #13161c;
+    --bg-2: #191d25;
+    --bg-3: #21262f;
+    --bg-4: #2b313c;
+    --border: #1d2128;
+    --border-strong: #2b313c;
+    --border-bright: #3a414e;
 
-    --text-1: #eaf0f6;
-    --text-2: #b7c1ce;
-    --text-3: #7d8896;
-    --text-4: #56606e;
+    --text-1: #e5e9f0;
+    --text-2: #a3acbd;
+    --text-3: #6b7385;
+    --text-4: #4a515f;
 
-    --accent: #5fa9ff;
-    --accent-soft: rgba(95, 169, 255, 0.14);
-    --accent-glow: rgba(95, 169, 255, 0.32);
-    --accent-source: #6ee896;
-    --accent-transform: #5fa9ff;
-    --accent-sink: #ffa969;
-    --accent-warn: #ffd66b;
-    --accent-purple: #c89bff;
-    --danger: #ff5a5a;
+    /* Single primary accent — Linear-style indigo. Reserved for
+       selection, focus, primary action. Everything else stays neutral. */
+    --accent: #6470d8;
+    --accent-strong: #7a85e6;
+    --accent-soft: rgba(100, 112, 216, 0.14);
+    --accent-glow: rgba(100, 112, 216, 0.32);
+
+    /* Component kind hues — muted ghosts that hint at meaning without
+       shouting. All sit in a similar luminance band. */
+    --kind-source: #65a8cc;
+    --kind-transform: #98a4b8;
+    --kind-sink: #c89770;
+    --kind-control: #a48bd4;
+    --kind-quality: #c4a85a;
+    --kind-custom: #c98a8a;
+
+    /* Status — used SPARINGLY and only for real signals. */
+    --danger: #ef4444;
+    --success: #4ade80;
+    --warn: #eab308;
 
     --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.04) inset,
-        0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.42);
+        0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.4);
     --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.05) inset,
         0 4px 12px rgba(0, 0, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.55);
-    --focus-ring: 0 0 0 3px rgba(95, 169, 255, 0.22);
+    --focus-ring: 0 0 0 3px rgba(100, 112, 216, 0.22);
 
     --radius-sm: 6px;
     --radius: 8px;
     --radius-lg: 12px;
 
     --topbar-h: 44px;
-    --sidebar-w: 256px;
-    --properties-w: 320px;
+    --sidebar-w: 264px;
+    --properties-w: 324px;
 
     --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* Legacy aliases — keep mapping until everything is migrated. */
+    --accent-source: var(--kind-source);
+    --accent-transform: var(--kind-transform);
+    --accent-sink: var(--kind-sink);
+    --accent-purple: var(--kind-control);
+    --accent-warn: var(--warn);
 
     color-scheme: dark;
 }
@@ -373,17 +392,21 @@ textarea:focus-visible {
 }
 
 .palette-cat-chevron {
-    width: 12px;
-    text-align: center;
+    width: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: var(--text-3);
-    font-size: 9px;
+    flex-shrink: 0;
 }
 
 .palette-cat-icon {
     width: 16px;
-    text-align: center;
-    font-size: 14px;
-    font-weight: normal;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-2);
+    flex-shrink: 0;
 }
 
 .palette-cat-label {
@@ -466,19 +489,24 @@ textarea:focus-visible {
 }
 
 .palette-availability {
-    font-size: 11px;
     width: 14px;
-    text-align: center;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
 }
 
 .palette-availability-yes {
-    color: var(--accent-source);
+    color: var(--success);
 }
 
 .palette-availability-no {
-    color: var(--text-3);
-    opacity: 0.5;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-4);
+    opacity: 0.6;
 }
 
 .canvas-shell {
@@ -696,9 +724,11 @@ textarea:focus-visible {
 
 .context-menu-icon {
     width: 14px;
-    text-align: center;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: var(--text-3);
-    font-size: 12px;
     flex-shrink: 0;
 }
 
@@ -966,8 +996,12 @@ textarea:focus-visible {
 }
 
 .left-sidebar-tab-icon {
+    color: var(--text-3);
+    flex-shrink: 0;
+}
+
+.left-sidebar-tab[aria-selected='true'] .left-sidebar-tab-icon {
     color: var(--accent);
-    font-size: 12px;
 }
 
 .left-sidebar-body {
@@ -1081,18 +1115,23 @@ textarea:focus-visible {
 }
 
 .repo-chevron {
-    width: 10px;
+    width: 12px;
+    height: 12px;
     color: var(--text-3);
-    font-size: 9px;
-    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
 }
 
 .repo-icon {
     width: 14px;
-    text-align: center;
-    font-size: 12px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+    color: var(--text-2);
 }
 
 .repo-icon-project {
@@ -1100,23 +1139,23 @@ textarea:focus-visible {
 }
 
 .repo-icon-folder {
-    color: var(--accent-source);
+    color: var(--kind-source);
 }
 
 .repo-icon-pipeline {
-    color: var(--accent-transform);
+    color: var(--kind-transform);
 }
 
 .repo-icon-connection {
-    color: var(--accent-sink);
+    color: var(--kind-sink);
 }
 
 .repo-icon-context {
-    color: var(--text-3);
+    color: var(--kind-quality);
 }
 
 .repo-icon-routine {
-    color: #ff7b72;
+    color: var(--kind-custom);
 }
 
 .repo-icon-doc {
@@ -1226,8 +1265,8 @@ textarea:focus-visible {
 
 .engine-trigger-chevron {
     color: var(--text-3);
-    font-size: 10px;
     margin-left: 2px;
+    flex-shrink: 0;
 }
 
 .engine-dot {
@@ -1303,8 +1342,8 @@ textarea:focus-visible {
 }
 
 .engine-option-check {
-    color: var(--accent-source);
-    font-size: 14px;
+    color: var(--success);
+    flex-shrink: 0;
 }
 
 /* Editor tabs ------------------------------------------------------------ */
@@ -1880,21 +1919,12 @@ select.schema-input {
 }
 
 .bottom-empty-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--bg-2);
     color: var(--text-3);
-    font-size: 12px;
     margin-bottom: 6px;
 }
 
 .bottom-empty-icon-ok {
-    background: rgba(126, 231, 135, 0.1);
-    color: var(--accent-source);
+    color: var(--success);
 }
 
 .bottom-empty-title {
@@ -1927,9 +1957,15 @@ select.schema-input {
 
 .bottom-console-line {
     display: flex;
-    gap: 10px;
+    align-items: center;
+    gap: 8px;
     font-size: 11px;
     padding: 2px 0;
+}
+
+.bottom-console-icon {
+    color: var(--text-3);
+    flex-shrink: 0;
 }
 
 .bottom-console-time {
@@ -2064,8 +2100,11 @@ select.schema-input {
 
 .job-tab-icon {
     color: var(--text-3);
-    font-size: 11px;
     flex-shrink: 0;
+}
+
+.job-tab.is-active .job-tab-icon {
+    color: var(--accent);
 }
 
 .job-tab-name {
@@ -2962,9 +3001,8 @@ select.schema-input {
 
 .modal-tip-icon {
     color: var(--accent);
-    font-size: 14px;
     flex-shrink: 0;
-    margin-top: -1px;
+    margin-top: 1px;
 }
 
 .modal-tip b {

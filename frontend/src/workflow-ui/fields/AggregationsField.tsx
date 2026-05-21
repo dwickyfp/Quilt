@@ -1,4 +1,5 @@
 import { useContext } from 'react';
+import { X } from 'lucide-react';
 import { FieldContext } from './FieldContext';
 import { AGG_FUNCTIONS, type Aggregation, type AggregationFunction } from './types';
 
@@ -113,7 +114,7 @@ export function AggregationsField({ value, onChange }: Props) {
                                 onClick={() => remove(i)}
                                 aria-label="Remove"
                             >
-                                ×
+                                <X size={12} />
                             </button>
                         </div>
                     ))}

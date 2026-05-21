@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Boxes, FolderTree } from 'lucide-react';
 import Palette from './Palette';
 import ProjectTree from './ProjectTree';
 import type { RepoItem } from '../repo-types';
@@ -40,9 +41,7 @@ export default function LeftSidebar({
                     className="left-sidebar-tab"
                     onClick={() => setTab('project')}
                 >
-                    <span className="left-sidebar-tab-icon" aria-hidden="true">
-                        ◆
-                    </span>
+                    <FolderTree className="left-sidebar-tab-icon" size={13} aria-hidden="true" />
                     Project
                 </button>
                 <button
@@ -52,9 +51,7 @@ export default function LeftSidebar({
                     className="left-sidebar-tab"
                     onClick={() => setTab('palette')}
                 >
-                    <span className="left-sidebar-tab-icon" aria-hidden="true">
-                        ⊞
-                    </span>
+                    <Boxes className="left-sidebar-tab-icon" size={13} aria-hidden="true" />
                     Components
                 </button>
             </div>

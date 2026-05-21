@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
 
 export type EngineId = 'duckdb' | 'slothdb' | 'native';
 
@@ -68,9 +69,7 @@ export default function EngineSelector({ value, onChange }: Props) {
                 <span className="engine-dot" style={{ background: current.dot }} aria-hidden />
                 <span className="engine-trigger-label">Engine</span>
                 <span className="engine-trigger-value">{current.label}</span>
-                <span className="engine-trigger-chevron" aria-hidden>
-                    ▾
-                </span>
+                <ChevronDown size={12} className="engine-trigger-chevron" aria-hidden="true" />
             </button>
             {open ? (
                 <div className="engine-dropdown" role="listbox" aria-label="Engine">
@@ -92,9 +91,11 @@ export default function EngineSelector({ value, onChange }: Props) {
                                 <div className="engine-option-desc">{e.description}</div>
                             </div>
                             {e.id === value ? (
-                                <span className="engine-option-check" aria-hidden>
-                                    ✓
-                                </span>
+                                <Check
+                                    size={14}
+                                    className="engine-option-check"
+                                    aria-hidden="true"
+                                />
                             ) : null}
                         </button>
                     ))}

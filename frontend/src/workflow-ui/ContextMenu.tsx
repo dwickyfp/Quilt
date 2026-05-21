@@ -6,7 +6,7 @@ export type MenuItem =
           kind: 'item';
           key: string;
           label: string;
-          icon?: string;
+          icon?: React.ReactNode;
           shortcut?: string;
           onClick: () => void;
           disabled?: boolean;
@@ -96,13 +96,9 @@ export default function ContextMenu({ position, items, onClose }: Props) {
                             }}
                             disabled={item.disabled}
                         >
-                            {item.icon ? (
-                                <span className="context-menu-icon" aria-hidden="true">
-                                    {item.icon}
-                                </span>
-                            ) : (
-                                <span className="context-menu-icon" aria-hidden="true" />
-                            )}
+                            <span className="context-menu-icon" aria-hidden="true">
+                                {item.icon}
+                            </span>
                             <span className="context-menu-label">{item.label}</span>
                             {item.shortcut ? (
                                 <span className="context-menu-shortcut">{item.shortcut}</span>

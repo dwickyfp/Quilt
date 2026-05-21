@@ -1,4 +1,5 @@
 import { useContext, useMemo } from 'react';
+import { Code, LayoutList } from 'lucide-react';
 import { FieldContext } from './FieldContext';
 import type { Column } from '../../pipeline-types';
 
@@ -201,14 +202,14 @@ export function FilterBuilderField({ value, onChange }: Props) {
                     }
                     onClick={() => setMode('builder')}
                 >
-                    <span aria-hidden="true">▦</span> Visual
+                    <LayoutList size={12} aria-hidden="true" /> Visual
                 </button>
                 <button
                     type="button"
                     className={'filter-mode' + (predicate.mode === 'raw' ? ' is-active' : '')}
                     onClick={() => setMode('raw')}
                 >
-                    <span aria-hidden="true">{'<>'}</span> Raw SQL
+                    <Code size={12} aria-hidden="true" /> Raw SQL
                 </button>
             </div>
 

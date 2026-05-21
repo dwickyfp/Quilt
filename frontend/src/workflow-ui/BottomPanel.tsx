@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CheckCircle2, ChevronDown, ChevronUp, Terminal } from 'lucide-react';
 
 type TabId = 'problems' | 'output' | 'console';
 
@@ -85,7 +86,7 @@ export default function BottomPanel() {
                     onClick={() => setCollapsed(c => !c)}
                     aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
                 >
-                    {collapsed ? '▴' : '▾'}
+                    {collapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
             </div>
             {!collapsed ? (
@@ -102,7 +103,7 @@ export default function BottomPanel() {
 function ProblemsTab() {
     return (
         <div className="bottom-empty">
-            <div className="bottom-empty-icon bottom-empty-icon-ok">✓</div>
+            <CheckCircle2 size={22} className="bottom-empty-icon bottom-empty-icon-ok" />
             <div className="bottom-empty-title">No problems detected</div>
             <div className="bottom-empty-desc">
                 Schema mismatches, missing required properties, and engine compatibility warnings
@@ -128,6 +129,7 @@ function ConsoleTab() {
     return (
         <div className="bottom-empty bottom-console">
             <div className="bottom-console-line">
+                <Terminal size={12} className="bottom-console-icon" />
                 <span className="bottom-console-time">[ready]</span>
                 <span className="bottom-console-msg">
                     Diagnostics console. Runtime events, engine diagnostics, and connector errors

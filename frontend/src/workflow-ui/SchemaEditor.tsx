@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { DATA_TYPES, type Column, type DataType } from '../pipeline-types';
 
 type Props = {
@@ -96,7 +97,7 @@ export default function SchemaEditor({ columns, onChange, readOnly = false }: Pr
                                     onClick={() => removeColumn(i)}
                                     aria-label={'Remove ' + c.name}
                                 >
-                                    ×
+                                    <X size={12} />
                                 </button>
                             </div>
                         ) : null}

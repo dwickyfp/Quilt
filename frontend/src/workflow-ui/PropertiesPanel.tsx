@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
+import { CheckCircle2, MousePointer2 } from 'lucide-react';
 import type { Column, DuckleNodeData } from '../pipeline-types';
 import SchemaEditor from './SchemaEditor';
 import FieldRenderer from './fields/FieldRenderer';
@@ -72,21 +73,7 @@ export default function PropertiesPanel({
         return (
             <aside className="properties">
                 <div className="properties-empty">
-                    <svg
-                        width="40"
-                        height="40"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                    >
-                        <circle cx="12" cy="12" r="9" />
-                        <line x1="12" y1="8" x2="12" y2="12" />
-                        <circle cx="12" cy="16" r="0.5" fill="currentColor" />
-                    </svg>
+                    <MousePointer2 size={32} strokeWidth={1.4} />
                     <div className="properties-empty-title">Nothing selected</div>
                     <div className="properties-empty-desc">
                         Click a node on the canvas to edit its configuration, schema, and validation
@@ -274,9 +261,7 @@ export default function PropertiesPanel({
                     {tab === 'validation' ? (
                         <div className="properties-section">
                             <div className="validation-summary validation-ok">
-                                <span className="validation-icon" aria-hidden="true">
-                                    ✓
-                                </span>
+                                <CheckCircle2 size={14} className="validation-icon" aria-hidden="true" />
                                 <span>No issues detected for this node.</span>
                             </div>
                             <div className="properties-hint">

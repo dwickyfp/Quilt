@@ -1,6 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+    Box,
+    ChevronDown,
+    ChevronRight,
+    Code2,
+    Copy,
+    FileCog,
+    FileText,
+    Folder,
+    FolderOpen,
+    FolderPlus,
+    Pencil,
+    Plug,
+    Plus,
+    Trash2,
+    Variable,
+    Workflow,
+    ArrowUpRight,
+} from 'lucide-react';
 import type { RepoItem, RepoItemType } from '../repo-types';
 import { useContextMenu, type MenuItem } from './ContextMenu';
+
+const ICON_SIZE = 14;
 
 type Props = {
     items: RepoItem[];
@@ -14,16 +35,6 @@ type Props = {
     onDelete: (id: string) => void;
 };
 
-const TYPE_ICONS: Record<RepoItemType, string> = {
-    project: '◆',
-    folder: '▸',
-    pipeline: '⋈',
-    connection: '⌬',
-    context: '⌗',
-    routine: 'ƒ',
-    doc: '✎',
-};
-
 const TYPE_LABEL: Record<RepoItemType, string> = {
     project: 'Project',
     folder: 'Folder',
@@ -33,6 +44,26 @@ const TYPE_LABEL: Record<RepoItemType, string> = {
     routine: 'Routine',
     doc: 'Document',
 };
+
+function TypeIcon({ type, isOpen }: { type: RepoItemType; isOpen: boolean }) {
+    const size = ICON_SIZE;
+    switch (type) {
+        case 'project':
+            return <Box size={size} />;
+        case 'folder':
+            return isOpen ? <FolderOpen size={size} /> : <Folder size={size} />;
+        case 'pipeline':
+            return <Workflow size={size} />;
+        case 'connection':
+            return <Plug size={size} />;
+        case 'context':
+            return <Variable size={size} />;
+        case 'routine':
+            return <Code2 size={size} />;
+        case 'doc':
+            return <FileText size={size} />;
+    }
+}
 
 export default function ProjectTree(props: Props) {
     const {
@@ -105,14 +136,14 @@ export default function ProjectTree(props: Props) {
             kind: 'item',
             key: 'new-pipeline',
             label: 'New pipeline…',
-            icon: '⋈',
+            icon: <FileCog size={ICON_SIZE} />,
             onClick: () => onNewPipeline(item.id),
         },
         {
             kind: 'item',
             key: 'new-folder',
             label: 'New folder',
-            icon: '▸',
+            icon: <FolderPlus size={ICON_SIZE} />,
             onClick: () => onNewFolder(item.id),
         },
         { kind: 'separator', key: 's1' },
@@ -120,7 +151,7 @@ export default function ProjectTree(props: Props) {
             kind: 'item',
             key: 'rename',
             label: 'Rename',
-            icon: '✎',
+            icon: <Pencil size={ICON_SIZE} />,
             shortcut: 'F2',
             onClick: () => startRename(item.id),
             disabled: item.type === 'project',
@@ -129,7 +160,7 @@ export default function ProjectTree(props: Props) {
             kind: 'item',
             key: 'delete',
             label: 'Delete',
-            icon: '✕',
+            icon: <Trash2 size={ICON_SIZE} />,
             shortcut: 'Del',
             onClick: () => onDelete(item.id),
             danger: true,
@@ -143,7 +174,7 @@ export default function ProjectTree(props: Props) {
             kind: 'item',
             key: 'open',
             label: 'Open',
-            icon: '↗',
+            icon: <ArrowUpRight size={ICON_SIZE} />,
             shortcut: 'Enter',
             onClick: () => onOpenPipeline(item.id),
             disabled: item.type !== 'pipeline',
@@ -152,7 +183,7 @@ export default function ProjectTree(props: Props) {
             kind: 'item',
             key: 'duplicate',
             label: 'Duplicate',
-            icon: '⎘',
+            icon: <Copy size={ICON_SIZE} />,
             shortcut: 'Ctrl+D',
             onClick: () => onDuplicate(item.id),
         },
@@ -161,7 +192,7 @@ export default function ProjectTree(props: Props) {
             kind: 'item',
             key: 'rename',
             label: 'Rename',
-            icon: '✎',
+            icon: <Pencil size={ICON_SIZE} />,
             shortcut: 'F2',
             onClick: () => startRename(item.id),
         },
@@ -169,7 +200,7 @@ export default function ProjectTree(props: Props) {
             kind: 'item',
             key: 'delete',
             label: 'Delete',
-            icon: '✕',
+            icon: <Trash2 size={ICON_SIZE} />,
             shortcut: 'Del',
             onClick: () => onDelete(item.id),
             danger: true,
@@ -217,10 +248,16 @@ export default function ProjectTree(props: Props) {
                     title={item.name}
                 >
                     <span className="repo-chevron" aria-hidden="true">
-                        {isContainer ? (isExpanded ? '▾' : '▸') : ''}
+                        {isContainer ? (
+                            isExpanded ? (
+                                <ChevronDown size={12} />
+                            ) : (
+                                <ChevronRight size={12} />
+                            )
+                        ) : null}
                     </span>
                     <span className={'repo-icon repo-icon-' + item.type} aria-hidden="true">
-                        {TYPE_ICONS[item.type]}
+                        <TypeIcon type={item.type} isOpen={isExpanded} />
                     </span>
                     {isRenaming ? (
                         <RenameInput
@@ -257,7 +294,7 @@ export default function ProjectTree(props: Props) {
                     onClick={() => onNewPipeline('pipelines')}
                     title="New pipeline"
                 >
-                    <span aria-hidden="true">+</span> Pipeline
+                    <Plus size={13} /> Pipeline
                 </button>
                 <button
                     type="button"
@@ -265,7 +302,7 @@ export default function ProjectTree(props: Props) {
                     onClick={() => onNewFolder('root')}
                     title="New folder"
                 >
-                    <span aria-hidden="true">▸</span> Folder
+                    <FolderPlus size={13} /> Folder
                 </button>
             </div>
             <div className="repo-tree-body" onContextMenu={e => e.preventDefault()}>
