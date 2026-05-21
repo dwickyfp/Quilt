@@ -14,7 +14,7 @@ import {
 import EditorTabs from './workflow-ui/EditorTabs';
 import EditorHeader, { type Job } from './workflow-ui/EditorHeader';
 import EngineSelector, { type EngineId } from './workflow-ui/EngineSelector';
-import Palette from './workflow-ui/Palette';
+import LeftSidebar from './workflow-ui/LeftSidebar';
 import PropertiesPanel from './workflow-ui/PropertiesPanel';
 import BottomPanel from './workflow-ui/BottomPanel';
 import StatusBar from './workflow-ui/StatusBar';
@@ -22,6 +22,7 @@ import type { ComponentDef, NodeKind as PaletteKind } from './workflow-ui/palett
 import { getDefaults, getManifest } from './workflow-ui/fields/component-manifests';
 import type { DuckleNodeData } from './pipeline-types';
 import type { DropPosition, NodeAction, PaneAction } from './canvas/Canvas';
+import type { RepoItem } from './repo-types';
 
 type RuntimeState = 'connecting' | 'ready' | 'offline';
 
@@ -72,6 +73,16 @@ const INITIAL_EDGES: Edge[] = [
 
 const INITIAL_JOBS: Job[] = [{ id: 'j1', name: 'orders_etl', dirty: false }];
 
+const INITIAL_REPO: RepoItem[] = [
+    { id: 'root', name: 'Duckle Project', type: 'project' },
+    { id: 'pipelines', name: 'Pipelines', type: 'folder', parentId: 'root' },
+    { id: 'connections', name: 'Connections', type: 'folder', parentId: 'root' },
+    { id: 'contexts', name: 'Contexts', type: 'folder', parentId: 'root' },
+    { id: 'routines', name: 'Routines', type: 'folder', parentId: 'root' },
+    { id: 'docs', name: 'Documentation', type: 'folder', parentId: 'root' },
+    { id: 'j1', name: 'orders_etl', type: 'pipeline', parentId: 'pipelines' },
+];
+
 function paletteKindToFlowType(kind: PaletteKind): string {
     switch (kind) {
         case 'source':
@@ -96,6 +107,7 @@ export default function App() {
     const [activeJobId, setActiveJobId] = useState<string>('j1');
     const [isRunning, setIsRunning] = useState<boolean>(false);
     const [renameRequest, setRenameRequest] = useState<number>(0);
+    const [repo, setRepo] = useState<RepoItem[]>(INITIAL_REPO);
 
     useEffect(() => {
         let cancelled = false;
@@ -316,6 +328,86 @@ export default function App() {
         [handleAutoLayout],
     );
 
+    // Repository handlers ---------------------------------------------------
+    const handleOpenPipeline = useCallback(
+        (id: string) => {
+            const item = repo.find(i => i.id === id);
+            if (!item || item.type !== 'pipeline') return;
+            setJobs(js => (js.find(j => j.id === id) ? js : [...js, { id, name: item.name, dirty: false }]));
+            setActiveJobId(id);
+        },
+        [repo],
+    );
+
+    const handleNewPipelineInRepo = useCallback(
+        (parentId: string) => {
+            const id = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+            const pipelineCount = repo.filter(i => i.type === 'pipeline').length;
+            const name = 'untitled_' + (pipelineCount + 1);
+            const realParent = repo.find(i => i.id === parentId && (i.type === 'folder' || i.type === 'project'))
+                ? parentId
+                : 'pipelines';
+            setRepo(r => [...r, { id, name, type: 'pipeline', parentId: realParent }]);
+            setJobs(js => [...js, { id, name, dirty: false }]);
+            setActiveJobId(id);
+        },
+        [repo],
+    );
+
+    const handleNewFolderInRepo = useCallback(
+        (parentId: string) => {
+            const id = 'f_' + Date.now().toString(36);
+            const count = repo.filter(i => i.type === 'folder' && i.parentId === parentId).length;
+            const name = 'new_folder' + (count > 0 ? '_' + (count + 1) : '');
+            const realParent = repo.find(i => i.id === parentId && (i.type === 'folder' || i.type === 'project'))
+                ? parentId
+                : 'root';
+            setRepo(r => [...r, { id, name, type: 'folder', parentId: realParent }]);
+        },
+        [repo],
+    );
+
+    const handleRenameRepoItem = useCallback((id: string, newName: string) => {
+        setRepo(r => r.map(i => (i.id === id ? { ...i, name: newName } : i)));
+        setJobs(js => js.map(j => (j.id === id ? { ...j, name: newName } : j)));
+    }, []);
+
+    const handleDuplicateRepoItem = useCallback(
+        (id: string) => {
+            const item = repo.find(i => i.id === id);
+            if (!item) return;
+            const newId = item.type[0] + '_' + Date.now().toString(36);
+            setRepo(r => [...r, { ...item, id: newId, name: item.name + '_copy' }]);
+        },
+        [repo],
+    );
+
+    const handleDeleteRepoItem = useCallback(
+        (id: string) => {
+            const item = repo.find(i => i.id === id);
+            if (!item || item.type === 'project') return;
+            const toDelete = new Set<string>([id]);
+            const addDescendants = (parentId: string) => {
+                for (const c of repo) {
+                    if (c.parentId === parentId) {
+                        toDelete.add(c.id);
+                        addDescendants(c.id);
+                    }
+                }
+            };
+            addDescendants(id);
+            setRepo(r => r.filter(i => !toDelete.has(i.id)));
+            setJobs(js => js.filter(j => !toDelete.has(j.id)));
+            if (toDelete.has(activeJobId)) {
+                const remaining = jobs.filter(j => !toDelete.has(j.id));
+                setActiveJobId(remaining[0]?.id ?? '');
+            }
+        },
+        [repo, jobs, activeJobId],
+    );
+
+    const openJobIds = useMemo(() => new Set(jobs.map(j => j.id)), [jobs]);
+
     return (
         <div className="app">
             <header className="topbar">
@@ -331,7 +423,17 @@ export default function App() {
             </header>
 
             <main className="workspace">
-                <Palette />
+                <LeftSidebar
+                    repoItems={repo}
+                    activeJobId={activeJobId}
+                    openJobIds={openJobIds}
+                    onOpenPipeline={handleOpenPipeline}
+                    onNewPipeline={handleNewPipelineInRepo}
+                    onNewFolder={handleNewFolderInRepo}
+                    onRenameRepoItem={handleRenameRepoItem}
+                    onDuplicateRepoItem={handleDuplicateRepoItem}
+                    onDeleteRepoItem={handleDeleteRepoItem}
+                />
                 <section className="canvas-shell">
                     <EditorHeader
                         jobs={jobs}
