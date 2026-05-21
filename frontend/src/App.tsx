@@ -19,6 +19,7 @@ import EngineSelector, { type EngineId } from './workflow-ui/EngineSelector';
 import { useTheme } from './theme';
 import { loadPersisted, savePersisted } from './persistence';
 import { resolveOutputSchema } from './schema-resolve';
+import { runPipeline, type RunResult } from './tauri-bridge';
 import WorkspacePickerModal from './workflow-ui/WorkspacePickerModal';
 import {
     getWorkspacePath,
@@ -517,12 +518,37 @@ export default function App() {
         [activeJobId, jobs],
     );
 
+    const [runResult, setRunResult] = useState<RunResult | null>(null);
+
     const handleRun = useCallback(() => {
         setIsRunning(true);
-        setTimeout(() => setIsRunning(false), 2000);
-    }, []);
+        setRunResult(null);
+        const start = performance.now();
+        void runPipeline(nodes, edges)
+            .then(result => {
+                if (result) {
+                    setRunResult(result);
+                } else {
+                    setRunResult({
+                        status: 'error',
+                        duration_ms: Math.round(performance.now() - start),
+                        nodes: {},
+                        preview: [],
+                        error:
+                            'Pipeline execution is only available in the desktop app. Launch with `cargo run -p duckle-desktop`.',
+                    });
+                }
+            })
+            .finally(() => setIsRunning(false));
+    }, [nodes, edges]);
 
     const handleStop = useCallback(() => setIsRunning(false), []);
+
+    const nodeLabels = useMemo(() => {
+        const m: Record<string, string> = {};
+        for (const n of nodes) m[n.id] = n.data.label;
+        return m;
+    }, [nodes]);
 
     const handleSave = useCallback(() => {
         setJobs(js => js.map(j => (j.id === activeJobId ? { ...j, dirty: false } : j)));
@@ -987,7 +1013,11 @@ export default function App() {
                 />
             </main>
 
-            <BottomPanel />
+            <BottomPanel
+                runResult={runResult}
+                isRunning={isRunning}
+                nodeLabels={nodeLabels}
+            />
 
             <StatusBar
                 engine={engine}

@@ -17,7 +17,11 @@ use duckle_plugin_sdk::{Inspection, InspectError};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use thiserror::Error;
+
+pub mod plan;
+pub use plan::{CompiledPipeline, PipelineDoc, Stage, StageKind};
 
 #[derive(Debug, Error)]
 pub enum EngineError {
@@ -360,8 +364,174 @@ fn duckdb_value_to_json(row: &duckdb::Row<'_>, idx: usize) -> JsonValue {
     }
 }
 
-fn sql_escape(s: &str) -> String {
+pub(crate) fn sql_escape(s: &str) -> String {
     s.replace('\'', "''")
+}
+
+// ---- Pipeline execution ------------------------------------------------
+
+#[derive(Debug, Serialize)]
+pub struct RunResult {
+    pub status: String,
+    pub duration_ms: u64,
+    pub nodes: std::collections::BTreeMap<String, NodeRunStatus>,
+    pub preview: Vec<NodePreview>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NodeRunStatus {
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rows: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NodePreview {
+    pub node_id: String,
+    pub columns: Vec<Column>,
+    pub rows: Vec<JsonValue>,
+}
+
+const PREVIEW_ROW_LIMIT: usize = 50;
+
+impl DuckdbEngine {
+    /// Execute a pipeline end-to-end: compile to SQL, create temp views
+    /// for every non-sink, run each sink, and snapshot a preview of any
+    /// leaf node that has no downstream sink.
+    pub fn execute_pipeline(&self, doc: &PipelineDoc) -> RunResult {
+        let total_start = Instant::now();
+        let compiled = match plan::compile(doc) {
+            Ok(c) => c,
+            Err(e) => {
+                return RunResult {
+                    status: "error".into(),
+                    duration_ms: total_start.elapsed().as_millis() as u64,
+                    nodes: Default::default(),
+                    preview: Vec::new(),
+                    error: Some(e.to_string()),
+                };
+            }
+        };
+
+        let mut nodes: std::collections::BTreeMap<String, NodeRunStatus> = Default::default();
+        let mut overall_error: Option<String> = None;
+
+        // First pass: drop any leftover views from a prior run so we
+        // don't read stale data.
+        self.with_connection(|conn| {
+            for stage in &compiled.stages {
+                if stage.kind == StageKind::View {
+                    let _ = conn.execute(
+                        &format!("DROP VIEW IF EXISTS {}", plan::quote_ident(&stage.node_id)),
+                        [],
+                    );
+                }
+            }
+        });
+
+        for stage in &compiled.stages {
+            let started = Instant::now();
+            let result = self.with_connection(|conn| {
+                if stage.kind == StageKind::Sink {
+                    // execute() returns rows-affected for INSERTs/COPYs.
+                    let rows = conn.execute(&stage.sql, [])?;
+                    Ok::<u64, duckdb::Error>(rows as u64)
+                } else {
+                    conn.execute(&stage.sql, [])?;
+                    Ok(0)
+                }
+            });
+            let elapsed_ms = started.elapsed().as_millis() as u64;
+            match result {
+                Ok(rows) => {
+                    nodes.insert(
+                        stage.node_id.clone(),
+                        NodeRunStatus {
+                            status: "ok".into(),
+                            kind: Some(match stage.kind {
+                                StageKind::Sink => "sink".into(),
+                                StageKind::View => "view".into(),
+                            }),
+                            rows: if stage.kind == StageKind::Sink {
+                                Some(rows)
+                            } else {
+                                None
+                            },
+                            duration_ms: Some(elapsed_ms),
+                            error: None,
+                        },
+                    );
+                }
+                Err(err) => {
+                    let msg = err.to_string();
+                    nodes.insert(
+                        stage.node_id.clone(),
+                        NodeRunStatus {
+                            status: "error".into(),
+                            kind: Some(match stage.kind {
+                                StageKind::Sink => "sink".into(),
+                                StageKind::View => "view".into(),
+                            }),
+                            rows: None,
+                            duration_ms: Some(elapsed_ms),
+                            error: Some(msg.clone()),
+                        },
+                    );
+                    overall_error.get_or_insert(format!("{}: {}", stage.label, msg));
+                    break;
+                }
+            }
+        }
+
+        // Collect previews for leaves that successfully ran a view.
+        let mut preview = Vec::new();
+        if overall_error.is_none() {
+            for leaf_id in &compiled.leaves {
+                let Some(stage) = compiled.stages.iter().find(|s| s.node_id == *leaf_id) else {
+                    continue;
+                };
+                if stage.kind != StageKind::View {
+                    continue;
+                }
+                if let Ok(p) = self.preview_view(leaf_id) {
+                    preview.push(p);
+                }
+            }
+        }
+
+        RunResult {
+            status: if overall_error.is_some() { "error".into() } else { "ok".into() },
+            duration_ms: total_start.elapsed().as_millis() as u64,
+            nodes,
+            preview,
+            error: overall_error,
+        }
+    }
+
+    fn preview_view(&self, view_id: &str) -> Result<NodePreview, EngineError> {
+        let from_clause = plan::quote_ident(view_id);
+        let inspection = self.with_connection(|conn| -> Result<Inspection, EngineError> {
+            let schema = read_schema(conn, &from_clause)?;
+            let rows = read_preview(conn, &from_clause, &schema, PREVIEW_ROW_LIMIT)?;
+            Ok(Inspection {
+                schema,
+                sample_rows: rows,
+            })
+        })?;
+        Ok(NodePreview {
+            node_id: view_id.to_string(),
+            columns: inspection.schema,
+            rows: inspection.sample_rows,
+        })
+    }
 }
 
 /// Convenience: a [`SchemaInspector`] impl backed by [`DuckdbEngine`].

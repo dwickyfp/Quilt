@@ -1,23 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Terminal } from 'lucide-react';
+import {
+    AlertCircle,
+    CheckCircle2,
+    ChevronDown,
+    ChevronUp,
+    PlayCircle,
+    Terminal,
+} from 'lucide-react';
+import type { RunResult } from '../tauri-bridge';
 
 type TabId = 'problems' | 'output' | 'console';
 
-const TABS: { id: TabId; label: string; badge?: number }[] = [
-    { id: 'problems', label: 'Problems', badge: 0 },
-    { id: 'output', label: 'Output' },
-    { id: 'console', label: 'Console' },
-];
-
 const MIN_HEIGHT = 100;
 const MAX_HEIGHT = 600;
-const DEFAULT_HEIGHT = 220;
+const DEFAULT_HEIGHT = 260;
 
-export default function BottomPanel() {
+export type Props = {
+    runResult: RunResult | null;
+    isRunning: boolean;
+    nodeLabels: Record<string, string>;
+};
+
+export default function BottomPanel({ runResult, isRunning, nodeLabels }: Props) {
     const [tab, setTab] = useState<TabId>('problems');
     const [collapsed, setCollapsed] = useState<boolean>(true);
     const [height, setHeight] = useState<number>(DEFAULT_HEIGHT);
     const dragRef = useRef<{ startY: number; startH: number } | null>(null);
+
+    // Auto-expand Output tab when a run finishes.
+    useEffect(() => {
+        if (runResult) {
+            setTab('output');
+            setCollapsed(false);
+        }
+    }, [runResult]);
 
     const onResizeStart = useCallback(
         (e: React.MouseEvent) => {
@@ -57,6 +73,16 @@ export default function BottomPanel() {
         }
     };
 
+    const errors = runResult
+        ? Object.entries(runResult.nodes).filter(([, st]) => st.status === 'error')
+        : [];
+
+    const tabs: { id: TabId; label: string; badge?: number }[] = [
+        { id: 'problems', label: 'Problems', badge: errors.length },
+        { id: 'output', label: 'Output' },
+        { id: 'console', label: 'Console' },
+    ];
+
     return (
         <div
             className={'bottom-panel' + (collapsed ? ' is-collapsed' : '')}
@@ -64,7 +90,7 @@ export default function BottomPanel() {
         >
             <div className="bottom-panel-resize" onMouseDown={onResizeStart} aria-hidden="true" />
             <div className="bottom-panel-tabs" role="tablist">
-                {TABS.map(t => (
+                {tabs.map(t => (
                     <button
                         key={t.id}
                         type="button"
@@ -74,7 +100,7 @@ export default function BottomPanel() {
                         onClick={() => onTabClick(t.id)}
                     >
                         {t.label}
-                        {t.badge !== undefined ? (
+                        {t.badge !== undefined && t.badge > 0 ? (
                             <span className="bottom-panel-tab-badge">{t.badge}</span>
                         ) : null}
                     </button>
@@ -91,8 +117,16 @@ export default function BottomPanel() {
             </div>
             {!collapsed ? (
                 <div className="bottom-panel-content">
-                    {tab === 'problems' ? <ProblemsTab /> : null}
-                    {tab === 'output' ? <OutputTab /> : null}
+                    {tab === 'problems' ? (
+                        <ProblemsTab errors={errors} nodeLabels={nodeLabels} />
+                    ) : null}
+                    {tab === 'output' ? (
+                        <OutputTab
+                            runResult={runResult}
+                            isRunning={isRunning}
+                            nodeLabels={nodeLabels}
+                        />
+                    ) : null}
                     {tab === 'console' ? <ConsoleTab /> : null}
                 </div>
             ) : null}
@@ -100,29 +134,177 @@ export default function BottomPanel() {
     );
 }
 
-function ProblemsTab() {
+function ProblemsTab({
+    errors,
+    nodeLabels,
+}: {
+    errors: [string, { error?: string }][];
+    nodeLabels: Record<string, string>;
+}) {
+    if (errors.length === 0) {
+        return (
+            <div className="bottom-empty">
+                <CheckCircle2 size={22} className="bottom-empty-icon bottom-empty-icon-ok" />
+                <div className="bottom-empty-title">No problems detected</div>
+                <div className="bottom-empty-desc">
+                    Schema mismatches, missing required properties, and engine compatibility
+                    warnings surface here. Click an issue to jump to the offending node.
+                </div>
+            </div>
+        );
+    }
     return (
-        <div className="bottom-empty">
-            <CheckCircle2 size={22} className="bottom-empty-icon bottom-empty-icon-ok" />
-            <div className="bottom-empty-title">No problems detected</div>
-            <div className="bottom-empty-desc">
-                Schema mismatches, missing required properties, and engine compatibility warnings
-                surface here. Click an issue to jump to the offending node.
+        <div className="bottom-problems">
+            {errors.map(([nodeId, st]) => (
+                <div className="bottom-problem-row" key={nodeId}>
+                    <AlertCircle size={13} className="bottom-problem-icon" />
+                    <div>
+                        <div className="bottom-problem-title">
+                            {nodeLabels[nodeId] ?? nodeId}
+                        </div>
+                        <div className="bottom-problem-detail">
+                            {st.error ?? 'Execution failed.'}
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function OutputTab({
+    runResult,
+    isRunning,
+    nodeLabels,
+}: {
+    runResult: RunResult | null;
+    isRunning: boolean;
+    nodeLabels: Record<string, string>;
+}) {
+    if (isRunning) {
+        return (
+            <div className="bottom-empty">
+                <PlayCircle size={22} className="bottom-empty-icon bottom-empty-icon-ok" />
+                <div className="bottom-empty-title">Running…</div>
+                <div className="bottom-empty-desc">
+                    Executing the pipeline through the DuckDB engine.
+                </div>
+            </div>
+        );
+    }
+    if (!runResult) {
+        return (
+            <div className="bottom-empty">
+                <div className="bottom-empty-title">No run output yet</div>
+                <div className="bottom-empty-desc">
+                    Press <kbd className="kbd">F5</kbd> or click <b>Run</b> to execute the
+                    pipeline. Logs, per-node row counts, and execution timings stream here.
+                </div>
+            </div>
+        );
+    }
+
+    const totals = runStats(runResult);
+    return (
+        <div className="bottom-output">
+            <div className="bottom-output-summary">
+                <span className={'bottom-status status-' + runResult.status}>
+                    {runResult.status === 'ok' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                    {runResult.status === 'ok' ? 'Run succeeded' : 'Run failed'}
+                </span>
+                <span className="bottom-output-stat">
+                    <b>{totals.nodeCount}</b> nodes
+                </span>
+                <span className="bottom-output-stat">
+                    <b>{totals.rowsWritten.toLocaleString()}</b> rows written
+                </span>
+                <span className="bottom-output-stat">
+                    <b>{runResult.duration_ms} ms</b> total
+                </span>
+            </div>
+            <div className="bottom-output-rows">
+                {Object.entries(runResult.nodes).map(([nodeId, st]) => (
+                    <div className={'bottom-output-row status-' + st.status} key={nodeId}>
+                        <span className="bottom-output-dot" />
+                        <span className="bottom-output-label">
+                            {nodeLabels[nodeId] ?? nodeId}
+                        </span>
+                        <span className="bottom-output-kind">{st.kind ?? ''}</span>
+                        {st.rows !== undefined ? (
+                            <span className="bottom-output-rows-stat">
+                                {st.rows.toLocaleString()} rows
+                            </span>
+                        ) : (
+                            <span className="bottom-output-rows-stat" />
+                        )}
+                        <span className="bottom-output-time">
+                            {st.duration_ms !== undefined ? st.duration_ms + ' ms' : ''}
+                        </span>
+                        {st.error ? (
+                            <span className="bottom-output-error">{st.error}</span>
+                        ) : null}
+                    </div>
+                ))}
+            </div>
+            {runResult.error ? (
+                <div className="bottom-output-error-banner">{runResult.error}</div>
+            ) : null}
+            {runResult.preview.length > 0 ? (
+                <div className="bottom-output-previews">
+                    {runResult.preview.map(p => (
+                        <PreviewTable key={p.node_id} preview={p} label={nodeLabels[p.node_id]} />
+                    ))}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+function PreviewTable({
+    preview,
+    label,
+}: {
+    preview: { node_id: string; columns: { name: string; type: string }[]; rows: Record<string, unknown>[] };
+    label?: string;
+}) {
+    return (
+        <div className="bottom-preview">
+            <div className="bottom-preview-head">
+                Preview · <b>{label ?? preview.node_id}</b> · {preview.rows.length} rows
+            </div>
+            <div className="bottom-preview-scroll">
+                <table className="bottom-preview-table">
+                    <thead>
+                        <tr>
+                            {preview.columns.map(c => (
+                                <th key={c.name}>
+                                    {c.name}
+                                    <span className="bottom-preview-coltype">{c.type}</span>
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {preview.rows.map((r, i) => (
+                            <tr key={i}>
+                                {preview.columns.map(c => (
+                                    <td key={c.name}>
+                                        {formatCell(r[c.name])}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
 }
 
-function OutputTab() {
-    return (
-        <div className="bottom-empty">
-            <div className="bottom-empty-title">No run output yet</div>
-            <div className="bottom-empty-desc">
-                Press <kbd className="kbd">F5</kbd> or click <b>Run</b> to execute the pipeline.
-                Logs, per-node row counts, and execution timings stream here.
-            </div>
-        </div>
-    );
+function formatCell(v: unknown): string {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'object') return JSON.stringify(v);
+    return String(v);
 }
 
 function ConsoleTab() {
@@ -138,4 +320,14 @@ function ConsoleTab() {
             </div>
         </div>
     );
+}
+
+function runStats(r: RunResult) {
+    let rowsWritten = 0;
+    let nodeCount = 0;
+    for (const st of Object.values(r.nodes)) {
+        nodeCount += 1;
+        if (st.rows) rowsWritten += st.rows;
+    }
+    return { rowsWritten, nodeCount };
 }

@@ -1107,6 +1107,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
+ "tokio",
  "tracing",
  "tracing-subscriber",
 ]

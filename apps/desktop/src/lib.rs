@@ -4,7 +4,7 @@
 //! invoke commands to the frontend.
 
 use duckle_connectors::CsvConnector;
-use duckle_duckdb_engine::DuckdbEngine;
+use duckle_duckdb_engine::{DuckdbEngine, PipelineDoc, RunResult};
 use duckle_metadata::Schema;
 use duckle_plugin_sdk::{InspectError, SchemaInspector};
 use serde::Serialize;
@@ -23,7 +23,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![ping, autodetect_schema])
+        .invoke_handler(tauri::generate_handler![
+            ping,
+            autodetect_schema,
+            run_pipeline
+        ])
         .run(tauri::generate_context!())
         .expect("error while running duckle");
 }
@@ -102,4 +106,16 @@ async fn autodetect_schema(
 
 fn format_inspect_error(err: InspectError) -> String {
     err.to_string()
+}
+
+/// Run a pipeline through the DuckDB engine. Receives the React Flow
+/// nodes + edges as JSON; compiles to SQL; executes via DuckDB; returns
+/// per-node status + preview rows for any leaf node that didn't feed a
+/// sink.
+#[tauri::command]
+async fn run_pipeline(pipeline: PipelineDoc) -> Result<RunResult, String> {
+    let engine = engine()?;
+    tokio::task::spawn_blocking(move || engine.execute_pipeline(&pipeline))
+        .await
+        .map_err(|e| e.to_string())
 }
