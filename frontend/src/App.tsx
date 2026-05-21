@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import Canvas from './canvas/Canvas';
+import EditorTabs from './workflow-ui/EditorTabs';
+import EngineSelector, { type EngineId } from './workflow-ui/EngineSelector';
 
 type RuntimeState = 'connecting' | 'ready' | 'offline';
 
 export default function App() {
     const [runtime, setRuntime] = useState<RuntimeState>('connecting');
+    const [engine, setEngine] = useState<EngineId>('duckdb');
 
     useEffect(() => {
         let cancelled = false;
@@ -27,6 +29,8 @@ export default function App() {
                 <div className="brand">
                     <span className="brand-mark">◇</span> Duckle
                 </div>
+                <div className="topbar-sep" aria-hidden="true" />
+                <EngineSelector value={engine} onChange={setEngine} />
                 <div className="topbar-spacer" />
                 <div className="status" data-state={runtime}>
                     <span className="status-dot" /> runtime: {runtime}
@@ -57,7 +61,7 @@ export default function App() {
                 </aside>
 
                 <section className="canvas-shell">
-                    <Canvas />
+                    <EditorTabs engine={engine} />
                 </section>
             </main>
         </div>

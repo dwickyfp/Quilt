@@ -257,3 +257,222 @@ body,
 .react-flow__edge:hover .react-flow__edge-path {
     stroke: var(--accent);
 }
+
+/* Topbar separator + engine selector ------------------------------------- */
+.topbar-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--border);
+}
+
+.engine-selector {
+    position: relative;
+    -webkit-app-region: no-drag;
+}
+
+.engine-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0 10px;
+    height: 28px;
+    color: var(--text-1);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 80ms ease, border-color 80ms ease;
+}
+
+.engine-trigger:hover {
+    background: var(--bg-3);
+    border-color: var(--border-strong);
+}
+
+.engine-trigger[aria-expanded='true'] {
+    background: var(--bg-3);
+    border-color: var(--border-strong);
+}
+
+.engine-trigger-label {
+    color: var(--text-3);
+}
+
+.engine-trigger-value {
+    font-weight: 600;
+}
+
+.engine-trigger-chevron {
+    color: var(--text-3);
+    font-size: 10px;
+    margin-left: 2px;
+}
+
+.engine-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.engine-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-1);
+    padding: 4px;
+    min-width: 320px;
+    z-index: 100;
+    animation: dropdown-in 90ms ease-out;
+}
+
+@keyframes dropdown-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.engine-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: none;
+    color: var(--text-1);
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.engine-option:hover {
+    background: var(--bg-3);
+}
+
+.engine-option[aria-selected='true'] {
+    background: var(--bg-3);
+}
+
+.engine-option-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.engine-option-label {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.engine-option-desc {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 2px;
+}
+
+.engine-option-check {
+    color: var(--accent-source);
+    font-size: 14px;
+}
+
+/* Editor tabs ------------------------------------------------------------ */
+.editor {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.tabbar {
+    display: flex;
+    align-items: stretch;
+    height: 36px;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 6px;
+    flex-shrink: 0;
+}
+
+.tab {
+    background: none;
+    border: none;
+    color: var(--text-3);
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 80ms ease, border-color 80ms ease;
+}
+
+.tab:hover {
+    color: var(--text-1);
+}
+
+.tab[aria-selected='true'] {
+    color: var(--text-1);
+    border-bottom-color: var(--accent);
+}
+
+.tab-content {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+}
+
+.tab-panel {
+    position: absolute;
+    inset: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.tab-panel-active {
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* Empty state ------------------------------------------------------------- */
+.empty-state {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 32px;
+    background: var(--bg-0);
+}
+
+.empty-icon {
+    color: var(--text-3);
+    margin-bottom: 8px;
+}
+
+.empty-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-1);
+}
+
+.empty-desc {
+    font-size: 13px;
+    color: var(--text-3);
+    max-width: 380px;
+    text-align: center;
+    line-height: 1.5;
+}
