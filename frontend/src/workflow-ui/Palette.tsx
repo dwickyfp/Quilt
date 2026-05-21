@@ -16,7 +16,8 @@ const KIND_COLOR: Record<NodeKind, string> = {
     custom: '#ff7b72',
 };
 
-const DEFAULT_EXPANDED = new Set<string>(['sources', 'transforms', 'sinks']);
+const DEFAULT_EXPANDED = new Set<string>();
+const ALL_CATEGORY_IDS = PALETTE.map(c => c.id);
 
 export default function Palette() {
     const [query, setQuery] = useState('');
@@ -102,6 +103,23 @@ export default function Palette() {
                     <span>
                         <b>{TOTAL_COMPONENT_COUNT}</b> total
                     </span>
+                    <span className="palette-stats-spacer" />
+                    <button
+                        type="button"
+                        className="palette-stats-btn"
+                        onClick={() => setExpanded(new Set(ALL_CATEGORY_IDS))}
+                        title="Expand all categories"
+                    >
+                        Expand all
+                    </button>
+                    <button
+                        type="button"
+                        className="palette-stats-btn"
+                        onClick={() => setExpanded(new Set())}
+                        title="Collapse all categories"
+                    >
+                        Collapse all
+                    </button>
                 </div>
             </div>
 

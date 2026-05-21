@@ -7,11 +7,12 @@ import type {
     NodeChange,
     OnSelectionChangeParams,
 } from '@xyflow/react';
-import Canvas from '../canvas/Canvas';
+import Canvas, { type DropPosition } from '../canvas/Canvas';
 import PlanView from './PlanView';
 import RunView from './RunView';
 import type { EngineId } from './EngineSelector';
 import type { DuckleNodeData } from '../pipeline-types';
+import type { ComponentDef } from './palette-data';
 
 type TabId = 'canvas' | 'plan' | 'run';
 
@@ -29,6 +30,7 @@ type Props = {
     onEdgesChange: (changes: EdgeChange[]) => void;
     onConnect: (connection: Connection) => void;
     onSelectionChange: (params: OnSelectionChangeParams) => void;
+    onDropComponent: (component: ComponentDef, position: DropPosition) => void;
 };
 
 export default function EditorTabs({
@@ -39,6 +41,7 @@ export default function EditorTabs({
     onEdgesChange,
     onConnect,
     onSelectionChange,
+    onDropComponent,
 }: Props) {
     const [active, setActive] = useState<TabId>('canvas');
 
@@ -67,6 +70,7 @@ export default function EditorTabs({
                         onEdgesChange={onEdgesChange}
                         onConnect={onConnect}
                         onSelectionChange={onSelectionChange}
+                        onDropComponent={onDropComponent}
                     />
                 </div>
                 <div className={'tab-panel' + (active === 'plan' ? ' tab-panel-active' : '')}>

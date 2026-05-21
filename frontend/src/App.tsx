@@ -18,7 +18,10 @@ import Palette from './workflow-ui/Palette';
 import PropertiesPanel from './workflow-ui/PropertiesPanel';
 import BottomPanel from './workflow-ui/BottomPanel';
 import StatusBar from './workflow-ui/StatusBar';
+import type { ComponentDef, NodeKind as PaletteKind } from './workflow-ui/palette-data';
+import { getDefaults, getManifest } from './workflow-ui/fields/component-manifests';
 import type { DuckleNodeData } from './pipeline-types';
+import type { DropPosition } from './canvas/Canvas';
 
 type RuntimeState = 'connecting' | 'ready' | 'offline';
 
@@ -68,6 +71,20 @@ const INITIAL_EDGES: Edge[] = [
 ];
 
 const INITIAL_JOBS: Job[] = [{ id: 'j1', name: 'orders_etl', dirty: false }];
+
+function paletteKindToFlowType(kind: PaletteKind): string {
+    switch (kind) {
+        case 'source':
+            return 'source';
+        case 'sink':
+            return 'sink';
+        case 'transform':
+        case 'control':
+        case 'quality':
+        case 'custom':
+            return 'transform';
+    }
+}
 
 export default function App() {
     const [runtime, setRuntime] = useState<RuntimeState>('connecting');
@@ -162,6 +179,29 @@ export default function App() {
         );
     }, []);
 
+    const handleDropComponent = useCallback(
+        (component: ComponentDef, position: DropPosition) => {
+            const id = 'n_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+            const manifest = getManifest(component.id);
+            const flowType = paletteKindToFlowType(component.kind);
+            const newNode: Node<DuckleNodeData> = {
+                id,
+                type: flowType,
+                position,
+                data: {
+                    label: component.label,
+                    subtitle: component.summary,
+                    componentId: component.id,
+                    properties: manifest ? getDefaults(manifest) : {},
+                },
+            };
+            setNodes(ns => [...ns, newNode]);
+            setSelectedId(id);
+            setJobs(js => js.map(j => (j.id === activeJobId ? { ...j, dirty: true } : j)));
+        },
+        [activeJobId],
+    );
+
     return (
         <div className="app">
             <header className="topbar">
@@ -200,6 +240,7 @@ export default function App() {
                         onEdgesChange={handleEdgesChange}
                         onConnect={handleConnect}
                         onSelectionChange={handleSelectionChange}
+                        onDropComponent={handleDropComponent}
                     />
                 </section>
                 <PropertiesPanel
