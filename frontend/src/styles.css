@@ -1939,3 +1939,305 @@ select.schema-input {
 .preview-table tr:hover td {
     background: var(--bg-3);
 }
+
+/* Modal --------------------------------------------------------------------- */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 10, 14, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 24px;
+    animation: modal-backdrop-in 120ms ease-out;
+}
+
+@keyframes modal-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal {
+    background: var(--bg-1);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.04) inset,
+        0 24px 64px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(88, 166, 255, 0.08);
+    width: 100%;
+    max-width: 520px;
+    max-height: calc(100vh - 48px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modal-card-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modal-card-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-file {
+    max-width: 560px;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-1);
+    letter-spacing: -0.01em;
+}
+
+.modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 80ms ease, color 80ms ease;
+}
+
+.modal-close:hover {
+    background: var(--bg-3);
+    color: var(--text-1);
+}
+
+.modal-body {
+    padding: 16px 20px 18px;
+    overflow-y: auto;
+}
+
+.modal-field + .modal-field {
+    margin-top: 14px;
+}
+
+.modal-field-label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.modal-field-pathrow {
+    display: flex;
+    gap: 8px;
+}
+
+.modal-input {
+    width: 100%;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text-1);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 80ms ease, background 80ms ease;
+}
+
+.modal-input:focus {
+    border-color: var(--accent);
+    background: var(--bg-1);
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.18);
+}
+
+.modal-input-path {
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    font-size: 12px;
+}
+
+.modal-input-browse {
+    flex-shrink: 0;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0 14px;
+    color: var(--text-1);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 80ms ease, border-color 80ms ease;
+}
+
+.modal-input-browse:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg-0);
+}
+
+.modal-recent {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-2);
+    padding: 4px;
+}
+
+.modal-recent-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    font-size: 11px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 60ms ease, color 60ms ease;
+}
+
+.modal-recent-item svg {
+    color: var(--text-3);
+    flex-shrink: 0;
+}
+
+.modal-recent-item:hover {
+    background: var(--bg-3);
+    color: var(--text-1);
+}
+
+.modal-recent-item.is-active {
+    background: rgba(88, 166, 255, 0.12);
+    color: var(--accent);
+}
+
+.modal-recent-item.is-active svg {
+    color: var(--accent);
+}
+
+.modal-recent-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.modal-hint {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--text-3);
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+}
+
+.modal-tip {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 10px 12px;
+    background: rgba(88, 166, 255, 0.06);
+    border: 1px solid rgba(88, 166, 255, 0.18);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--text-2);
+    line-height: 1.5;
+}
+
+.modal-tip-icon {
+    color: var(--accent);
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: -1px;
+}
+
+.modal-tip b {
+    color: var(--text-1);
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 20px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-1);
+}
+
+.btn {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    color: var(--text-1);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 80ms ease, border-color 80ms ease, transform 80ms ease;
+}
+
+.btn:hover {
+    background: var(--bg-2);
+    border-color: var(--border-strong);
+}
+
+.btn:active {
+    transform: translateY(1px);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg-0);
+}
+
+.btn-primary:hover {
+    background: #79b3ff;
+    border-color: #79b3ff;
+}
+
+.btn-primary:disabled {
+    background: var(--bg-2);
+    border-color: var(--border);
+    color: var(--text-3);
+}
+
+.btn-secondary {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text-2);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-3);
+    color: var(--text-1);
+}
