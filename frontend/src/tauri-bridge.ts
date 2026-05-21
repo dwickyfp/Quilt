@@ -148,3 +148,56 @@ export async function compilePipelineSql(
         return null;
     }
 }
+
+// ---- Schedules ---------------------------------------------------------
+
+export type ScheduleKind =
+    | { type: 'cron'; expr: string }
+    | { type: 'interval'; seconds: number };
+
+export type Schedule = {
+    id: string;
+    pipeline_id: string;
+    name: string;
+    enabled: boolean;
+    kind: ScheduleKind;
+    last_run_at?: string;
+    last_run_status?: 'ok' | 'error' | 'cancelled';
+    last_run_duration_ms?: number;
+    last_run_error?: string;
+    next_run_at?: string;
+};
+
+export async function scheduleSetWorkspace(path: string | null): Promise<void> {
+    if (!isTauri()) return;
+    try {
+        await invoke('schedule_set_workspace', { path: path ?? '' });
+    } catch (err) {
+        console.warn('scheduleSetWorkspace failed', err);
+    }
+}
+
+export async function scheduleList(): Promise<Schedule[]> {
+    if (!isTauri()) return [];
+    try {
+        return await invoke<Schedule[]>('schedule_list');
+    } catch (err) {
+        console.warn('scheduleList failed', err);
+        return [];
+    }
+}
+
+export async function scheduleUpsert(schedule: Schedule): Promise<Schedule | null> {
+    if (!isTauri()) return null;
+    return await invoke<Schedule>('schedule_upsert', { schedule });
+}
+
+export async function scheduleDelete(id: string): Promise<void> {
+    if (!isTauri()) return;
+    await invoke('schedule_delete', { id });
+}
+
+export async function scheduleRunNow(id: string): Promise<RunResult | null> {
+    if (!isTauri()) return null;
+    return await invoke<RunResult>('schedule_run_now', { id });
+}

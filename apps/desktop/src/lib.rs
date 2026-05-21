@@ -9,8 +9,10 @@ use duckle_duckdb_engine::{
 };
 use duckle_metadata::Schema;
 use duckle_plugin_sdk::{InspectError, SchemaInspector};
+use duckle_scheduler::{Schedule, Scheduler};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 use tauri::ipc::Channel;
 use tracing_subscriber::EnvFilter;
@@ -26,13 +28,28 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .setup(|_app| {
+            // Boot the scheduler now that we're inside the tokio runtime
+            // tauri spins up. It sits idle until set_workspace is called.
+            if let Ok(eng) = engine() {
+                let s = Scheduler::new(eng);
+                s.spawn_ticker();
+                let _ = SCHEDULER.set(s);
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             ping,
             autodetect_schema,
             run_pipeline,
             run_pipeline_partial,
             cancel_pipeline,
-            compile_pipeline
+            compile_pipeline,
+            schedule_set_workspace,
+            schedule_list,
+            schedule_upsert,
+            schedule_delete,
+            schedule_run_now
         ])
         .run(tauri::generate_context!())
         .expect("error while running duckle");
@@ -173,4 +190,49 @@ fn cancel_pipeline() -> Result<(), String> {
 #[tauri::command]
 fn compile_pipeline(pipeline: PipelineDoc) -> Result<Vec<StageSql>, String> {
     compile_pipeline_sql(&pipeline).map_err(|e| e.to_string())
+}
+
+// ---- Scheduler commands ------------------------------------------------
+
+static SCHEDULER: OnceLock<Scheduler> = OnceLock::new();
+
+fn scheduler() -> Result<&'static Scheduler, String> {
+    SCHEDULER
+        .get()
+        .ok_or_else(|| "Scheduler not initialized".to_string())
+}
+
+/// Point the scheduler at a workspace folder; loads schedules from
+/// `<workspace>/schedules.json`. Called by the frontend whenever the
+/// workspace path changes.
+#[tauri::command]
+fn schedule_set_workspace(path: String) -> Result<(), String> {
+    let sched = scheduler()?;
+    let p = if path.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(path))
+    };
+    sched.set_workspace(p);
+    Ok(())
+}
+
+#[tauri::command]
+fn schedule_list() -> Result<Vec<Schedule>, String> {
+    Ok(scheduler()?.list())
+}
+
+#[tauri::command]
+fn schedule_upsert(schedule: Schedule) -> Result<Schedule, String> {
+    scheduler()?.upsert(schedule)
+}
+
+#[tauri::command]
+fn schedule_delete(id: String) -> Result<(), String> {
+    scheduler()?.delete(&id)
+}
+
+#[tauri::command]
+async fn schedule_run_now(id: String) -> Result<RunResult, String> {
+    scheduler()?.run_now(&id).await
 }

@@ -21,6 +21,7 @@ type Props = {
     onRenameRepoItem: (id: string, newName: string) => void;
     onDuplicateRepoItem: (id: string) => void;
     onDeleteRepoItem: (id: string) => void;
+    onSchedulePipeline: (id: string) => void;
 };
 
 export default function LeftSidebar({
@@ -38,6 +39,7 @@ export default function LeftSidebar({
     onRenameRepoItem,
     onDuplicateRepoItem,
     onDeleteRepoItem,
+    onSchedulePipeline,
 }: Props) {
     const [tab, setTab] = useState<SideTab>('palette');
 
@@ -84,6 +86,7 @@ export default function LeftSidebar({
                         onRename={onRenameRepoItem}
                         onDuplicate={onDuplicateRepoItem}
                         onDelete={onDeleteRepoItem}
+                        onSchedulePipeline={onSchedulePipeline}
                     />
                 )}
             </div>

@@ -24,9 +24,11 @@ import {
     compilePipelineSql,
     runPipeline,
     runPipelinePartial,
+    scheduleSetWorkspace,
     type PipelineEvent,
     type RunResult,
 } from './tauri-bridge';
+import ScheduleEditorModal from './workflow-ui/ScheduleEditorModal';
 import { RunStatusContext } from './canvas/run-status-context';
 import { validatePipeline } from './validation';
 import WorkspacePickerModal from './workflow-ui/WorkspacePickerModal';
@@ -334,6 +336,20 @@ export default function App() {
     const handlePickedWorkspace = useCallback((path: string) => {
         setWorkspacePath(path);
         setWorkspacePathState(path);
+    }, []);
+
+    // Sync the workspace path with the Rust scheduler so it loads any
+    // schedules persisted in that folder.
+    useEffect(() => {
+        if (!isInTauri()) return;
+        void scheduleSetWorkspace(workspacePathState);
+    }, [workspacePathState]);
+
+    const [scheduleModalPipelineId, setScheduleModalPipelineId] = useState<string | null>(
+        null,
+    );
+    const handleSchedulePipeline = useCallback((pipelineId: string) => {
+        setScheduleModalPipelineId(pipelineId);
     }, []);
 
     const handleSwitchWorkspace = useCallback(async () => {
@@ -1227,6 +1243,7 @@ export default function App() {
                     onRenameRepoItem={handleRenameRepoItem}
                     onDuplicateRepoItem={handleDuplicateRepoItem}
                     onDeleteRepoItem={handleDeleteRepoItem}
+                    onSchedulePipeline={handleSchedulePipeline}
                 />
                 <section className="canvas-shell">
                     <EditorHeader
@@ -1307,6 +1324,17 @@ export default function App() {
                     edge={editingEdge}
                     onSave={handleEdgeEditSave}
                     onCancel={() => setEditingEdgeId(null)}
+                />
+            ) : null}
+
+            {scheduleModalPipelineId ? (
+                <ScheduleEditorModal
+                    pipelineId={scheduleModalPipelineId}
+                    pipelineName={
+                        repo.find(r => r.id === scheduleModalPipelineId)?.name ??
+                        scheduleModalPipelineId
+                    }
+                    onClose={() => setScheduleModalPipelineId(null)}
                 />
             ) : null}
 

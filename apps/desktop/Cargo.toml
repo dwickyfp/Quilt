@@ -33,3 +33,4 @@ duckle-metadata = { workspace = true }
 duckle-plugin-sdk = { workspace = true }
 duckle-connectors = { workspace = true }
 duckle-duckdb-engine = { workspace = true }
+duckle-scheduler = { workspace = true }

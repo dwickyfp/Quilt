@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+    AlarmClock,
     Box,
     ChevronDown,
     ChevronRight,
@@ -38,6 +39,7 @@ type Props = {
     onRename: (id: string, newName: string) => void;
     onDuplicate: (id: string) => void;
     onDelete: (id: string) => void;
+    onSchedulePipeline: (id: string) => void;
 };
 
 const TYPE_LABEL: Record<RepoItemType, string> = {
@@ -86,6 +88,7 @@ export default function ProjectTree(props: Props) {
         onRename,
         onDuplicate,
         onDelete,
+        onSchedulePipeline,
     } = props;
 
     // Walk up to find which root folder this item lives under.
@@ -239,26 +242,42 @@ export default function ProjectTree(props: Props) {
         ];
     };
 
-    const buildItemMenu = (item: RepoItem): MenuItem[] => [
-        { kind: 'header', key: 'h', label: TYPE_LABEL[item.type] + ': ' + item.name },
-        {
-            kind: 'item',
-            key: 'open',
-            label: 'Open',
-            icon: <ArrowUpRight size={ICON_SIZE} />,
-            shortcut: 'Enter',
-            onClick: () => onOpenPipeline(item.id),
-            disabled: item.type !== 'pipeline',
-        },
-        {
+    const buildItemMenu = (item: RepoItem): MenuItem[] => {
+        const items: MenuItem[] = [
+            { kind: 'header', key: 'h', label: TYPE_LABEL[item.type] + ': ' + item.name },
+            {
+                kind: 'item',
+                key: 'open',
+                label: 'Open',
+                icon: <ArrowUpRight size={ICON_SIZE} />,
+                shortcut: 'Enter',
+                onClick: () => onOpenPipeline(item.id),
+                disabled: item.type !== 'pipeline',
+            },
+        ];
+        if (item.type === 'pipeline') {
+            items.push({
+                kind: 'item',
+                key: 'schedule',
+                label: 'Schedule…',
+                icon: <AlarmClock size={ICON_SIZE} />,
+                onClick: () => onSchedulePipeline(item.id),
+            });
+        }
+        items.push({
             kind: 'item',
             key: 'duplicate',
             label: 'Duplicate',
             icon: <Copy size={ICON_SIZE} />,
             shortcut: 'Ctrl+D',
             onClick: () => onDuplicate(item.id),
-        },
-        { kind: 'separator', key: 's1' },
+        });
+        items.push({ kind: 'separator', key: 's1' });
+        return items;
+    };
+
+    const finishItemMenu = (base: MenuItem[], item: RepoItem): MenuItem[] => [
+        ...base,
         {
             kind: 'item',
             key: 'rename',
@@ -282,7 +301,7 @@ export default function ProjectTree(props: Props) {
         const itemsArr =
             item.type === 'folder' || item.type === 'project'
                 ? buildFolderMenu(item)
-                : buildItemMenu(item);
+                : finishItemMenu(buildItemMenu(item), item);
         menu.open(e, itemsArr);
     };
 
