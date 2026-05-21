@@ -15,6 +15,8 @@ import EditorTabs from './workflow-ui/EditorTabs';
 import EngineSelector, { type EngineId } from './workflow-ui/EngineSelector';
 import Palette from './workflow-ui/Palette';
 import PropertiesPanel from './workflow-ui/PropertiesPanel';
+import BottomPanel from './workflow-ui/BottomPanel';
+import StatusBar from './workflow-ui/StatusBar';
 import type { DuckleNodeData } from './pipeline-types';
 
 type RuntimeState = 'connecting' | 'ready' | 'offline';
@@ -141,6 +143,15 @@ export default function App() {
                 </section>
                 <PropertiesPanel selected={selectedNode} onUpdate={handleUpdateNode} />
             </main>
+
+            <BottomPanel />
+
+            <StatusBar
+                engine={engine}
+                runtime={runtime}
+                nodeCount={nodes.length}
+                edgeCount={edges.length}
+            />
         </div>
     );
 }

@@ -1052,3 +1052,244 @@ select.schema-input {
     background: var(--bg-3);
     color: var(--danger);
 }
+
+/* Bottom panel ------------------------------------------------------------ */
+.bottom-panel {
+    border-top: 1px solid var(--border);
+    background: var(--bg-1);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.bottom-panel.is-collapsed {
+    height: auto;
+}
+
+.bottom-panel-resize {
+    height: 4px;
+    margin-top: -4px;
+    cursor: ns-resize;
+    position: relative;
+    z-index: 2;
+}
+
+.bottom-panel.is-collapsed .bottom-panel-resize {
+    pointer-events: none;
+}
+
+.bottom-panel-resize:hover {
+    background: var(--accent);
+    opacity: 0.5;
+}
+
+.bottom-panel-tabs {
+    display: flex;
+    align-items: stretch;
+    height: 32px;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--border);
+    padding: 0 6px;
+    flex-shrink: 0;
+}
+
+.bottom-panel.is-collapsed .bottom-panel-tabs {
+    border-bottom: none;
+}
+
+.bottom-panel-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    padding: 0 12px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 80ms ease, border-color 80ms ease;
+}
+
+.bottom-panel-tab:hover {
+    color: var(--text-1);
+}
+
+.bottom-panel-tab[aria-selected='true'] {
+    color: var(--text-1);
+    border-bottom-color: var(--accent);
+}
+
+.bottom-panel-tab-badge {
+    font-size: 10px;
+    color: var(--text-3);
+    background: var(--bg-2);
+    border-radius: 9px;
+    padding: 1px 6px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+}
+
+.bottom-panel-spacer {
+    flex: 1;
+}
+
+.bottom-panel-toggle {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 0 10px;
+    font-size: 12px;
+}
+
+.bottom-panel-toggle:hover {
+    color: var(--text-1);
+}
+
+.bottom-panel-content {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    background: var(--bg-0);
+}
+
+.bottom-empty {
+    padding: 20px;
+    color: var(--text-3);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.bottom-empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bg-2);
+    color: var(--text-3);
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.bottom-empty-icon-ok {
+    background: rgba(126, 231, 135, 0.1);
+    color: var(--accent-source);
+}
+
+.bottom-empty-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-1);
+    margin-bottom: 4px;
+}
+
+.bottom-empty-desc {
+    max-width: 540px;
+}
+
+.kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    font-size: 10px;
+    color: var(--text-1);
+}
+
+.bottom-console {
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    padding: 8px 14px;
+}
+
+.bottom-console-line {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    padding: 2px 0;
+}
+
+.bottom-console-time {
+    color: var(--text-3);
+    flex-shrink: 0;
+}
+
+.bottom-console-msg {
+    color: var(--text-2);
+}
+
+/* Status bar -------------------------------------------------------------- */
+.statusbar {
+    display: flex;
+    align-items: center;
+    height: 24px;
+    background: var(--bg-1);
+    border-top: 1px solid var(--border);
+    padding: 0 12px;
+    font-size: 11px;
+    color: var(--text-2);
+    flex-shrink: 0;
+    gap: 10px;
+}
+
+.statusbar-section {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.statusbar-spacer {
+    flex: 1;
+}
+
+.statusbar-sep {
+    width: 1px;
+    height: 12px;
+    background: var(--border);
+}
+
+.statusbar-label {
+    color: var(--text-3);
+}
+
+.statusbar-value {
+    color: var(--text-1);
+}
+
+.statusbar-comma {
+    color: var(--text-3);
+}
+
+.statusbar-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.statusbar-dot-ok {
+    background: var(--accent-source);
+}
+
+.statusbar-runtime-ready {
+    color: var(--accent-source);
+}
+
+.statusbar-runtime-connecting {
+    color: var(--accent);
+}
+
+.statusbar-runtime-offline {
+    color: var(--danger);
+}
