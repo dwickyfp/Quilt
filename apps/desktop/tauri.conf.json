@@ -34,6 +34,6 @@
     "shortDescription": "Embedded, ultra-fast data engineering platform.",
     "longDescription": "Duckle is an open-source, local-first ETL/ELT/streaming platform with a drag-and-drop UI and native execution speed.",
     "copyright": "Copyright 2026 Sourav Roy",
-    "icon": []
+    "icon": ["icons/icon.ico"]
   }
 }
