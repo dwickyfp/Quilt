@@ -12,6 +12,7 @@ import {
     type OnSelectionChangeParams,
 } from '@xyflow/react';
 import EditorTabs from './workflow-ui/EditorTabs';
+import EditorHeader, { type Job } from './workflow-ui/EditorHeader';
 import EngineSelector, { type EngineId } from './workflow-ui/EngineSelector';
 import Palette from './workflow-ui/Palette';
 import PropertiesPanel from './workflow-ui/PropertiesPanel';
@@ -66,12 +67,17 @@ const INITIAL_EDGES: Edge[] = [
     { id: 'e2', source: 't1', target: 'k1' },
 ];
 
+const INITIAL_JOBS: Job[] = [{ id: 'j1', name: 'orders_etl', dirty: false }];
+
 export default function App() {
     const [runtime, setRuntime] = useState<RuntimeState>('connecting');
     const [engine, setEngine] = useState<EngineId>('duckdb');
     const [nodes, setNodes] = useState<Node<DuckleNodeData>[]>(INITIAL_NODES);
     const [edges, setEdges] = useState<Edge[]>(INITIAL_EDGES);
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [jobs, setJobs] = useState<Job[]>(INITIAL_JOBS);
+    const [activeJobId, setActiveJobId] = useState<string>('j1');
+    const [isRunning, setIsRunning] = useState<boolean>(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -114,6 +120,48 @@ export default function App() {
         [nodes, selectedId],
     );
 
+    const handleNewJob = useCallback(() => {
+        const id = 'j' + (jobs.length + 1);
+        setJobs(js => [...js, { id, name: 'untitled-' + (js.length + 1), dirty: false }]);
+        setActiveJobId(id);
+    }, [jobs.length]);
+
+    const handleCloseJob = useCallback(
+        (id: string) => {
+            setJobs(js => js.filter(j => j.id !== id));
+            if (activeJobId === id) {
+                setActiveJobId(jobs[0]?.id ?? '');
+            }
+        },
+        [activeJobId, jobs],
+    );
+
+    const handleRun = useCallback(() => {
+        setIsRunning(true);
+        // Real execution wires up in Option C.
+        setTimeout(() => setIsRunning(false), 2000);
+    }, []);
+
+    const handleStop = useCallback(() => setIsRunning(false), []);
+
+    const handleSave = useCallback(() => {
+        setJobs(js => js.map(j => (j.id === activeJobId ? { ...j, dirty: false } : j)));
+    }, [activeJobId]);
+
+    const handleValidate = useCallback(() => {
+        // Real validation lands in Option B.
+    }, []);
+
+    const handleAutoLayout = useCallback(() => {
+        // Real layout solver lands later; basic horizontal stack for now.
+        setNodes(ns =>
+            ns.map((n, i) => ({
+                ...n,
+                position: { x: 60 + i * 280, y: 140 },
+            })),
+        );
+    }, []);
+
     return (
         <div className="app">
             <header className="topbar">
@@ -131,6 +179,19 @@ export default function App() {
             <main className="workspace">
                 <Palette />
                 <section className="canvas-shell">
+                    <EditorHeader
+                        jobs={jobs}
+                        activeJobId={activeJobId}
+                        isRunning={isRunning}
+                        onSelectJob={setActiveJobId}
+                        onCloseJob={handleCloseJob}
+                        onNewJob={handleNewJob}
+                        onRun={handleRun}
+                        onStop={handleStop}
+                        onSave={handleSave}
+                        onValidate={handleValidate}
+                        onAutoLayout={handleAutoLayout}
+                    />
                     <EditorTabs
                         engine={engine}
                         nodes={nodes}

@@ -361,6 +361,8 @@ body,
     min-width: 0;
     position: relative;
     background: var(--bg-0);
+    display: flex;
+    flex-direction: column;
 }
 
 /* React Flow canvas overrides --------------------------------------------- */
@@ -1292,4 +1294,200 @@ select.schema-input {
 
 .statusbar-runtime-offline {
     color: var(--danger);
+}
+
+/* Editor header (job tabs + toolbar) ------------------------------------- */
+.editor-header {
+    display: flex;
+    align-items: stretch;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    height: 36px;
+    padding: 0 6px;
+    gap: 4px;
+}
+
+.job-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.job-tab {
+    display: inline-flex;
+    align-items: stretch;
+    height: 28px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.job-tab.is-active {
+    background: var(--bg-3);
+    border-color: var(--border-strong);
+}
+
+.job-tab-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    padding: 0 8px 0 10px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    max-width: 220px;
+}
+
+.job-tab.is-active .job-tab-button {
+    color: var(--text-1);
+    font-weight: 600;
+}
+
+.job-tab-icon {
+    color: var(--text-3);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.job-tab-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.job-tab-dirty {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+}
+
+.job-tab-close {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 0 8px;
+    font-size: 14px;
+    font-family: inherit;
+    line-height: 1;
+    border-left: 1px solid var(--border);
+}
+
+.job-tab.is-active .job-tab-close {
+    border-left-color: var(--border-strong);
+}
+
+.job-tab-close:hover {
+    background: var(--bg-2);
+    color: var(--danger);
+}
+
+.job-tab-new {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 0 10px;
+    height: 28px;
+    margin-top: 4px;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    font-family: inherit;
+    line-height: 1;
+}
+
+.job-tab-new:hover {
+    background: var(--bg-2);
+    color: var(--text-1);
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 0;
+    flex-shrink: 0;
+}
+
+.toolbar-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+    margin: 0 4px;
+}
+
+.toolbar-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0 10px;
+    height: 28px;
+    color: var(--text-1);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 80ms ease, border-color 80ms ease;
+}
+
+.toolbar-button:hover {
+    background: var(--bg-3);
+    border-color: var(--border-strong);
+}
+
+.toolbar-run {
+    background: rgba(126, 231, 135, 0.12);
+    border-color: rgba(126, 231, 135, 0.3);
+    color: var(--accent-source);
+}
+
+.toolbar-run:hover {
+    background: rgba(126, 231, 135, 0.18);
+    border-color: rgba(126, 231, 135, 0.5);
+}
+
+.toolbar-stop {
+    background: rgba(248, 81, 73, 0.12);
+    border-color: rgba(248, 81, 73, 0.3);
+    color: var(--danger);
+}
+
+.toolbar-stop:hover {
+    background: rgba(248, 81, 73, 0.18);
+    border-color: rgba(248, 81, 73, 0.5);
+}
+
+.toolbar-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background 80ms ease, border-color 80ms ease, color 80ms ease;
+}
+
+.toolbar-icon-button:hover {
+    background: var(--bg-2);
+    border-color: var(--border);
+    color: var(--text-1);
 }
