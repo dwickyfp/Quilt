@@ -478,6 +478,130 @@ body,
     box-shadow: 0 0 0 1px var(--accent), var(--shadow-1);
 }
 
+.node.is-disabled {
+    opacity: 0.55;
+    border-style: dashed;
+}
+
+.node-disabled-badge {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 1px 6px;
+    background: rgba(248, 81, 73, 0.18);
+    border: 1px solid rgba(248, 81, 73, 0.4);
+    color: var(--danger);
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Context menu ------------------------------------------------------------ */
+.context-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+}
+
+.context-menu {
+    position: fixed;
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.04) inset,
+        0 12px 32px rgba(0, 0, 0, 0.55);
+    min-width: 220px;
+    animation: context-menu-in 80ms ease-out;
+}
+
+@keyframes context-menu-in {
+    from {
+        opacity: 0;
+        transform: scale(0.97) translateY(-2px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.context-menu-header {
+    padding: 8px 12px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+}
+
+.context-menu-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text-1);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 60ms ease;
+}
+
+.context-menu-item:hover:not(.is-disabled) {
+    background: var(--bg-3);
+}
+
+.context-menu-item.is-danger {
+    color: var(--danger);
+}
+
+.context-menu-item.is-danger:hover {
+    background: rgba(248, 81, 73, 0.12);
+}
+
+.context-menu-item.is-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.context-menu-icon {
+    width: 14px;
+    text-align: center;
+    color: var(--text-3);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.context-menu-item.is-danger .context-menu-icon {
+    color: var(--danger);
+}
+
+.context-menu-label {
+    flex: 1;
+}
+
+.context-menu-shortcut {
+    color: var(--text-3);
+    font-size: 10px;
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    margin-left: 16px;
+}
+
 /* React Flow handles + edges */
 .react-flow__handle {
     width: 9px;

@@ -21,7 +21,7 @@ import StatusBar from './workflow-ui/StatusBar';
 import type { ComponentDef, NodeKind as PaletteKind } from './workflow-ui/palette-data';
 import { getDefaults, getManifest } from './workflow-ui/fields/component-manifests';
 import type { DuckleNodeData } from './pipeline-types';
-import type { DropPosition } from './canvas/Canvas';
+import type { DropPosition, NodeAction, PaneAction } from './canvas/Canvas';
 
 type RuntimeState = 'connecting' | 'ready' | 'offline';
 
@@ -95,6 +95,7 @@ export default function App() {
     const [jobs, setJobs] = useState<Job[]>(INITIAL_JOBS);
     const [activeJobId, setActiveJobId] = useState<string>('j1');
     const [isRunning, setIsRunning] = useState<boolean>(false);
+    const [renameRequest, setRenameRequest] = useState<number>(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -202,6 +203,119 @@ export default function App() {
         [activeJobId],
     );
 
+    const markDirty = useCallback(() => {
+        setJobs(js => js.map(j => (j.id === activeJobId ? { ...j, dirty: true } : j)));
+    }, [activeJobId]);
+
+    const nodeAutodetectAvailable = useCallback(
+        (nodeId: string) => {
+            const node = nodes.find(n => n.id === nodeId);
+            if (!node) return false;
+            const manifest = getManifest(node.data.componentId);
+            return Boolean(manifest?.autodetect);
+        },
+        [nodes],
+    );
+
+    const handleNodeAction = useCallback(
+        (action: NodeAction, nodeId: string) => {
+            const node = nodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            switch (action) {
+                case 'rename':
+                    setSelectedId(nodeId);
+                    setRenameRequest(n => n + 1);
+                    break;
+
+                case 'duplicate': {
+                    const dupId =
+                        'n_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+                    const copy: Node<DuckleNodeData> = {
+                        ...node,
+                        id: dupId,
+                        position: { x: node.position.x + 40, y: node.position.y + 40 },
+                        data: { ...node.data, label: node.data.label + ' (copy)' },
+                        selected: false,
+                    };
+                    setNodes(ns => [...ns, copy]);
+                    setSelectedId(dupId);
+                    markDirty();
+                    break;
+                }
+
+                case 'toggle-disable':
+                    setNodes(ns =>
+                        ns.map(n =>
+                            n.id === nodeId
+                                ? {
+                                      ...n,
+                                      data: { ...n.data, disabled: !n.data.disabled },
+                                  }
+                                : n,
+                        ),
+                    );
+                    markDirty();
+                    break;
+
+                case 'autodetect': {
+                    const manifest = getManifest(node.data.componentId);
+                    if (!manifest?.autodetect) return;
+                    void manifest.autodetect().then(result => {
+                        setNodes(ns =>
+                            ns.map(n =>
+                                n.id === nodeId
+                                    ? {
+                                          ...n,
+                                          data: {
+                                              ...n.data,
+                                              schema: result.columns,
+                                              sampleRows: result.sampleRows,
+                                          },
+                                      }
+                                    : n,
+                            ),
+                        );
+                        markDirty();
+                    });
+                    break;
+                }
+
+                case 'run-from-here':
+                    // Real partial-graph execution lands with the runtime.
+                    break;
+
+                case 'copy-id':
+                    void navigator.clipboard?.writeText(nodeId);
+                    break;
+
+                case 'delete':
+                    setNodes(ns => ns.filter(n => n.id !== nodeId));
+                    setEdges(es => es.filter(e => e.source !== nodeId && e.target !== nodeId));
+                    if (selectedId === nodeId) setSelectedId(null);
+                    markDirty();
+                    break;
+            }
+        },
+        [nodes, selectedId, markDirty],
+    );
+
+    const handlePaneAction = useCallback(
+        (action: PaneAction) => {
+            switch (action) {
+                case 'auto-layout':
+                    handleAutoLayout();
+                    break;
+                case 'select-all':
+                    setNodes(ns => ns.map(n => ({ ...n, selected: true })));
+                    break;
+                case 'paste':
+                    break;
+            }
+        },
+        [handleAutoLayout],
+    );
+
     return (
         <div className="app">
             <header className="topbar">
@@ -241,6 +355,9 @@ export default function App() {
                         onConnect={handleConnect}
                         onSelectionChange={handleSelectionChange}
                         onDropComponent={handleDropComponent}
+                        onNodeAction={handleNodeAction}
+                        onPaneAction={handlePaneAction}
+                        nodeAutodetectAvailable={nodeAutodetectAvailable}
                     />
                 </section>
                 <PropertiesPanel
@@ -248,6 +365,7 @@ export default function App() {
                     allNodes={nodes}
                     edges={edges}
                     onUpdate={handleUpdateNode}
+                    focusNameRequest={renameRequest}
                 />
             </main>
 

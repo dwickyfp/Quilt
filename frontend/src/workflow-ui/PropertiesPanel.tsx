@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge, Node } from '@xyflow/react';
 import type { Column, DuckleNodeData } from '../pipeline-types';
 import SchemaEditor from './SchemaEditor';
@@ -25,11 +25,30 @@ type Props = {
     allNodes: Node<DuckleNodeData>[];
     edges: Edge[];
     onUpdate: (id: string, patch: Partial<DuckleNodeData>) => void;
+    focusNameRequest?: number;
 };
 
-export default function PropertiesPanel({ selected, allNodes, edges, onUpdate }: Props) {
+export default function PropertiesPanel({
+    selected,
+    allNodes,
+    edges,
+    onUpdate,
+    focusNameRequest,
+}: Props) {
     const [tab, setTab] = useState<TabId>('basic');
     const [autodetecting, setAutodetecting] = useState(false);
+    const nameInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (focusNameRequest && nameInputRef.current) {
+            setTab('basic');
+            const el = nameInputRef.current;
+            setTimeout(() => {
+                el.focus();
+                el.select();
+            }, 50);
+        }
+    }, [focusNameRequest]);
 
     const upstreamSchema = useMemo<Column[]>(() => {
         if (!selected) return [];
@@ -124,6 +143,7 @@ export default function PropertiesPanel({ selected, allNodes, edges, onUpdate }:
                     <span className="properties-id">#{selected.id}</span>
                 </div>
                 <input
+                    ref={nameInputRef}
                     type="text"
                     className="properties-name-input"
                     value={data.label}

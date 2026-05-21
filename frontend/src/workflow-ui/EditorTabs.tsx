@@ -7,7 +7,7 @@ import type {
     NodeChange,
     OnSelectionChangeParams,
 } from '@xyflow/react';
-import Canvas, { type DropPosition } from '../canvas/Canvas';
+import Canvas, { type DropPosition, type NodeAction, type PaneAction } from '../canvas/Canvas';
 import PlanView from './PlanView';
 import RunView from './RunView';
 import type { EngineId } from './EngineSelector';
@@ -31,6 +31,9 @@ type Props = {
     onConnect: (connection: Connection) => void;
     onSelectionChange: (params: OnSelectionChangeParams) => void;
     onDropComponent: (component: ComponentDef, position: DropPosition) => void;
+    onNodeAction: (action: NodeAction, nodeId: string) => void;
+    onPaneAction: (action: PaneAction) => void;
+    nodeAutodetectAvailable: (nodeId: string) => boolean;
 };
 
 export default function EditorTabs({
@@ -42,6 +45,9 @@ export default function EditorTabs({
     onConnect,
     onSelectionChange,
     onDropComponent,
+    onNodeAction,
+    onPaneAction,
+    nodeAutodetectAvailable,
 }: Props) {
     const [active, setActive] = useState<TabId>('canvas');
 
@@ -71,6 +77,9 @@ export default function EditorTabs({
                         onConnect={onConnect}
                         onSelectionChange={onSelectionChange}
                         onDropComponent={onDropComponent}
+                        onNodeAction={onNodeAction}
+                        onPaneAction={onPaneAction}
+                        nodeAutodetectAvailable={nodeAutodetectAvailable}
                     />
                 </div>
                 <div className={'tab-panel' + (active === 'plan' ? ' tab-panel-active' : '')}>
