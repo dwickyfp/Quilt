@@ -1212,9 +1212,219 @@ textarea:focus-visible {
     stroke-width: 1.5;
 }
 
+/* Edge labels (typed connections) ------------------------------------------ */
+.edge-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1px 8px;
+    font-size: 10px;
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    color: var(--text-2);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    white-space: nowrap;
+    user-select: none;
+    cursor: default;
+    z-index: 5;
+}
+
+.edge-label.is-selected {
+    border-color: var(--accent);
+    color: var(--text-1);
+}
+
+.edge-label-name {
+    color: var(--text-1);
+}
+
+.edge-label-badge {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    font-size: 9px;
+    padding: 0 4px;
+    border-radius: 3px;
+}
+
+.edge-label-reject .edge-label-badge {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.edge-label-lookup .edge-label-badge {
+    color: var(--kind-source);
+    background: rgba(101, 168, 204, 0.14);
+}
+
+.edge-label-filter .edge-label-badge {
+    color: var(--kind-sink);
+    background: rgba(200, 151, 112, 0.14);
+}
+
+.edge-label-iterate .edge-label-badge {
+    color: var(--kind-control);
+    background: rgba(164, 139, 212, 0.14);
+}
+
+.edge-label-on-subjob-ok .edge-label-badge,
+.edge-label-on-component-ok .edge-label-badge {
+    color: var(--success);
+    background: rgba(74, 222, 128, 0.12);
+}
+
+.edge-label-on-subjob-error .edge-label-badge,
+.edge-label-on-component-error .edge-label-badge {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.edge-label-if .edge-label-badge {
+    color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.edge-label-run-if .edge-label-badge {
+    color: var(--kind-quality);
+    background: rgba(196, 168, 90, 0.14);
+}
+
+.edge-label-cond {
+    color: var(--text-3);
+    font-size: 10px;
+}
+
 .react-flow__edge.selected .react-flow__edge-path,
 .react-flow__edge:hover .react-flow__edge-path {
     stroke: var(--accent);
+}
+
+/* Connection type picker --------------------------------------------------- */
+.connection-picker-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 950;
+    background: rgba(8, 10, 14, 0.45);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    animation: modal-backdrop-in 100ms ease-out;
+}
+
+.connection-picker {
+    position: fixed;
+    width: 340px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-2);
+    overflow: hidden;
+    animation: modal-card-in 140ms var(--ease);
+}
+
+.connection-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-1);
+}
+
+.connection-picker-hint {
+    font-size: 10px;
+    color: var(--text-3);
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    font-weight: 500;
+}
+
+.connection-picker-section {
+    padding: 8px 6px 10px;
+    border-top: 1px solid var(--border);
+}
+
+.connection-picker-section:first-of-type {
+    border-top: none;
+}
+
+.connection-picker-section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-2);
+    font-weight: 700;
+    padding: 0 10px;
+}
+
+.connection-picker-section-subtitle {
+    font-size: 11px;
+    color: var(--text-3);
+    padding: 2px 10px 6px;
+    line-height: 1.4;
+}
+
+.connection-picker-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.connection-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text-1);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 60ms ease;
+}
+
+.connection-picker-item:hover {
+    background: var(--bg-3);
+}
+
+.connection-picker-stroke {
+    flex-shrink: 0;
+}
+
+.connection-picker-item-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.connection-picker-item-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-1);
+}
+
+.connection-picker-item-desc {
+    font-size: 10px;
+    color: var(--text-3);
+    margin-top: 2px;
+    line-height: 1.4;
+}
+
+.connection-picker-item-badge {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-3);
+    background: var(--bg-3);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Consolas, monospace;
+    font-weight: 700;
+    flex-shrink: 0;
 }
 
 /* Topbar separator + engine selector ------------------------------------- */

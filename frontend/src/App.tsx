@@ -11,6 +11,7 @@ import {
     type NodeChange,
     type OnSelectionChangeParams,
 } from '@xyflow/react';
+import type { ConnectionType } from './canvas/connection-types';
 import EditorTabs from './workflow-ui/EditorTabs';
 import EditorHeader, { type Job } from './workflow-ui/EditorHeader';
 import EngineSelector, { type EngineId } from './workflow-ui/EngineSelector';
@@ -73,8 +74,8 @@ const SAMPLE_NODES: Node<DuckleNodeData>[] = [
 ];
 
 const SAMPLE_EDGES: Edge[] = [
-    { id: 'e1', source: 's1', target: 't1' },
-    { id: 'e2', source: 't1', target: 'k1' },
+    { id: 'e1', source: 's1', target: 't1', type: 'duckle', data: { connectionType: 'main' } },
+    { id: 'e2', source: 't1', target: 'k1', type: 'duckle', data: { connectionType: 'main' } },
 ];
 
 const INITIAL_JOBS: Job[] = [{ id: 'j1', name: 'orders_etl', dirty: false }];
@@ -207,9 +208,44 @@ export default function App() {
         [setEdges],
     );
 
-    const handleConnect = useCallback(
-        (connection: Connection) => {
-            setEdges(es => addEdge(connection, es));
+    const handleConnectWithType = useCallback(
+        (connection: Connection, type: ConnectionType) => {
+            setEdges(es =>
+                addEdge(
+                    {
+                        ...connection,
+                        type: 'duckle',
+                        data: { connectionType: type },
+                    },
+                    es,
+                ),
+            );
+            markDirty();
+        },
+        [setEdges, markDirty],
+    );
+
+    const handleEdgeChangeType = useCallback(
+        (edgeId: string, newType: ConnectionType) => {
+            setEdges(es =>
+                es.map(e =>
+                    e.id === edgeId
+                        ? {
+                              ...e,
+                              type: 'duckle',
+                              data: { ...(e.data ?? {}), connectionType: newType },
+                          }
+                        : e,
+                ),
+            );
+            markDirty();
+        },
+        [setEdges, markDirty],
+    );
+
+    const handleEdgeDelete = useCallback(
+        (edgeId: string) => {
+            setEdges(es => es.filter(e => e.id !== edgeId));
             markDirty();
         },
         [setEdges, markDirty],
@@ -552,11 +588,13 @@ export default function App() {
                         edges={edges}
                         onNodesChange={handleNodesChange}
                         onEdgesChange={handleEdgesChange}
-                        onConnect={handleConnect}
+                        onConnectWithType={handleConnectWithType}
                         onSelectionChange={handleSelectionChange}
                         onDropComponent={handleDropComponent}
                         onNodeAction={handleNodeAction}
                         onPaneAction={handlePaneAction}
+                        onEdgeChangeType={handleEdgeChangeType}
+                        onEdgeDelete={handleEdgeDelete}
                         nodeAutodetectAvailable={nodeAutodetectAvailable}
                     />
                 </section>

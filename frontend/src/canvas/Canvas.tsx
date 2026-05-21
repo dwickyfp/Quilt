@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -14,11 +14,9 @@ import {
     type OnSelectionChangeParams,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import SourceNode from './nodes/SourceNode';
-import TransformNode from './nodes/TransformNode';
-import SinkNode from './nodes/SinkNode';
-import type { DuckleNodeData } from '../pipeline-types';
 import {
+    Check,
+    ClipboardPaste,
     Copy,
     Hash,
     LayoutGrid,
@@ -29,8 +27,14 @@ import {
     Power,
     Sparkles,
     Trash2,
-    ClipboardPaste,
 } from 'lucide-react';
+import SourceNode from './nodes/SourceNode';
+import TransformNode from './nodes/TransformNode';
+import SinkNode from './nodes/SinkNode';
+import DuckleEdge from './DuckleEdge';
+import ConnectionTypePicker from './ConnectionTypePicker';
+import { CONNECTION_TYPES, type ConnectionType } from './connection-types';
+import type { DuckleNodeData } from '../pipeline-types';
 import type { ComponentDef } from '../workflow-ui/palette-data';
 import { useContextMenu, type MenuItem } from '../workflow-ui/ContextMenu';
 
@@ -40,6 +44,14 @@ const nodeTypes = {
     source: SourceNode,
     transform: TransformNode,
     sink: SinkNode,
+};
+
+const edgeTypes = {
+    duckle: DuckleEdge,
+};
+
+const DEFAULT_EDGE_OPTIONS = {
+    type: 'duckle' as const,
 };
 
 const DELETE_KEYS = ['Delete', 'Backspace'];
@@ -62,11 +74,13 @@ type Props = {
     edges: Edge[];
     onNodesChange: (changes: NodeChange[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
-    onConnect: (connection: Connection) => void;
+    onConnectWithType: (connection: Connection, type: ConnectionType) => void;
     onSelectionChange: (params: OnSelectionChangeParams) => void;
     onDropComponent: (component: ComponentDef, position: DropPosition) => void;
     onNodeAction: (action: NodeAction, nodeId: string) => void;
     onPaneAction: (action: PaneAction) => void;
+    onEdgeChangeType: (edgeId: string, newType: ConnectionType) => void;
+    onEdgeDelete: (edgeId: string) => void;
     nodeAutodetectAvailable: (nodeId: string) => boolean;
 };
 
@@ -75,15 +89,50 @@ function CanvasInner({
     edges,
     onNodesChange,
     onEdgesChange,
-    onConnect,
+    onConnectWithType,
     onSelectionChange,
     onDropComponent,
     onNodeAction,
     onPaneAction,
+    onEdgeChangeType,
+    onEdgeDelete,
     nodeAutodetectAvailable,
 }: Props) {
     const { screenToFlowPosition } = useReactFlow();
     const menu = useContextMenu();
+    const mouseRef = useRef({ x: 0, y: 0 });
+    const [pendingConnection, setPendingConnection] = useState<Connection | null>(null);
+    const [pickerPos, setPickerPos] = useState<{ x: number; y: number } | null>(null);
+
+    const onMouseMove = useCallback((e: React.MouseEvent) => {
+        mouseRef.current = { x: e.clientX, y: e.clientY };
+    }, []);
+
+    const handleConnectStart = useCallback(() => {
+        // Capture position at start; in case onConnect doesn't fire (cancelled drag)
+        // mouse ref keeps tracking.
+    }, []);
+
+    const handleConnect = useCallback((connection: Connection) => {
+        setPendingConnection(connection);
+        setPickerPos({ x: mouseRef.current.x, y: mouseRef.current.y });
+    }, []);
+
+    const handlePickType = useCallback(
+        (type: ConnectionType) => {
+            if (pendingConnection) {
+                onConnectWithType(pendingConnection, type);
+            }
+            setPendingConnection(null);
+            setPickerPos(null);
+        },
+        [pendingConnection, onConnectWithType],
+    );
+
+    const handleCancelPick = useCallback(() => {
+        setPendingConnection(null);
+        setPickerPos(null);
+    }, []);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         if (e.dataTransfer.types.includes('application/duckle-component')) {
@@ -181,6 +230,39 @@ function CanvasInner({
         [menu, onNodeAction, nodeAutodetectAvailable],
     );
 
+    const handleEdgeContextMenu = useCallback(
+        (e: React.MouseEvent, edge: Edge) => {
+            const currentType = (edge.data as { connectionType?: ConnectionType } | undefined)
+                ?.connectionType ?? 'main';
+            const items: MenuItem[] = [
+                {
+                    kind: 'header',
+                    key: 'header',
+                    label: 'Connection · ' + edge.id.slice(0, 8),
+                },
+                ...CONNECTION_TYPES.map((t): MenuItem => ({
+                    kind: 'item',
+                    key: 'type-' + t.id,
+                    label: t.label,
+                    icon: currentType === t.id ? <Check size={ICON_SIZE} /> : null,
+                    onClick: () => onEdgeChangeType(edge.id, t.id),
+                })),
+                { kind: 'separator', key: 's1' },
+                {
+                    kind: 'item',
+                    key: 'delete',
+                    label: 'Delete connection',
+                    icon: <Trash2 size={ICON_SIZE} />,
+                    shortcut: 'Del',
+                    onClick: () => onEdgeDelete(edge.id),
+                    danger: true,
+                },
+            ];
+            menu.open(e, items);
+        },
+        [menu, onEdgeChangeType, onEdgeDelete],
+    );
+
     const handlePaneContextMenu = useCallback(
         (e: React.MouseEvent | MouseEvent) => {
             const items: MenuItem[] = [
@@ -225,17 +307,26 @@ function CanvasInner({
     );
 
     return (
-        <div className="canvas-dnd" onDragOver={handleDragOver} onDrop={handleDrop}>
+        <div
+            className="canvas-dnd"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onMouseMove={onMouseMove}
+        >
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
+                onConnect={handleConnect}
+                onConnectStart={handleConnectStart}
                 onSelectionChange={onSelectionChange}
                 onNodeContextMenu={handleNodeContextMenu}
+                onEdgeContextMenu={handleEdgeContextMenu}
                 onPaneContextMenu={handlePaneContextMenu}
                 nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
+                defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
                 deleteKeyCode={DELETE_KEYS}
                 fitView
                 colorMode="dark"
@@ -245,6 +336,13 @@ function CanvasInner({
                 <Controls />
             </ReactFlow>
             {menu.element}
+            {pickerPos ? (
+                <ConnectionTypePicker
+                    position={pickerPos}
+                    onPick={handlePickType}
+                    onCancel={handleCancelPick}
+                />
+            ) : null}
         </div>
     );
 }

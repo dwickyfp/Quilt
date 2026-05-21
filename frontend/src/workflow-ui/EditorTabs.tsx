@@ -13,6 +13,7 @@ import RunView from './RunView';
 import type { EngineId } from './EngineSelector';
 import type { DuckleNodeData } from '../pipeline-types';
 import type { ComponentDef } from './palette-data';
+import type { ConnectionType } from '../canvas/connection-types';
 
 type TabId = 'canvas' | 'plan' | 'run';
 
@@ -28,11 +29,13 @@ type Props = {
     edges: Edge[];
     onNodesChange: (changes: NodeChange[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
-    onConnect: (connection: Connection) => void;
+    onConnectWithType: (connection: Connection, type: ConnectionType) => void;
     onSelectionChange: (params: OnSelectionChangeParams) => void;
     onDropComponent: (component: ComponentDef, position: DropPosition) => void;
     onNodeAction: (action: NodeAction, nodeId: string) => void;
     onPaneAction: (action: PaneAction) => void;
+    onEdgeChangeType: (edgeId: string, newType: ConnectionType) => void;
+    onEdgeDelete: (edgeId: string) => void;
     nodeAutodetectAvailable: (nodeId: string) => boolean;
 };
 
@@ -42,11 +45,13 @@ export default function EditorTabs({
     edges,
     onNodesChange,
     onEdgesChange,
-    onConnect,
+    onConnectWithType,
     onSelectionChange,
     onDropComponent,
     onNodeAction,
     onPaneAction,
+    onEdgeChangeType,
+    onEdgeDelete,
     nodeAutodetectAvailable,
 }: Props) {
     const [active, setActive] = useState<TabId>('canvas');
@@ -74,11 +79,13 @@ export default function EditorTabs({
                         edges={edges}
                         onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange}
-                        onConnect={onConnect}
+                        onConnectWithType={onConnectWithType}
                         onSelectionChange={onSelectionChange}
                         onDropComponent={onDropComponent}
                         onNodeAction={onNodeAction}
                         onPaneAction={onPaneAction}
+                        onEdgeChangeType={onEdgeChangeType}
+                        onEdgeDelete={onEdgeDelete}
                         nodeAutodetectAvailable={nodeAutodetectAvailable}
                     />
                 </div>
