@@ -1,0 +1,21 @@
+order_id,customer,status,amount,region,created_at
+1001,Ada Lovelace,paid,129.95,west,2026-05-01
+1002,Alan Turing,pending,49.00,east,2026-05-01
+1003,Grace Hopper,paid,12.50,west,2026-05-02
+1004,Edsger Dijkstra,refunded,8.75,north,2026-05-02
+1005,Donald Knuth,paid,420.00,west,2026-05-03
+1006,Barbara Liskov,paid,77.10,east,2026-05-03
+1007,John McCarthy,pending,15.00,south,2026-05-04
+1008,Margaret Hamilton,paid,250.25,west,2026-05-04
+1009,Dennis Ritchie,paid,99.99,east,2026-05-05
+1010,Ken Thompson,refunded,30.00,north,2026-05-05
+1011,Linus Torvalds,paid,5.49,south,2026-05-06
+1012,Tim Berners-Lee,paid,1000.00,west,2026-05-06
+1013,Vint Cerf,pending,62.30,east,2026-05-07
+1014,Radia Perlman,paid,88.00,north,2026-05-07
+1015,Bjarne Stroustrup,paid,144.44,west,2026-05-08
+1016,Guido van Rossum,refunded,19.95,south,2026-05-08
+1017,James Gosling,paid,210.00,east,2026-05-09
+1018,Brendan Eich,pending,33.33,west,2026-05-09
+1019,Anders Hejlsberg,paid,175.50,north,2026-05-10
+1020,Rich Hickey,paid,64.00,south,2026-05-10

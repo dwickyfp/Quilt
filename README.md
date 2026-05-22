@@ -71,15 +71,46 @@ Prerequisites:
 
 - Rust stable (install via https://rustup.rs)
 - Node.js 20+ and npm
+- Tauri CLI: `cargo install tauri-cli` (provides `cargo tauri`)
 - Platform build tools for Tauri 2 (see https://tauri.app/start/prerequisites)
 
 ```sh
-# install frontend deps
+# install frontend deps (once)
 npm --prefix frontend install
-
-# run the desktop app in dev mode
-cargo run -p duckle-desktop
 ```
+
+### Run in dev mode
+
+Duckle's UI (React/Vite) and shell (Tauri/Rust) are two processes. Use
+the Tauri CLI, which starts the Vite dev server **and** the desktop
+shell together and wires them up:
+
+```sh
+cargo tauri dev          # run from apps/desktop/
+```
+
+Or use the helper scripts from the repo root:
+
+```
+dev.cmd        # Windows cmd
+.\dev.ps1      # PowerShell
+```
+
+> Do **not** run `cargo run -p duckle-desktop` on its own. That starts
+> only the Rust shell; with no Vite dev server up, the window shows
+> "localhost refused to connect". `cargo tauri dev` (or `dev.cmd`)
+> handles both.
+
+### Build a release (what end users get)
+
+```sh
+cargo tauri build        # run from apps/desktop/  (or use build.cmd)
+```
+
+This compiles the frontend, **bundles it into the app**, and emits an
+installer + standalone executable under
+`apps/desktop/target/release/bundle/`. The packaged app has no Vite or
+localhost dependency — double-click and it runs, fully offline.
 
 ## License
 
