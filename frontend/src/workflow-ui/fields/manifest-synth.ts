@@ -1369,25 +1369,68 @@ function synthStringTransform(comp: ComponentDef): ComponentManifest {
     ], 'upstream');
 }
 
+const TIME_UNITS = ['year', 'quarter', 'month', 'week', 'day', 'hour', 'minute', 'second'];
+const unitField = (label: string): Field => ({
+    key: 'unit',
+    label,
+    kind: 'select',
+    defaultValue: 'day',
+    options: TIME_UNITS.map(u => ({ label: u, value: u })),
+});
+const outColField = (placeholder = 'leave blank to replace the column'): Field => ({
+    key: 'outputColumn',
+    label: 'Output column',
+    kind: 'text',
+    placeholder,
+});
+
 function synthDateTimeTransform(comp: ComponentDef): ComponentManifest {
-    return base(comp, [
-        {
-            label: 'Date/time operation',
-            fields: [
-                { key: 'column', label: 'Column', kind: 'column', required: true },
-                { key: 'format', label: 'Format pattern', kind: 'text', placeholder: 'yyyy-MM-dd HH:mm:ss' },
-                {
-                    key: 'unit',
-                    label: 'Unit (extract/diff/trunc)',
-                    kind: 'select',
-                    defaultValue: 'day',
-                    options: ['year','quarter','month','week','day','hour','minute','second'].map(u => ({label:u,value:u})),
-                },
-                { key: 'timezone', label: 'Timezone', kind: 'text', placeholder: 'UTC' },
-                { key: 'outputColumn', label: 'Output column', kind: 'text' },
-            ],
-        },
-    ], 'upstream');
+    const id = comp.id;
+    const col: Field = { key: 'column', label: 'Date column', kind: 'column', required: true };
+    if (id === 'xf.dt.parse') {
+        return base(comp, [{ label: 'Parse date', fields: [
+            col,
+            { key: 'format', label: 'Format pattern', kind: 'text', defaultValue: '%Y-%m-%d', placeholder: '%Y-%m-%d %H:%M:%S' },
+            outColField(),
+        ] }], 'upstream');
+    }
+    if (id === 'xf.dt.format') {
+        return base(comp, [{ label: 'Format date', fields: [
+            col,
+            { key: 'format', label: 'Format pattern', kind: 'text', defaultValue: '%Y-%m-%d', placeholder: '%Y-%m-%d' },
+            outColField(),
+        ] }], 'upstream');
+    }
+    if (id === 'xf.dt.extract') {
+        return base(comp, [{ label: 'Extract part', fields: [col, unitField('Part'), outColField()] }], 'upstream');
+    }
+    if (id === 'xf.dt.trunc') {
+        return base(comp, [{ label: 'Truncate', fields: [col, unitField('Truncate to'), outColField()] }], 'upstream');
+    }
+    if (id === 'xf.dt.tz') {
+        return base(comp, [{ label: 'Timezone convert', fields: [
+            col,
+            { key: 'timezone', label: 'Timezone', kind: 'text', required: true, placeholder: 'America/New_York' },
+            outColField(),
+        ] }], 'upstream');
+    }
+    if (id === 'xf.dt.add') {
+        return base(comp, [{ label: 'Date add', fields: [
+            col,
+            { key: 'amount', label: 'Amount (negative subtracts)', kind: 'integer', defaultValue: 1 },
+            unitField('Unit'),
+            outColField(),
+        ] }], 'upstream');
+    }
+    if (id === 'xf.dt.diff') {
+        return base(comp, [{ label: 'Date diff', fields: [
+            { key: 'startColumn', label: 'Start column', kind: 'column', required: true },
+            { key: 'endColumn', label: 'End column', kind: 'column', required: true },
+            unitField('Unit'),
+            { key: 'outputColumn', label: 'Output column', kind: 'text', defaultValue: 'date_diff' },
+        ] }], 'upstream');
+    }
+    return synthGeneric(comp, 'upstream');
 }
 
 function synthNumericTransform(comp: ComponentDef): ComponentManifest {
@@ -1424,29 +1467,64 @@ function synthPivotTransform(comp: ComponentDef): ComponentManifest {
 }
 
 function synthJsonTransform(comp: ComponentDef): ComponentManifest {
-    return base(comp, [
-        {
-            label: 'JSON operation',
-            fields: [
-                { key: 'column', label: 'JSON column', kind: 'column', required: true },
-                { key: 'path', label: 'JSONPath', kind: 'text', placeholder: '$.user.email' },
-                { key: 'outputColumn', label: 'Output column', kind: 'text' },
-            ],
-        },
-    ], 'upstream');
+    const id = comp.id;
+    const col: Field = { key: 'column', label: 'JSON column', kind: 'column', required: true };
+    if (id === 'xf.json.path') {
+        return base(comp, [{ label: 'JSONPath extract', fields: [
+            col,
+            { key: 'path', label: 'JSONPath', kind: 'text', required: true, placeholder: '$.user.email' },
+            outColField(),
+        ] }], 'upstream');
+    }
+    if (id === 'xf.json.flatten') {
+        return base(comp, [{ label: 'Flatten', fields: [
+            { key: 'column', label: 'Struct column to flatten', kind: 'column', required: true,
+              description: "Expands the struct's fields into top-level columns." },
+        ] }], 'declared');
+    }
+    if (id === 'xf.json.merge') {
+        return base(comp, [{ label: 'Merge objects', fields: [
+            { key: 'column', label: 'First JSON column', kind: 'column', required: true },
+            { key: 'secondColumn', label: 'Second JSON column', kind: 'column', required: true },
+            { key: 'outputColumn', label: 'Output column', kind: 'text', defaultValue: 'merged' },
+        ] }], 'upstream');
+    }
+    // parse / stringify
+    return base(comp, [{ label: 'JSON operation', fields: [col, outColField()] }], 'upstream');
 }
 
 function synthArrayTransform(comp: ComponentDef): ComponentManifest {
-    return base(comp, [
-        {
-            label: 'Array operation',
-            fields: [
-                { key: 'column', label: 'Array column', kind: 'column', required: true },
-                { key: 'index', label: 'Index / argument', kind: 'integer' },
-                { key: 'outputColumn', label: 'Output column', kind: 'text' },
-            ],
-        },
-    ], comp.id === 'xf.arr.explode' ? 'declared' : 'upstream');
+    const id = comp.id;
+    const col: Field = { key: 'column', label: 'Array column', kind: 'column', required: true };
+    if (id === 'xf.arr.element') {
+        return base(comp, [{ label: 'Element at', fields: [
+            col,
+            { key: 'index', label: 'Index (1-based)', kind: 'integer', defaultValue: 1 },
+            outColField(),
+        ] }], 'upstream');
+    }
+    if (id === 'xf.arr.contains') {
+        return base(comp, [{ label: 'Contains', fields: [
+            col,
+            { key: 'value', label: 'Value to find', kind: 'text', required: true },
+            { key: 'outputColumn', label: 'Output column', kind: 'text', placeholder: 'e.g. has_value' },
+        ] }], 'upstream');
+    }
+    if (id === 'xf.arr.collect') {
+        return base(comp, [{ label: 'Collect list', fields: [
+            { key: 'valueColumn', label: 'Value column', kind: 'column', required: true },
+            { key: 'groupBy', label: 'Group by', kind: 'columns', description: 'Leave empty to collect all rows into one list.' },
+            { key: 'outputColumn', label: 'Output column', kind: 'text', defaultValue: 'items' },
+        ] }], 'declared');
+    }
+    if (id === 'xf.arr.explode') {
+        return base(comp, [{ label: 'Explode / Unnest', fields: [
+            { key: 'column', label: 'Array column', kind: 'column', required: true,
+              description: 'One output row per element, other columns repeated.' },
+        ] }], 'declared');
+    }
+    // distinct
+    return base(comp, [{ label: 'Array distinct', fields: [col, outColField()] }], 'upstream');
 }
 
 function synthCdcTransform(comp: ComponentDef): ComponentManifest {

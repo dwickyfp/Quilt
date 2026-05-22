@@ -489,12 +489,98 @@ fn unimplemented_component_fails_loudly_not_silently() {
     let d = doc(
         json!([
             node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
-            node("x1", "xf.rollup", json!({})),
+            node("x1", "xf.transpose", json!({})),
         ]),
         json!([main_edge("e1", "s1", "x1")]),
     );
     let result = engine.execute_pipeline(&d);
     assert_eq!(result.status, "error", "unimplemented op should fail, not pass through");
+}
+
+#[test]
+fn date_diff_computes_days() {
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "start,end\n2024-01-01,2024-01-11\n");
+    let out = out_path(tmp.path(), "out.csv");
+
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node(
+                "d1",
+                "xf.dt.diff",
+                json!({ "startColumn": "start", "endColumn": "end", "unit": "day", "outputColumn": "days" }),
+            ),
+            node("k1", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s1", "d1"), main_edge("e2", "d1", "k1")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    let days = scalar_string(&format!("SELECT CAST(days AS VARCHAR) FROM read_csv_auto('{}')", out));
+    assert_eq!(days, "10");
+}
+
+#[test]
+fn rollup_adds_grand_total() {
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "region,amount\nwest,10\neast,20\n");
+    let out = out_path(tmp.path(), "out.csv");
+
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node(
+                "a1",
+                "xf.rollup",
+                json!({
+                    "groupBy": ["region"],
+                    "aggregations": [{ "column": "amount", "func": "sum", "output": "total" }]
+                }),
+            ),
+            node("k1", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s1", "a1"), main_edge("e2", "a1", "k1")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    // 2 region rows + 1 grand-total row (region NULL).
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 3);
+    let total = scalar_string(&format!(
+        "SELECT CAST(total AS VARCHAR) FROM read_csv_auto('{}') WHERE region IS NULL",
+        out
+    ));
+    assert_eq!(total, "30");
+}
+
+#[test]
+fn array_collect_groups_into_lists() {
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "g,v\na,1\na,2\nb,9\n");
+    let out = out_path(tmp.path(), "out.csv");
+
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node(
+                "c1",
+                "xf.arr.collect",
+                json!({ "valueColumn": "v", "groupBy": ["g"], "outputColumn": "items" }),
+            ),
+            node("k1", "snk.json", json!({ "path": out })),
+        ]),
+        json!([main_edge("e1", "s1", "c1"), main_edge("e2", "c1", "k1")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    let len_a = scalar_string(&format!(
+        "SELECT CAST(len(items) AS VARCHAR) FROM read_json_auto('{}') WHERE g = 'a'",
+        out
+    ));
+    assert_eq!(len_a, "2");
 }
 
 #[test]

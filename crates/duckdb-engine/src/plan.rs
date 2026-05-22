@@ -393,7 +393,9 @@ fn build_view_sql(
         "xf.distinct" => build_passthrough_op(inputs, "SELECT DISTINCT *"),
         "xf.limit" => build_limit(inputs, props),
         "xf.sort" => build_sort(inputs, props),
-        "xf.agg" | "xf.groupby" => build_aggregate(inputs, props),
+        "xf.agg" | "xf.groupby" => build_aggregate(inputs, props, GroupMode::Plain),
+        "xf.rollup" => build_aggregate(inputs, props, GroupMode::Rollup),
+        "xf.cube" => build_aggregate(inputs, props, GroupMode::Cube),
         "xf.union" => build_union(inputs, true),
         "xf.unionall" => build_union(inputs, false),
         "xf.intersect" => build_setop(inputs, "INTERSECT"),
@@ -417,12 +419,18 @@ fn build_view_sql(
         "xf.dt.parse" | "xf.dt.format" | "xf.dt.extract" | "xf.dt.trunc" | "xf.dt.tz" => {
             build_datetime(inputs, props, component_id)
         }
+        "xf.dt.add" => build_date_add(inputs, props),
+        "xf.dt.diff" => build_date_diff(inputs, props),
         "xf.json.parse" | "xf.json.stringify" | "xf.json.path" => {
             build_json(inputs, props, component_id)
         }
+        "xf.json.flatten" => build_json_flatten(inputs, props),
+        "xf.json.merge" => build_json_merge(inputs, props),
         "xf.arr.element" | "xf.arr.distinct" | "xf.arr.explode" => {
             build_array(inputs, props, component_id)
         }
+        "xf.arr.collect" => build_arr_collect(inputs, props),
+        "xf.arr.contains" => build_arr_contains(inputs, props),
         "xf.cast" => build_cast(inputs, props),
         "xf.rename" => build_rename(inputs, props),
         "xf.drop" | "xf.dropcol" => build_drop(inputs, props),
@@ -625,7 +633,17 @@ fn build_sort(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> 
     ))
 }
 
-fn build_aggregate(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+enum GroupMode {
+    Plain,
+    Rollup,
+    Cube,
+}
+
+fn build_aggregate(
+    inputs: &NodeInputs,
+    props: &JsonValue,
+    mode: GroupMode,
+) -> Result<String, String> {
     let upstream = inputs.main().ok_or_else(|| "missing main input".to_string())?;
     let group_by: Vec<String> = columns_from_props(props, "groupBy").unwrap_or_default();
     let aggregations = props
@@ -667,20 +685,154 @@ fn build_aggregate(inputs: &NodeInputs, props: &JsonValue) -> Result<String, Str
     let group_clause = if group_by.is_empty() {
         String::new()
     } else {
-        format!(
-            " GROUP BY {}",
-            group_by
-                .iter()
-                .map(|c| quote_ident(c))
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
+        let cols = group_by
+            .iter()
+            .map(|c| quote_ident(c))
+            .collect::<Vec<_>>()
+            .join(", ");
+        match mode {
+            GroupMode::Plain => format!(" GROUP BY {}", cols),
+            GroupMode::Rollup => format!(" GROUP BY ROLLUP ({})", cols),
+            GroupMode::Cube => format!(" GROUP BY CUBE ({})", cols),
+        }
     };
     Ok(format!(
         "SELECT {} FROM {}{}",
         select_terms.join(", "),
         quote_ident(upstream),
         group_clause
+    ))
+}
+
+fn interval_unit(unit: &str) -> &'static str {
+    match unit.to_lowercase().as_str() {
+        "year" | "years" => "YEAR",
+        "quarter" | "quarters" => "QUARTER",
+        "month" | "months" => "MONTH",
+        "week" | "weeks" => "WEEK",
+        "hour" | "hours" => "HOUR",
+        "minute" | "minutes" => "MINUTE",
+        "second" | "seconds" => "SECOND",
+        _ => "DAY",
+    }
+}
+
+fn build_date_add(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.dt.add"))?;
+    let column = require_column(props)?;
+    let amount = props.get("amount").and_then(JsonValue::as_i64).unwrap_or(1);
+    let unit = string_prop(props, "unit").unwrap_or_else(|| "day".into());
+    // amount * INTERVAL 1 unit handles negatives cleanly.
+    let expr = format!(
+        "{} + ({} * INTERVAL 1 {})",
+        quote_ident(&column),
+        amount,
+        interval_unit(&unit)
+    );
+    Ok(apply_col_expr(upstream, &column, expr, string_prop(props, "outputColumn")))
+}
+
+fn build_date_diff(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.dt.diff"))?;
+    let start = string_prop(props, "startColumn")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Date diff needs a start column".to_string())?;
+    let end = string_prop(props, "endColumn")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Date diff needs an end column".to_string())?;
+    let unit = string_prop(props, "unit").unwrap_or_else(|| "day".into());
+    let out = string_prop(props, "outputColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "date_diff".into());
+    Ok(format!(
+        "SELECT *, date_diff('{}', {}, {}) AS {} FROM {}",
+        sql_escape(&unit),
+        quote_ident(&start),
+        quote_ident(&end),
+        quote_ident(&out),
+        quote_ident(upstream)
+    ))
+}
+
+fn build_json_flatten(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.json.flatten"))?;
+    let column = require_column(props)?;
+    let col = quote_ident(&column);
+    // Expand a STRUCT column's fields to top-level columns.
+    Ok(format!(
+        "SELECT * EXCLUDE ({}), {}.* FROM {}",
+        col,
+        col,
+        quote_ident(upstream)
+    ))
+}
+
+fn build_json_merge(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.json.merge"))?;
+    let a = require_column(props)?;
+    let b = string_prop(props, "secondColumn")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Merge needs a second column".to_string())?;
+    let out = string_prop(props, "outputColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "merged".into());
+    Ok(format!(
+        "SELECT *, json_merge_patch(CAST({} AS JSON), CAST({} AS JSON)) AS {} FROM {}",
+        quote_ident(&a),
+        quote_ident(&b),
+        quote_ident(&out),
+        quote_ident(upstream)
+    ))
+}
+
+fn build_arr_collect(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.arr.collect"))?;
+    let value = string_prop(props, "valueColumn")
+        .or_else(|| string_prop(props, "column"))
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Collect needs a value column".to_string())?;
+    let out = string_prop(props, "outputColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "items".into());
+    let group = columns_list(props, "groupBy");
+    if group.is_empty() {
+        Ok(format!(
+            "SELECT list({}) AS {} FROM {}",
+            quote_ident(&value),
+            quote_ident(&out),
+            quote_ident(upstream)
+        ))
+    } else {
+        let g = group.iter().map(|c| quote_ident(c)).collect::<Vec<_>>().join(", ");
+        Ok(format!(
+            "SELECT {}, list({}) AS {} FROM {} GROUP BY {}",
+            g,
+            quote_ident(&value),
+            quote_ident(&out),
+            quote_ident(upstream),
+            g
+        ))
+    }
+}
+
+fn build_arr_contains(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.arr.contains"))?;
+    let column = require_column(props)?;
+    let value = string_prop(props, "value").unwrap_or_default();
+    let lit = if value.trim().parse::<f64>().is_ok() {
+        value.trim().to_string()
+    } else {
+        format!("'{}'", sql_escape(&value))
+    };
+    let expr = format!("list_contains({}, {})", quote_ident(&column), lit);
+    let out = string_prop(props, "outputColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| format!("{}_contains", column));
+    Ok(format!(
+        "SELECT *, {} AS {} FROM {}",
+        expr,
+        quote_ident(&out),
+        quote_ident(upstream)
     ))
 }
 
