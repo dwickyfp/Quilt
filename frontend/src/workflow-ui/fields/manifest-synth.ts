@@ -1244,10 +1244,34 @@ function synthRowTransform(comp: ComponentDef): ComponentManifest {
 }
 
 function synthAggregateTransform(comp: ComponentDef): ComponentManifest {
+    if (comp.id === 'xf.aggwin') {
+        // Window aggregate: an aggregate over a window that keeps every row.
+        return base(comp, [
+            {
+                label: 'Window aggregate',
+                fields: [
+                    {
+                        key: 'function',
+                        label: 'Function',
+                        kind: 'select',
+                        defaultValue: 'sum',
+                        options: ['sum', 'avg', 'count', 'min', 'max'].map(f => ({
+                            label: f.toUpperCase(),
+                            value: f,
+                        })),
+                    },
+                    { key: 'column', label: 'Column', kind: 'column', required: true },
+                    { key: 'partitionBy', label: 'Partition by', kind: 'columns' },
+                    { key: 'orderBy', label: 'Order by', kind: 'columns' },
+                    { key: 'outputName', label: 'Output column', kind: 'text', defaultValue: 'window_value' },
+                ],
+            },
+        ], 'declared');
+    }
     return base(comp, [
         { label: 'Grouping', fields: [{ key: 'groupKeys', label: 'Group by', kind: 'columns', required: true }] },
         { label: 'Aggregations', fields: [{ key: 'aggregations', label: 'Aggregations', kind: 'aggregations', required: true }] },
-        { label: 'Filter', fields: [{ key: 'having', label: 'HAVING clause', kind: 'expression', rows: 2, placeholder: 'sum_amount > 1000' }] },
+        { label: 'Filter', fields: [{ key: 'havingClause', label: 'HAVING clause', kind: 'expression', rows: 2, placeholder: 'sum_amount > 1000' }] },
     ], 'declared');
 }
 
@@ -1446,6 +1470,19 @@ function synthNumericTransform(comp: ComponentDef): ComponentManifest {
 }
 
 function synthPivotTransform(comp: ComponentDef): ComponentManifest {
+    if (comp.id === 'xf.unpivot') {
+        // Unpivot: wide to long. Chosen columns become name/value rows.
+        return base(comp, [
+            {
+                label: 'Unpivot',
+                fields: [
+                    { key: 'columns', label: 'Columns to unpivot', kind: 'columns', required: true },
+                    { key: 'nameColumn', label: 'Name column', kind: 'text', defaultValue: 'name' },
+                    { key: 'valueColumn', label: 'Value column', kind: 'text', defaultValue: 'value' },
+                ],
+            },
+        ], 'declared');
+    }
     return base(comp, [
         {
             label: 'Pivot',

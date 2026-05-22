@@ -838,6 +838,60 @@ fn duckdb_source_reads_table() {
 }
 
 #[test]
+fn window_aggregate_keeps_rows() {
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "g,amt\na,10\na,20\nb,5\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("w1", "xf.aggwin", json!({
+                "function": "sum", "column": "amt", "partitionBy": ["g"], "outputName": "g_total"
+            })),
+            node("k1", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s1", "w1"), main_edge("e2", "w1", "k1")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    // All 3 rows kept; group 'a' rows carry the partition total 30.
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 3);
+    let total = scalar_string(&format!(
+        "SELECT CAST(g_total AS VARCHAR) FROM read_csv_auto('{}') WHERE g = 'a' LIMIT 1",
+        out
+    ));
+    assert_eq!(total, "30", "got {}", total);
+}
+
+#[test]
+fn unpivot_wide_to_long() {
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "id,q1,q2\n1,10,20\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("u1", "xf.unpivot", json!({
+                "columns": ["q1", "q2"], "nameColumn": "quarter", "valueColumn": "amount"
+            })),
+            node("k1", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s1", "u1"), main_edge("e2", "u1", "k1")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    // One input row, two unpivoted columns -> two output rows.
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 2);
+    let q1 = scalar_string(&format!(
+        "SELECT CAST(amount AS VARCHAR) FROM read_csv_auto('{}') WHERE quarter = 'q1'",
+        out
+    ));
+    assert_eq!(q1, "10", "got {}", q1);
+}
+
+#[test]
 fn missing_source_file_errors_cleanly() {
     let tmp = tempfile::tempdir().unwrap();
     let out = out_path(tmp.path(), "never.parquet");

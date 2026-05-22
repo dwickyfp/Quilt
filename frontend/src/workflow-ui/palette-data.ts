@@ -243,7 +243,7 @@ export const PALETTE: Category[] = [
                     xf('groupby', 'Group By', 'available'),
                     xf('rollup', 'Rollup', 'available'),
                     xf('cube', 'Cube', 'available'),
-                    xf('aggwin', 'Window Aggregate', 'planned'),
+                    xf('aggwin', 'Window Aggregate', 'available', 'Aggregate over a window, keep every row'),
                     xf('count', 'Count Rows', 'available'),
                 ],
             },
@@ -329,7 +329,7 @@ export const PALETTE: Category[] = [
                 label: 'Pivot / Shape',
                 components: [
                     xf('pivot', 'Pivot', 'available', 'Rows to columns'),
-                    xf('unpivot', 'Unpivot', 'planned'),
+                    xf('unpivot', 'Unpivot', 'available', 'Columns to name/value rows (wide to long)'),
                     xf('denorm', 'Denormalize', 'planned'),
                     xf('norm', 'Normalize', 'planned'),
                     xf('transpose', 'Transpose', 'planned'),

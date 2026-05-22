@@ -411,6 +411,7 @@ fn build_view_sql(
         "xf.agg" | "xf.groupby" => build_aggregate(inputs, props, GroupMode::Plain),
         "xf.rollup" => build_aggregate(inputs, props, GroupMode::Rollup),
         "xf.cube" => build_aggregate(inputs, props, GroupMode::Cube),
+        "xf.aggwin" => build_window_aggregate(inputs, props),
         "xf.union" => build_union(inputs, true),
         "xf.unionall" => build_union(inputs, false),
         "xf.intersect" => build_setop(inputs, "INTERSECT"),
@@ -419,6 +420,7 @@ fn build_view_sql(
         "xf.rownum" | "xf.rank" | "xf.denserank" | "xf.lead" | "xf.lag" | "xf.first"
         | "xf.last" | "xf.ntile" => build_window(inputs, props, component_id),
         "xf.pivot" => build_pivot(inputs, props),
+        "xf.unpivot" => build_unpivot(inputs, props),
         // Data-quality validators - the PASS rows. Failures go to the
         // node's __reject table (see build_reject_sql).
         "qa.notnull" | "qa.range" | "qa.regex" | "qa.unique" => {
@@ -1183,6 +1185,72 @@ fn build_cross_join(inputs: &NodeInputs) -> Result<String, String> {
         "SELECT * FROM {} CROSS JOIN {}",
         quote_ident(left),
         quote_ident(right)
+    ))
+}
+
+/// Window aggregate: an aggregate computed over a window, keeping every
+/// row (unlike Group By, which collapses them).
+fn build_window_aggregate(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.aggwin"))?;
+    let func = string_prop(props, "function").unwrap_or_else(|| "sum".into()).to_uppercase();
+    let column = string_prop(props, "column")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "*".into());
+    let call = if column == "*" {
+        format!("{}(*)", func)
+    } else {
+        format!("{}({})", func, quote_ident(&column))
+    };
+    let partition = columns_list(props, "partitionBy");
+    let order = columns_list(props, "orderBy");
+    let mut over = String::new();
+    if !partition.is_empty() {
+        over.push_str(&format!(
+            "PARTITION BY {}",
+            partition.iter().map(|c| quote_ident(c)).collect::<Vec<_>>().join(", ")
+        ));
+    }
+    if !order.is_empty() {
+        if !over.is_empty() {
+            over.push(' ');
+        }
+        over.push_str(&format!(
+            "ORDER BY {}",
+            order.iter().map(|c| quote_ident(c)).collect::<Vec<_>>().join(", ")
+        ));
+    }
+    let out = string_prop(props, "outputName")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| format!("{}_{}", func.to_lowercase(), column.replace('*', "all")));
+    Ok(format!(
+        "SELECT *, {} OVER ({}) AS {} FROM {}",
+        call,
+        over,
+        quote_ident(&out),
+        quote_ident(upstream)
+    ))
+}
+
+/// Unpivot: turn a set of columns into name/value rows (wide to long).
+fn build_unpivot(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.unpivot"))?;
+    let cols = columns_list(props, "columns");
+    if cols.is_empty() {
+        return Err("Unpivot needs the columns to unpivot".to_string());
+    }
+    let name_col = string_prop(props, "nameColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "name".into());
+    let value_col = string_prop(props, "valueColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "value".into());
+    let on = cols.iter().map(|c| quote_ident(c)).collect::<Vec<_>>().join(", ");
+    Ok(format!(
+        "SELECT * FROM (UNPIVOT (SELECT * FROM {}) ON {} INTO NAME {} VALUE {})",
+        quote_ident(upstream),
+        on,
+        quote_ident(&name_col),
+        quote_ident(&value_col)
     ))
 }
 
