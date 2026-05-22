@@ -368,18 +368,45 @@ fn build_passthrough_op(inputs: &NodeInputs, op: &str) -> Result<String, String>
 
 fn build_filter(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
     let upstream = inputs.main().ok_or_else(|| "missing main input".to_string())?;
-    let predicate = props
-        .get("predicate")
-        .and_then(JsonValue::as_str)
-        .or_else(|| props.get("filterSql").and_then(JsonValue::as_str))
-        .unwrap_or("TRUE")
-        .trim();
+    // The predicate is usually a structured object carrying compiled
+    // `sql`; it may also be a raw string (legacy / raw-SQL mode).
+    let predicate = filter_predicate_sql(props.get("predicate"))
+        .or_else(|| {
+            props
+                .get("filterSql")
+                .and_then(JsonValue::as_str)
+                .map(str::to_string)
+        })
+        .unwrap_or_default();
+    let predicate = predicate.trim();
     let predicate = if predicate.is_empty() { "TRUE" } else { predicate };
     Ok(format!(
         "SELECT * FROM {} WHERE {}",
         quote_ident(upstream),
         predicate
     ))
+}
+
+/// Extract the effective SQL from a filter predicate value, which may be
+/// a plain string or the structured FilterPredicate object the visual
+/// builder writes ({ mode, conditions, rawSql, sql }).
+fn filter_predicate_sql(v: Option<&JsonValue>) -> Option<String> {
+    match v {
+        Some(JsonValue::String(s)) => Some(s.clone()),
+        Some(JsonValue::Object(o)) => o
+            .get("sql")
+            .and_then(JsonValue::as_str)
+            .map(str::to_string)
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| {
+                if o.get("mode").and_then(JsonValue::as_str) == Some("raw") {
+                    o.get("rawSql").and_then(JsonValue::as_str).map(str::to_string)
+                } else {
+                    None
+                }
+            }),
+        _ => None,
+    }
 }
 
 fn build_project(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
@@ -475,13 +502,17 @@ fn build_aggregate(inputs: &NodeInputs, props: &JsonValue) -> Result<String, Str
     let mut select_terms: Vec<String> = group_by.iter().map(|c| quote_ident(c)).collect();
     for agg in &aggregations {
         let column = agg.get("column").and_then(JsonValue::as_str).unwrap_or("*");
+        // The UI's AggregationsField stores { column, func, output };
+        // accept the function/alias spellings too for robustness.
         let func = agg
             .get("function")
+            .or_else(|| agg.get("func"))
             .and_then(JsonValue::as_str)
             .unwrap_or("count")
             .to_uppercase();
         let alias = agg
             .get("alias")
+            .or_else(|| agg.get("output"))
             .and_then(JsonValue::as_str)
             .map(String::from)
             .unwrap_or_else(|| format!("{}_{}", func.to_lowercase(), column.replace('*', "all")));

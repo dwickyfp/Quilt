@@ -60,6 +60,9 @@ export type FilterPredicate = {
     match: 'all' | 'any';
     conditions: Condition[];
     rawSql?: string;
+    /** Compiled SQL — kept in sync on every edit so the canvas card
+     *  and the Rust executor read one authoritative string. */
+    sql?: string;
 };
 
 function newId(): string {
@@ -167,28 +170,34 @@ export function FilterBuilderField({ value, onChange }: Props) {
         [predicate, upstreamSchema],
     );
 
+    // Always persist the compiled SQL alongside the structured predicate
+    // so the canvas card and the executor read one authoritative value.
+    const emit = (next: FilterPredicate) => {
+        onChange({ ...next, sql: predicateToSql(next, upstreamSchema) });
+    };
+
     const addCondition = () => {
         const firstCol = upstreamSchema[0]?.name ?? '';
         const newCond: Condition = { id: newId(), column: firstCol, op: 'eq', value: '' };
-        onChange({ ...predicate, conditions: [...predicate.conditions, newCond] });
+        emit({ ...predicate, conditions: [...predicate.conditions, newCond] });
     };
 
     const updateCondition = (id: string, patch: Partial<Condition>) => {
-        onChange({
+        emit({
             ...predicate,
             conditions: predicate.conditions.map(c => (c.id === id ? { ...c, ...patch } : c)),
         });
     };
 
     const removeCondition = (id: string) => {
-        onChange({ ...predicate, conditions: predicate.conditions.filter(c => c.id !== id) });
+        emit({ ...predicate, conditions: predicate.conditions.filter(c => c.id !== id) });
     };
 
     const setMode = (mode: 'builder' | 'raw') => {
         if (mode === 'raw') {
-            onChange({ ...predicate, mode, rawSql: predicate.rawSql ?? generatedSql });
+            emit({ ...predicate, mode, rawSql: predicate.rawSql ?? generatedSql });
         } else {
-            onChange({ ...predicate, mode });
+            emit({ ...predicate, mode });
         }
     };
 
@@ -223,7 +232,7 @@ export function FilterBuilderField({ value, onChange }: Props) {
                                     type="radio"
                                     name="filter-match"
                                     checked={predicate.match === 'all'}
-                                    onChange={() => onChange({ ...predicate, match: 'all' })}
+                                    onChange={() => emit({ ...predicate, match: 'all' })}
                                 />
                                 <span>
                                     <b>All</b> (AND)
@@ -234,7 +243,7 @@ export function FilterBuilderField({ value, onChange }: Props) {
                                     type="radio"
                                     name="filter-match"
                                     checked={predicate.match === 'any'}
-                                    onChange={() => onChange({ ...predicate, match: 'any' })}
+                                    onChange={() => emit({ ...predicate, match: 'any' })}
                                 />
                                 <span>
                                     <b>Any</b> (OR)
@@ -381,7 +390,7 @@ export function FilterBuilderField({ value, onChange }: Props) {
                         placeholder="status = 'paid' AND amount > 100"
                         rows={4}
                         onChange={e =>
-                            onChange({ ...predicate, mode: 'raw', rawSql: e.target.value })
+                            emit({ ...predicate, mode: 'raw', rawSql: e.target.value })
                         }
                         spellCheck={false}
                     />

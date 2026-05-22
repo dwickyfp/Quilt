@@ -192,6 +192,86 @@ fn preview_returned_for_leaf_without_sink() {
 }
 
 #[test]
+fn structured_filter_predicate_actually_filters() {
+    // The visual filter builder stores a structured object carrying its
+    // compiled SQL — the executor must honor it, not fall back to TRUE.
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(
+        tmp.path(),
+        "orders.csv",
+        "id,status\n1,paid\n2,pending\n3,paid\n",
+    );
+    let out = out_path(tmp.path(), "filtered.csv");
+
+    let engine = DuckdbEngine::new().unwrap();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node(
+                "f1",
+                "xf.filter",
+                json!({
+                    "predicate": {
+                        "mode": "builder",
+                        "match": "all",
+                        "conditions": [
+                            { "id": "c1", "column": "status", "op": "eq", "value": "paid" }
+                        ],
+                        "sql": "status = 'paid'"
+                    }
+                }),
+            ),
+            node("k1", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s1", "f1"), main_edge("e2", "f1", "k1")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    // Header + 2 paid rows — NOT all 3 (which is what the WHERE TRUE bug did).
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 2);
+}
+
+#[test]
+fn aggregate_accepts_func_output_keys() {
+    // The UI stores aggregations as { column, func, output }; the
+    // executor must accept those spellings (not only function/alias).
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(
+        tmp.path(),
+        "sales.csv",
+        "region,amount\nwest,10\nwest,20\neast,5\n",
+    );
+    let out = out_path(tmp.path(), "agg.csv");
+
+    let engine = DuckdbEngine::new().unwrap();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node(
+                "a1",
+                "xf.agg",
+                json!({
+                    "groupBy": ["region"],
+                    "aggregations": [
+                        { "column": "amount", "func": "sum", "output": "total" }
+                    ]
+                }),
+            ),
+            node("k1", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s1", "a1"), main_edge("e2", "a1", "k1")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 2);
+    let west = scalar_string(&format!(
+        "SELECT CAST(total AS VARCHAR) FROM read_csv_auto('{}') WHERE region = 'west'",
+        out
+    ));
+    assert_eq!(west, "30");
+}
+
+#[test]
 fn missing_source_file_errors_cleanly() {
     let tmp = tempfile::tempdir().unwrap();
     let out = out_path(tmp.path(), "never.parquet");

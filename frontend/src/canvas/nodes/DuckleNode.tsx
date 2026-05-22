@@ -73,10 +73,11 @@ export default function DuckleNode({ id, data, selected, type }: NodeProps<Duckl
                 </div>
                 <div className="node-label">{data.label}</div>
                 {(() => {
-                    // Subtitle reflects the live config (file name, predicate,
-                    // group-by keys, ...), falling back to any seeded subtitle.
-                    const subtitle =
-                        deriveNodeSubtitle(data.componentId, data.properties) ?? data.subtitle;
+                    // Subtitle reflects ONLY the live config (file name,
+                    // predicate, group-by keys, …). We intentionally don't
+                    // fall back to a seeded subtitle, so a card never shows
+                    // a label that isn't in the component's actual config.
+                    const subtitle = deriveNodeSubtitle(data.componentId, data.properties);
                     return subtitle ? (
                         <div className="node-subtitle" title={subtitle}>
                             {subtitle}

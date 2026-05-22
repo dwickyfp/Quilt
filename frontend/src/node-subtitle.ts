@@ -33,8 +33,17 @@ export function deriveNodeSubtitle(
     }
 
     switch (componentId) {
-        case 'xf.filter':
-            return str(p.predicate) ?? str(p.filterSql);
+        case 'xf.filter': {
+            // The predicate is a structured object carrying its compiled
+            // SQL; older configs may store a raw string.
+            const pred = p.predicate;
+            if (typeof pred === 'string') return str(pred);
+            if (pred && typeof pred === 'object') {
+                const o = pred as { sql?: unknown; rawSql?: unknown; mode?: unknown };
+                return str(o.sql) ?? (o.mode === 'raw' ? str(o.rawSql) : undefined);
+            }
+            return str(p.filterSql);
+        }
         case 'xf.project': {
             const n = strs(p.columns).length;
             return n ? `keep ${n} col${n === 1 ? '' : 's'}` : undefined;
