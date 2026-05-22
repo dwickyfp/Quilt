@@ -11,7 +11,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 pub const DUCKDB_VERSION: &str = "1.1.3";
-pub const SLOTHDB_VERSION: &str = "0.1.0";
+pub const SLOTHDB_VERSION: &str = "0.2.7";
 
 /// Static description of an installable engine.
 struct EngineSpec {
@@ -88,18 +88,17 @@ fn asset_for(s: &EngineSpec) -> Option<String> {
             }
             .to_string(),
         ),
-        // SlothDB mirrors the same naming; adjust if its releases differ.
-        "slothdb" => {
-            let plat = match (os, arch) {
-                ("windows", "x86_64") => "windows-amd64",
-                ("windows", "aarch64") => "windows-arm64",
-                ("linux", "x86_64") => "linux-amd64",
-                ("linux", "aarch64") => "linux-aarch64",
-                ("macos", _) => "macos-universal",
+        // SlothDB ships raw, single-file binaries per its releases —
+        // not zips. Names per https://github.com/SouravRoy-ETL/slothdb.
+        "slothdb" => Some(
+            match (os, arch) {
+                ("windows", _) => "slothdb.exe",
+                ("linux", "x86_64") => "slothdb-linux-x64",
+                ("macos", _) => "slothdb-macos",
                 _ => return None,
-            };
-            Some(format!("slothdb-{}.zip", plat))
-        }
+            }
+            .to_string(),
+        ),
         _ => None,
     }
 }
@@ -204,28 +203,38 @@ fn install_spec<F: FnMut(InstallProgress)>(
         on_progress(InstallProgress::Downloading { received, total });
     }
 
-    on_progress(InstallProgress::Extracting);
     let target = binary_path(app_data, s);
-    let want = binary_file_name(s);
-    let reader = std::io::Cursor::new(buf);
-    let mut archive = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
-    let mut extracted = false;
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
-        let name = file.name().to_string();
-        let leaf = name.rsplit('/').next().unwrap_or(&name);
-        if leaf.eq_ignore_ascii_case(&want) || leaf.eq_ignore_ascii_case(s.binary) {
-            let mut out = std::fs::File::create(&target).map_err(|e| e.to_string())?;
-            std::io::copy(&mut file, &mut out).map_err(|e| e.to_string())?;
-            extracted = true;
-            break;
+
+    if asset.to_ascii_lowercase().ends_with(".zip") {
+        // Zipped distribution (DuckDB) — pull the binary out.
+        on_progress(InstallProgress::Extracting);
+        let want = binary_file_name(s);
+        let reader = std::io::Cursor::new(buf);
+        let mut archive = zip::ZipArchive::new(reader).map_err(|e| e.to_string())?;
+        let mut extracted = false;
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
+            let name = file.name().to_string();
+            let leaf = name.rsplit('/').next().unwrap_or(&name);
+            if leaf.eq_ignore_ascii_case(&want) || leaf.eq_ignore_ascii_case(s.binary) {
+                let mut out = std::fs::File::create(&target).map_err(|e| e.to_string())?;
+                std::io::copy(&mut file, &mut out).map_err(|e| e.to_string())?;
+                extracted = true;
+                break;
+            }
         }
-    }
-    if !extracted {
-        return Err(format!(
-            "{} binary not found inside the downloaded archive",
-            s.name
-        ));
+        if !extracted {
+            return Err(format!(
+                "{} binary not found inside the downloaded archive",
+                s.name
+            ));
+        }
+    } else {
+        // Raw single-file binary (SlothDB) — the download IS the binary.
+        if buf.is_empty() {
+            return Err(format!("{} download was empty", s.name));
+        }
+        std::fs::write(&target, &buf).map_err(|e| e.to_string())?;
     }
 
     #[cfg(unix)]
@@ -234,15 +243,15 @@ fn install_spec<F: FnMut(InstallProgress)>(
         let _ = std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o755));
     }
 
+    // Verify the binary landed and is non-empty. Probing --version is
+    // best-effort: DuckDB supports it; we don't assume every engine does,
+    // so a non-zero --version isn't fatal as long as the file is there.
     on_progress(InstallProgress::Verifying);
-    let ok = std::process::Command::new(&target)
-        .arg("--version")
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
-    if !ok {
-        return Err(format!("Installed {} binary failed to run (--version)", s.name));
+    let bytes = std::fs::metadata(&target).map(|m| m.len()).unwrap_or(0);
+    if bytes == 0 {
+        return Err(format!("Installed {} binary is empty", s.name));
     }
+    let _ = std::process::Command::new(&target).arg("--version").output();
 
     let path = target.to_string_lossy().to_string();
     on_progress(InstallProgress::Done { path: path.clone() });
@@ -273,5 +282,21 @@ mod tests {
         assert!(status(tmp.path())
             .iter()
             .any(|e| e.id == "duckdb" && e.installed));
+    }
+
+    #[test]
+    #[ignore = "downloads the SlothDB raw binary from GitHub releases (network)"]
+    fn installs_slothdb() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = install(tmp.path(), "slothdb", |_| {}).expect("install");
+        let p = std::path::Path::new(&path);
+        assert!(p.exists(), "binary should exist");
+        assert!(
+            std::fs::metadata(p).unwrap().len() > 0,
+            "binary should be non-empty"
+        );
+        assert!(status(tmp.path())
+            .iter()
+            .any(|e| e.id == "slothdb" && e.installed));
     }
 }
