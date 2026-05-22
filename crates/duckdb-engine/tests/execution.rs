@@ -817,6 +817,7 @@ fn sqlite_sink_writes_table() {
 
 #[test]
 fn duckdb_source_reads_table() {
+    let engine = engine_or_skip!();
     let tmp = tempfile::tempdir().unwrap();
     let srcdb = out_path(tmp.path(), "src.duckdb");
     duckdb_exec(
@@ -824,7 +825,6 @@ fn duckdb_source_reads_table() {
         "CREATE TABLE orders AS SELECT * FROM (VALUES (1,'paid'),(2,'pending'),(3,'paid')) t(id,status)",
     );
     let out = out_path(tmp.path(), "out.csv");
-    let engine = engine_or_skip!();
     let d = doc(
         json!([
             node("s1", "src.duckdb", json!({ "database": srcdb, "tableName": "orders" })),
