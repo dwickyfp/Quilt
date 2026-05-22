@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import {
     AlarmClock,
     CalendarClock,
+    Eye,
+    FolderOpen,
     Pencil,
     Play,
     Plus,
@@ -10,6 +12,7 @@ import {
     Trash2,
     X,
 } from 'lucide-react';
+import { isTauri } from '../tauri-dialog';
 import {
     scheduleDelete,
     scheduleList,
@@ -29,10 +32,12 @@ type Draft = {
     id: string;
     name: string;
     enabled: boolean;
-    mode: 'cron' | 'interval';
+    mode: 'cron' | 'interval' | 'file_watch';
     cronExpr: string;
     intervalUnit: 'seconds' | 'minutes' | 'hours' | 'days';
     intervalValue: number;
+    watchPath: string;
+    watchRecursive: boolean;
 };
 
 const CRON_PRESETS: { label: string; expr: string }[] = [
@@ -75,12 +80,13 @@ export default function ScheduleEditorModal({ pipelineId, pipelineName, onClose 
             cronExpr: '0 0 * * * *',
             intervalUnit: 'hours',
             intervalValue: 1,
+            watchPath: '',
+            watchRecursive: true,
         });
         setError(null);
     };
 
     const startEdit = (s: Schedule) => {
-        const isCron = s.kind.type === 'cron';
         const intervalSec = s.kind.type === 'interval' ? s.kind.seconds : 3600;
         const cronExpr = s.kind.type === 'cron' ? s.kind.expr : '0 0 * * * *';
         const { value, unit } = splitInterval(intervalSec);
@@ -88,10 +94,12 @@ export default function ScheduleEditorModal({ pipelineId, pipelineName, onClose 
             id: s.id,
             name: s.name,
             enabled: s.enabled,
-            mode: isCron ? 'cron' : 'interval',
+            mode: s.kind.type,
             cronExpr,
             intervalUnit: unit,
             intervalValue: value,
+            watchPath: s.kind.type === 'file_watch' ? s.kind.path : '',
+            watchRecursive: s.kind.type === 'file_watch' ? s.kind.recursive : true,
         });
         setError(null);
     };
@@ -103,7 +111,16 @@ export default function ScheduleEditorModal({ pipelineId, pipelineName, onClose 
         const kind: ScheduleKind =
             editing.mode === 'cron'
                 ? { type: 'cron', expr: editing.cronExpr.trim() }
-                : { type: 'interval', seconds: joinInterval(editing.intervalValue, editing.intervalUnit) };
+                : editing.mode === 'file_watch'
+                  ? {
+                        type: 'file_watch',
+                        path: editing.watchPath.trim(),
+                        recursive: editing.watchRecursive,
+                    }
+                  : {
+                        type: 'interval',
+                        seconds: joinInterval(editing.intervalValue, editing.intervalUnit),
+                    };
         const draft: Schedule = {
             id: editing.id,
             pipeline_id: pipelineId,
@@ -247,6 +264,8 @@ function ScheduleRow({
                 <div className="schedule-row-detail">
                     {schedule.kind.type === 'cron' ? (
                         <CalendarClock size={11} />
+                    ) : schedule.kind.type === 'file_watch' ? (
+                        <Eye size={11} />
                     ) : (
                         <Repeat size={11} />
                     )}
@@ -353,9 +372,64 @@ function ScheduleForm({
                     >
                         <CalendarClock size={12} /> Cron
                     </button>
+                    <button
+                        type="button"
+                        className={
+                            'schedule-mode-button' +
+                            (draft.mode === 'file_watch' ? ' is-active' : '')
+                        }
+                        onClick={() => onChange({ ...draft, mode: 'file_watch' })}
+                    >
+                        <Eye size={12} /> File watch
+                    </button>
                 </div>
             </div>
-            {draft.mode === 'interval' ? (
+            {draft.mode === 'file_watch' ? (
+                <>
+                    <div className="modal-field">
+                        <label className="modal-field-label">Watch path</label>
+                        <div className="schedule-watch-row">
+                            <input
+                                type="text"
+                                className="modal-input"
+                                value={draft.watchPath}
+                                onChange={e => onChange({ ...draft, watchPath: e.target.value })}
+                                placeholder="C:\\data\\incoming"
+                                spellCheck={false}
+                            />
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={async () => {
+                                    const picked = await pickWatchPath();
+                                    if (picked) onChange({ ...draft, watchPath: picked });
+                                }}
+                            >
+                                <FolderOpen size={13} /> Browse
+                            </button>
+                        </div>
+                    </div>
+                    <div className="modal-field">
+                        <label className="schedule-toggle">
+                            <input
+                                type="checkbox"
+                                checked={draft.watchRecursive}
+                                onChange={e =>
+                                    onChange({ ...draft, watchRecursive: e.target.checked })
+                                }
+                            />
+                            Watch subfolders recursively
+                        </label>
+                    </div>
+                    <div className="modal-tip">
+                        <span>
+                            The pipeline runs ~2s after any change under the watched path
+                            (create / modify / delete), debounced so a burst of writes triggers
+                            one run.
+                        </span>
+                    </div>
+                </>
+            ) : draft.mode === 'interval' ? (
                 <div className="modal-field">
                     <label className="modal-field-label">Interval</label>
                     <div className="schedule-interval-row">
@@ -477,8 +551,24 @@ function joinInterval(value: number, unit: 'seconds' | 'minutes' | 'hours' | 'da
 
 function describeKind(kind: ScheduleKind): string {
     if (kind.type === 'cron') return `Cron: ${kind.expr}`;
+    if (kind.type === 'file_watch') return `Watch: ${kind.path}`;
     const { value, unit } = splitInterval(kind.seconds);
     return `Every ${value} ${unit}`;
+}
+
+async function pickWatchPath(): Promise<string | null> {
+    if (!isTauri()) return null;
+    try {
+        const { open } = await import('@tauri-apps/plugin-dialog');
+        const picked = await open({
+            directory: true,
+            multiple: false,
+            title: 'Choose a folder to watch',
+        });
+        return typeof picked === 'string' ? picked : null;
+    } catch {
+        return null;
+    }
 }
 
 function formatTime(iso: string): string {

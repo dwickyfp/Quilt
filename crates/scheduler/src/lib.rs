@@ -9,16 +9,21 @@
 use chrono::{DateTime, Utc};
 use cron::Schedule as CronSchedule;
 use duckle_duckdb_engine::{DuckdbEngine, PipelineDoc, RunResult};
+use notify::{RecommendedWatcher, RecursiveMode};
+use notify_debouncer_mini::{new_debouncer, DebounceEventResult, Debouncer};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::time;
 use tracing::warn;
 
 const SCHEDULES_FILE: &str = "schedules.json";
 const TICK_INTERVAL: Duration = Duration::from_secs(15);
+const WATCH_DEBOUNCE: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -28,6 +33,12 @@ pub enum ScheduleKind {
     Cron { expr: String },
     /// Fire every N seconds since last run (or app start).
     Interval { seconds: u64 },
+    /// Fire when a file or folder changes (debounced ~2s).
+    FileWatch {
+        path: String,
+        #[serde(default)]
+        recursive: bool,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,26 +69,36 @@ fn default_true() -> bool {
 pub struct Scheduler {
     inner: Arc<Mutex<SchedulerInner>>,
     engine: DuckdbEngine,
+    fire_tx: UnboundedSender<String>,
 }
 
 struct SchedulerInner {
     schedules: Vec<Schedule>,
     workspace_path: Option<PathBuf>,
+    /// Active file-watchers, keyed by schedule id. Holding the
+    /// `Debouncer` keeps the watch alive; dropping it stops watching.
+    watchers: HashMap<String, Debouncer<RecommendedWatcher>>,
+    /// Receiver for file-watch fires; taken by `spawn_ticker`.
+    fire_rx: Option<UnboundedReceiver<String>>,
 }
 
 impl Scheduler {
     pub fn new(engine: DuckdbEngine) -> Self {
+        let (fire_tx, fire_rx) = unbounded_channel();
         Self {
             inner: Arc::new(Mutex::new(SchedulerInner {
                 schedules: Vec::new(),
                 workspace_path: None,
+                watchers: HashMap::new(),
+                fire_rx: Some(fire_rx),
             })),
             engine,
+            fire_tx,
         }
     }
 
     /// Switch to a different workspace path. Loads schedules from the
-    /// new path; computes next-run times for each.
+    /// new path; computes next-run times for each; rebuilds watchers.
     pub fn set_workspace(&self, path: Option<PathBuf>) {
         let mut g = self.inner.lock().expect("scheduler poisoned");
         g.workspace_path = path.clone();
@@ -91,6 +112,57 @@ impl Scheduler {
         for s in g.schedules.iter_mut() {
             compute_next_run(s);
         }
+        self.rebuild_watchers(&mut g);
+    }
+
+    /// Recreate file-watchers for the current schedule set. Drops all
+    /// existing watchers and rebuilds from enabled FileWatch
+    /// schedules.
+    fn rebuild_watchers(&self, inner: &mut SchedulerInner) {
+        inner.watchers.clear();
+        let specs: Vec<(String, String, bool)> = inner
+            .schedules
+            .iter()
+            .filter(|s| s.enabled)
+            .filter_map(|s| match &s.kind {
+                ScheduleKind::FileWatch { path, recursive } => {
+                    Some((s.id.clone(), path.clone(), *recursive))
+                }
+                _ => None,
+            })
+            .collect();
+        for (id, path, recursive) in specs {
+            match self.make_watcher(&id, &path, recursive) {
+                Ok(w) => {
+                    inner.watchers.insert(id, w);
+                }
+                Err(e) => warn!("File-watch setup failed for {}: {}", id, e),
+            }
+        }
+    }
+
+    fn make_watcher(
+        &self,
+        schedule_id: &str,
+        path: &str,
+        recursive: bool,
+    ) -> notify::Result<Debouncer<RecommendedWatcher>> {
+        let tx = self.fire_tx.clone();
+        let sid = schedule_id.to_string();
+        let mut debouncer = new_debouncer(WATCH_DEBOUNCE, move |res: DebounceEventResult| {
+            if let Ok(events) = res {
+                if !events.is_empty() {
+                    let _ = tx.send(sid.clone());
+                }
+            }
+        })?;
+        let mode = if recursive {
+            RecursiveMode::Recursive
+        } else {
+            RecursiveMode::NonRecursive
+        };
+        debouncer.watcher().watch(Path::new(path), mode)?;
+        Ok(debouncer)
     }
 
     pub fn list(&self) -> Vec<Schedule> {
@@ -112,6 +184,11 @@ impl Scheduler {
                     return Err("Interval must be at least 1 second".into());
                 }
             }
+            ScheduleKind::FileWatch { path, .. } => {
+                if path.trim().is_empty() {
+                    return Err("Watch path is required".into());
+                }
+            }
         }
         if schedule.id.is_empty() {
             schedule.id = uuid::Uuid::new_v4().to_string();
@@ -126,12 +203,14 @@ impl Scheduler {
         if let Some(path) = g.workspace_path.clone() {
             let _ = save_schedules(&path, &g.schedules);
         }
+        self.rebuild_watchers(&mut g);
         Ok(schedule)
     }
 
     pub fn delete(&self, id: &str) -> Result<(), String> {
         let mut g = self.inner.lock().expect("scheduler poisoned");
         g.schedules.retain(|s| s.id != id);
+        g.watchers.remove(id);
         if let Some(path) = g.workspace_path.clone() {
             let _ = save_schedules(&path, &g.schedules);
         }
@@ -176,8 +255,10 @@ impl Scheduler {
         }
     }
 
-    /// Start the polling task. Returns immediately.
+    /// Start the polling task and the file-watch fire listener.
+    /// Returns immediately.
     pub fn spawn_ticker(&self) {
+        // Cron / interval poller.
         let me = self.clone();
         tokio::spawn(async move {
             let mut tick = time::interval(TICK_INTERVAL);
@@ -187,6 +268,25 @@ impl Scheduler {
                 me.fire_due().await;
             }
         });
+
+        // File-watch fire listener — drains the channel watchers post to.
+        let rx = {
+            let mut g = self.inner.lock().expect("scheduler poisoned");
+            g.fire_rx.take()
+        };
+        if let Some(mut rx) = rx {
+            let me = self.clone();
+            tokio::spawn(async move {
+                while let Some(id) = rx.recv().await {
+                    let me2 = me.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = me2.run_now(&id).await {
+                            warn!("File-watch run {} failed: {}", id, e);
+                        }
+                    });
+                }
+            });
+        }
     }
 
     async fn fire_due(&self) {
@@ -226,6 +326,8 @@ fn compute_next_run(s: &mut Schedule) {
             let base = s.last_run_at.unwrap_or_else(Utc::now);
             Some(base + chrono::Duration::seconds(*seconds as i64))
         }
+        // Event-driven — no scheduled next-run time.
+        ScheduleKind::FileWatch { .. } => None,
     };
 }
 

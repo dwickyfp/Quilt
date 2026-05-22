@@ -153,7 +153,8 @@ export async function compilePipelineSql(
 
 export type ScheduleKind =
     | { type: 'cron'; expr: string }
-    | { type: 'interval'; seconds: number };
+    | { type: 'interval'; seconds: number }
+    | { type: 'file_watch'; path: string; recursive: boolean };
 
 export type Schedule = {
     id: string;

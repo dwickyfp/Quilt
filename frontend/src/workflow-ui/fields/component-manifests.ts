@@ -630,6 +630,47 @@ export const MANIFESTS: Record<string, ComponentManifest> = {
         ],
     },
 
+    'snk.s3': {
+        id: 'snk.s3',
+        kind: 'sink',
+        label: 'Amazon S3',
+        description: 'Write CSV / Parquet / JSON to an s3:// URI via DuckDB httpfs.',
+        schemaSource: 'upstream',
+        sections: [
+            {
+                label: 'Destination',
+                fields: [
+                    {
+                        key: 'path',
+                        label: 'S3 URI',
+                        kind: 'text',
+                        required: true,
+                        placeholder: 's3://bucket/path/out.parquet',
+                        description: 'Full S3 URI. Format is inferred from the extension.',
+                    },
+                    {
+                        key: 'connectionRef',
+                        label: 'Or use saved connection',
+                        kind: 'connection-ref',
+                        accepts: ['s3'],
+                    },
+                    {
+                        key: 'format',
+                        label: 'Format override',
+                        kind: 'select',
+                        options: [
+                            { label: 'Auto-detect from extension', value: '' },
+                            { label: 'CSV', value: 'csv' },
+                            { label: 'Parquet', value: 'parquet' },
+                            { label: 'JSON', value: 'json' },
+                        ],
+                    },
+                ],
+            },
+        ],
+        ports: { inputs: [{ id: 'main', label: 'in', type: 'main' }], outputs: [] },
+    },
+
     'snk.parquet': {
         id: 'snk.parquet',
         kind: 'sink',

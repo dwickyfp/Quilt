@@ -5264,6 +5264,16 @@ select.schema-input {
     width: 80px !important;
 }
 
+.schedule-watch-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.schedule-watch-row .modal-input {
+    flex: 1;
+}
+
 .schedule-presets {
     display: flex;
     flex-wrap: wrap;

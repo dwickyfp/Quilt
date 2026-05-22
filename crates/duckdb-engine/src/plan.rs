@@ -905,11 +905,44 @@ fn build_sink_sql(
         }
         "snk.parquet" => Ok(build_parquet_sink(props, from_view)),
         "snk.json" | "snk.jsonl" => Ok(build_json_sink(props, from_view)),
+        "snk.s3" | "snk.gcs" | "snk.azureblob" => Ok(build_cloud_sink(props, from_view)),
         other => Err(EngineError::Unsupported(format!(
             "Sink '{}' is not yet implemented",
             other
         ))),
     }
+}
+
+/// Cloud sink — COPY a view out to an s3:// / gs:// / az:// URL.
+/// DuckDB's httpfs handles the upload; credentials come from the
+/// SECRET wired up in execute_pipeline_with_events. Format is inferred
+/// from the URL extension unless overridden.
+fn build_cloud_sink(props: &JsonValue, from_view: &str) -> String {
+    let path = string_prop(props, "path")
+        .or_else(|| string_prop(props, "url"))
+        .unwrap_or_default();
+    let override_fmt = string_prop(props, "format").filter(|s| !s.is_empty());
+    let lower = path.to_ascii_lowercase();
+    let chosen = override_fmt.unwrap_or_else(|| {
+        if lower.ends_with(".parquet") || lower.ends_with(".pq") {
+            "parquet".into()
+        } else if lower.ends_with(".json") || lower.ends_with(".jsonl") || lower.ends_with(".ndjson") {
+            "json".into()
+        } else {
+            "csv".into()
+        }
+    });
+    let options = match chosen.as_str() {
+        "parquet" => "FORMAT PARQUET, COMPRESSION 'ZSTD'".to_string(),
+        "json" => "FORMAT JSON".to_string(),
+        _ => "FORMAT CSV, HEADER true".to_string(),
+    };
+    format!(
+        "COPY (SELECT * FROM {}) TO '{}' ({})",
+        quote_ident(from_view),
+        sql_escape(&path),
+        options
+    )
 }
 
 fn build_csv_sink(props: &JsonValue, from_view: &str) -> String {
