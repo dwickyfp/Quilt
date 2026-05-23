@@ -311,6 +311,18 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // Merge streams - multiple inputs concatenated into one output
+    if (id === 'ctl.merge') {
+        return {
+            inputs: [
+                { id: 'main_1', label: 'left', type: 'main' },
+                { id: 'main_2', label: 'right', type: 'main' },
+                { id: 'main_3', label: 'extra', type: 'main', optional: true },
+            ],
+            outputs: [MAIN_OUT],
+        };
+    }
+
     // Switch - one in, conditional outs + else
     if (id === 'ctl.switch') {
         return {
@@ -1633,6 +1645,9 @@ function synthRoutingControl(comp: ComponentDef): ComponentManifest {
                 ],
             },
         ], 'upstream');
+    }
+    if (id === 'ctl.replicate' || id === 'ctl.merge') {
+        return base(comp, [{ label: id === 'ctl.merge' ? 'Merge streams' : 'Replicate', fields: [] }], 'upstream');
     }
     if (id === 'ctl.iterate' || id === 'ctl.foreach') {
         return base(comp, [

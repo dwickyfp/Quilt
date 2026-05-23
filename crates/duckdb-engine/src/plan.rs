@@ -475,11 +475,14 @@ fn build_view_sql(
         // Custom SQL - runs the user's SELECT as a real stage, with the
         // upstream exposed as `input`. Makes SQL routines executable too.
         "code.sql" | "code.sqltemplate" => build_custom_sql(inputs, props),
-        // Control-flow nodes don't transform data - pass it through.
-        other if other.starts_with("ctl.") => {
-            let upstream = inputs.main().ok_or_else(|| missing_input_msg(other))?;
+        // Routing: replicate is a passthrough (the graph already lets
+        // multiple downstream edges read the same materialized table);
+        // merge concatenates multiple input streams with UNION ALL.
+        "ctl.replicate" => {
+            let upstream = inputs.main().ok_or_else(|| missing_input_msg("ctl.replicate"))?;
             Ok(format!("SELECT * FROM {}", quote_ident(upstream)))
         }
+        "ctl.merge" => build_union(inputs, false),
         // Everything else isn't executable yet. Fail loudly rather than
         // silently passing data through unchanged (which would look like
         // success while doing nothing).

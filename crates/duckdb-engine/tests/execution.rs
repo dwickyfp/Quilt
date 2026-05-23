@@ -1162,6 +1162,58 @@ fn transpose_swaps_rows_and_columns() {
 }
 
 #[test]
+fn replicate_passes_data_through() {
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "id\n1\n2\n3\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("r1", "ctl.replicate", json!({})),
+            node("k1", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s1", "r1"), main_edge("e2", "r1", "k1")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 3);
+}
+
+#[test]
+fn merge_streams_concatenates_inputs() {
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let csv_a = write_file(tmp.path(), "a.csv", "id\n1\n2\n");
+    let csv_b = write_file(tmp.path(), "b.csv", "id\n3\n4\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let main_n = |id: &str, source: &str, target: &str, n: usize| {
+        json!({
+            "id": id, "source": source, "target": target,
+            "targetHandle": format!("main_{}", n),
+            "data": { "connectionType": "main" }
+        })
+    };
+    let d = doc(
+        json!([
+            node("a", "src.csv", json!({ "path": csv_a, "hasHeader": true })),
+            node("b", "src.csv", json!({ "path": csv_b, "hasHeader": true })),
+            node("m", "ctl.merge", json!({})),
+            node("k1", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([
+            main_n("e1", "a", "m", 1),
+            main_n("e2", "b", "m", 2),
+            main_edge("e3", "m", "k1"),
+        ]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    // 2 + 2 = 4 rows after merge.
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 4);
+}
+
+#[test]
 fn missing_source_file_errors_cleanly() {
     let tmp = tempfile::tempdir().unwrap();
     let out = out_path(tmp.path(), "never.parquet");

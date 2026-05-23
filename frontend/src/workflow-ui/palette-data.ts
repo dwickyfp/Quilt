@@ -496,9 +496,9 @@ export const PALETTE: Category[] = [
                 id: 'ctl.routing',
                 label: 'Routing',
                 components: [
-                    ctl('replicate', 'Replicate / Tee', 'planned'),
+                    ctl('replicate', 'Replicate / Tee', 'available', 'Send the same data to multiple downstream outputs'),
                     ctl('switch', 'Switch / Conditional Split', 'planned'),
-                    ctl('merge', 'Merge Streams', 'planned'),
+                    ctl('merge', 'Merge Streams', 'available', 'Concatenate multiple input streams (UNION ALL)'),
                     ctl('iterate', 'Iterate', 'planned'),
                     ctl('foreach', 'For Each', 'planned'),
                 ],
