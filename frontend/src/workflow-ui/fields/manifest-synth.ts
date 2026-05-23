@@ -621,6 +621,27 @@ function synthDbSink(comp: ComponentDef): ComponentManifest {
 }
 
 function synthWarehouseSource(comp: ComponentDef): ComponentManifest {
+    if (comp.id === 'src.motherduck') {
+        // MotherDuck is DuckDB-native, no account/warehouse/role layer.
+        // Just a database name plus an optional inline token (otherwise
+        // the runtime falls back to the MOTHERDUCK_TOKEN env var).
+        return base(comp, [
+            {
+                label: 'MotherDuck',
+                fields: [
+                    { key: 'database', label: 'Database', kind: 'text', required: true, placeholder: 'my_db' },
+                    {
+                        key: 'token',
+                        label: 'MotherDuck token',
+                        kind: 'text',
+                        description: 'Optional. If empty, MOTHERDUCK_TOKEN from the environment is used.',
+                    },
+                    { key: 'schemaName', label: 'Schema', kind: 'text', defaultValue: 'main' },
+                    { key: 'tableName', label: 'Table', kind: 'text', required: true, placeholder: 'orders' },
+                ],
+            },
+        ]);
+    }
     return base(comp, [
         {
             label: 'Account',

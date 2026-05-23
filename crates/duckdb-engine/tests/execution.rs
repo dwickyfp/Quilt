@@ -1345,6 +1345,40 @@ fn mysql_sink_then_source_roundtrip() {
 }
 
 #[test]
+fn md_source_reads_table() {
+    // Live MotherDuck test: requires MOTHERDUCK_TOKEN plus a pre-created
+    // table named by DUCKLE_MD_TABLE (default 'duckle_test') inside the
+    // database DUCKLE_MD_DB (default 'my_db'). Skips cleanly otherwise.
+    let engine = engine_or_skip!();
+    let token = match std::env::var("MOTHERDUCK_TOKEN") {
+        Ok(t) if !t.is_empty() => t,
+        _ => {
+            eprintln!("skipping: set MOTHERDUCK_TOKEN to run against MotherDuck");
+            return;
+        }
+    };
+    let db = std::env::var("DUCKLE_MD_DB").unwrap_or_else(|_| "my_db".into());
+    let table = std::env::var("DUCKLE_MD_TABLE").unwrap_or_else(|_| "duckle_test".into());
+    let tmp = tempfile::tempdir().unwrap();
+    let out = out_path(tmp.path(), "out.csv");
+    let d = doc(
+        json!([
+            node("r", "src.motherduck", json!({
+                "database": db, "token": token,
+                "schemaName": "main", "tableName": table, "mode": "table"
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e", "r", "k")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "MotherDuck read failed: {:?}", result.error);
+    // Don't assert a specific row count - the table is the user's,
+    // not ours. Just confirm the read ran end to end.
+    assert!(std::path::Path::new(&out).exists(), "output CSV should exist");
+}
+
+#[test]
 fn missing_source_file_errors_cleanly() {
     let tmp = tempfile::tempdir().unwrap();
     let out = out_path(tmp.path(), "never.parquet");

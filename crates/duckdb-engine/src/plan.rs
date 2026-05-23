@@ -399,9 +399,8 @@ fn build_view_sql(
             component_id.strip_prefix("src.").unwrap_or(component_id),
             props,
         )),
-        "src.postgres" | "src.cockroach" | "src.mysql" | "src.mariadb" => {
-            build_relational_source(component_id, props)
-        }
+        "src.postgres" | "src.cockroach" | "src.mysql" | "src.mariadb"
+        | "src.motherduck" => build_relational_source(component_id, props),
         // Pass-through transforms
         "xf.filter" => build_filter(inputs, props),
         // Log Rows - pass data through unchanged; its rows surface in the
@@ -2108,6 +2107,7 @@ fn attach_prelude(component_id: &str, props: &JsonValue) -> String {
         "snk.postgres" | "snk.cockroach" => return db_attach(props, "postgres", 5432, false),
         "src.mysql" | "src.mariadb" => return db_attach(props, "mysql", 3306, true),
         "snk.mysql" | "snk.mariadb" => return db_attach(props, "mysql", 3306, false),
+        "src.motherduck" => return md_attach(props),
         _ => {}
     }
     let db = match string_prop(props, "database").filter(|s| !s.is_empty()) {
@@ -2225,18 +2225,44 @@ fn build_relational_sink(
 }
 
 /// Qualify a table reference under the right naming depth for each
-/// network DB family. Postgres / Cockroach are catalog.schema.table
-/// (default schema `public`); MySQL / MariaDB are catalog.table (the
-/// MySQL database is selected at ATTACH time, but if the user filled
-/// schemaName we honour it as a 3-level qualifier).
+/// network DB family. Postgres / Cockroach use catalog.schema.table
+/// (default schema `public`); MotherDuck is DuckDB-native and uses
+/// catalog.schema.table with default schema `main`; MySQL / MariaDB
+/// use catalog.table (the MySQL database is selected at ATTACH time,
+/// though we honour an explicit schemaName as a 3-level qualifier).
 fn relational_qualified(alias: &str, component_id: &str, schema: Option<&str>, table: &str) -> String {
-    let is_pg = component_id.ends_with(".postgres") || component_id.ends_with(".cockroach");
-    match (is_pg, schema) {
-        (true, Some(s)) => format!("{}.{}.{}", alias, quote_ident(s), quote_ident(table)),
-        (true, None) => format!("{}.public.{}", alias, quote_ident(table)),
-        (false, Some(s)) => format!("{}.{}.{}", alias, quote_ident(s), quote_ident(table)),
-        (false, None) => format!("{}.{}", alias, quote_ident(table)),
+    let default_schema: Option<&str> = if component_id.ends_with(".postgres")
+        || component_id.ends_with(".cockroach")
+    {
+        Some("public")
+    } else if component_id.ends_with(".motherduck") {
+        Some("main")
+    } else {
+        None // MySQL / MariaDB: skip the schema layer unless given
+    };
+    match (schema, default_schema) {
+        (Some(s), _) => format!("{}.{}.{}", alias, quote_ident(s), quote_ident(table)),
+        (None, Some(d)) => format!("{}.{}.{}", alias, quote_ident(d), quote_ident(table)),
+        (None, None) => format!("{}.{}", alias, quote_ident(table)),
     }
+}
+
+/// MotherDuck ATTACH. MotherDuck support is built into DuckDB itself
+/// (no extension to install), so this just builds an `md:` URL with
+/// an optional inline `motherduck_token` query parameter. If the token
+/// isn't in the form, MotherDuck falls back to the MOTHERDUCK_TOKEN env
+/// var, which lets a user keep credentials out of saved pipelines.
+fn md_attach(props: &JsonValue) -> String {
+    let db = match string_prop(props, "database").filter(|s| !s.is_empty()) {
+        Some(d) => d,
+        None => return String::new(),
+    };
+    let token = string_prop(props, "token").filter(|s| !s.is_empty());
+    let url = match token {
+        Some(t) => format!("md:{}?motherduck_token={}", db, t),
+        None => format!("md:{}", db),
+    };
+    format!("ATTACH '{}' AS duckle_src (READ_ONLY); ", sql_escape(&url))
 }
 
 /// SQLite / DuckDB sink - write the upstream into a table inside the

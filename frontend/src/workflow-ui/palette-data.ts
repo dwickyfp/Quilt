@@ -123,7 +123,7 @@ export const PALETTE: Category[] = [
                     src('redshift', 'Redshift', 'planned'),
                     src('databricks', 'Databricks SQL', 'planned'),
                     src('synapse', 'Azure Synapse', 'planned'),
-                    src('motherduck', 'MotherDuck', 'planned'),
+                    src('motherduck', 'MotherDuck', 'available', 'Read from MotherDuck via ATTACH md:'),
                 ],
             },
             {
