@@ -313,6 +313,11 @@ impl DuckdbEngine {
                 // get the column list, then assemble INSERT ... ON
                 // CONFLICT (Postgres) or ON DUPLICATE KEY UPDATE (MySQL).
                 self.run_upsert(&db_path, &secret_prefix, spec)
+            } else if let Some(spec) = stage.text_search.as_ref() {
+                // FTS in DuckDB v1.5+ can't see tables created in the
+                // same -c invocation, so we stage in one CLI call then
+                // index + query in a second.
+                self.run_text_search(&db_path, &secret_prefix, &stage.node_id, spec)
             } else if stage.sink_mode.as_deref() == Some("error")
                 && stage
                     .sink_path
@@ -498,6 +503,75 @@ impl DuckdbEngine {
             sql = native_sql.replace('\'', "''")
         );
         self.run(Some(db), &exec_sql, false)
+    }
+
+    /// Full-Text Search runs in two CLI invocations sharing the same
+    /// temp DB file. The first stages the upstream into a permanent
+    /// table; the second builds the BM25 index and the final node
+    /// table. The split is needed for DuckDB v1.5+ where the fts
+    /// PRAGMA can't see tables created in the same -c invocation; on
+    /// v1.4 it just costs one extra CLI spawn.
+    fn run_text_search(
+        &self,
+        db: &Path,
+        secret_prefix: &str,
+        node_id: &str,
+        spec: &plan::TextSearchSpec,
+    ) -> Result<String, EngineError> {
+        let staging = plan::quote_ident(&spec.staging_table);
+        let upstream = plan::quote_ident(&spec.from_view);
+        let node_q = plan::quote_ident(node_id);
+        let id_col_q = plan::quote_ident(&spec.id_col);
+        let output_q = plan::quote_ident(&spec.output_col);
+
+        // Phase 1: stage upstream into a named table that the next CLI
+        // invocation will see.
+        let stage_sql = format!(
+            "{secret}INSTALL fts; LOAD fts; \
+             DROP TABLE IF EXISTS {staging}; \
+             CREATE TABLE {staging} AS SELECT * FROM {upstream};",
+            secret = secret_prefix,
+            staging = staging,
+            upstream = upstream,
+        );
+        self.run(Some(db), &stage_sql, false)?;
+
+        // Phase 2: PRAGMA create_fts_index sees the staged table from
+        // disk; the same invocation then runs the BM25 SELECT.
+        let text_args = spec
+            .text_cols
+            .iter()
+            .map(|c| format!("'{}'", c.replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let index_schema = format!("fts_main_{}", spec.staging_table);
+        let match_expr = format!(
+            "{}.match_bm25({}, '{}')",
+            index_schema,
+            id_col_q,
+            spec.query.replace('\'', "''")
+        );
+        let order_limit = match spec.top_k {
+            Some(k) => format!(" ORDER BY {} DESC LIMIT {}", output_q, k),
+            None => String::new(),
+        };
+        let index_sql = format!(
+            "{secret}INSTALL fts; LOAD fts; \
+             PRAGMA create_fts_index('{staging_raw}', '{id_col}', {text_args}); \
+             CREATE OR REPLACE TABLE {node} AS \
+               SELECT *, {match_expr} AS {output_q} FROM {staging} \
+               WHERE {match_expr} IS NOT NULL{order_limit};",
+            secret = secret_prefix,
+            staging_raw = spec.staging_table.replace('\'', "''"),
+            id_col = spec.id_col.replace('\'', "''"),
+            text_args = text_args,
+            node = node_q,
+            match_expr = match_expr,
+            output_q = output_q,
+            staging = staging,
+            order_limit = order_limit,
+        );
+        self.run(Some(db), &index_sql, false)
     }
 
     fn count_rows(&self, db: &Path, name: &str) -> Result<u64, EngineError> {

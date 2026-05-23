@@ -10,7 +10,7 @@ use serde::Serialize;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-pub const DUCKDB_VERSION: &str = "1.4.4";
+pub const DUCKDB_VERSION: &str = "1.5.3";
 pub const SLOTHDB_VERSION: &str = "0.2.7";
 
 /// Static description of an installable engine.
