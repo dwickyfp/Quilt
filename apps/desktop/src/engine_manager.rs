@@ -121,7 +121,62 @@ pub enum InstallProgress {
     Downloading { received: u64, total: Option<u64> },
     Extracting,
     Verifying,
+    /// Per-extension progress for the DuckDB extension pre-install step
+    /// that runs after the engine binary lands. Fetching them up front
+    /// means the first time a fresh user touches a Postgres source or an
+    /// S3 file there is no network hop.
+    InstallingExtension { name: String, index: u32, total: u32 },
     Done { path: String },
+}
+
+/// DuckDB extensions Duckle uses or is wired to use. Pre-installed once
+/// at first launch so future ATTACH / read_xlsx / httpfs calls do not
+/// stop to download an extension mid-run.
+const DUCKDB_EXTENSIONS: &[&str] = &[
+    "httpfs",   // S3 / GCS / HTTP(S) URLs
+    "azure",    // Azure Blob native
+    "sqlite",   // SQLite ATTACH
+    "postgres", // PostgreSQL ATTACH
+    "mysql",    // MySQL / MariaDB ATTACH
+    "excel",    // .xlsx reader
+    "avro",     // Avro reader
+];
+
+fn duckdb_command(bin: &Path) -> std::process::Command {
+    let mut cmd = std::process::Command::new(bin);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW: suppress the console flash on Windows.
+        cmd.creation_flags(0x0800_0000);
+    }
+    cmd
+}
+
+/// Walk through every DuckDB extension Duckle needs, INSTALL+LOADing each
+/// so the file lands in the user's local DuckDB extension cache. Failures
+/// are logged via the progress callback but never abort the engine
+/// install: a user offline for one extension still gets a working engine
+/// and the rest of the extensions; the missing one will autoload (or
+/// fail loudly) the first time it's actually used.
+fn install_duckdb_extensions<F: FnMut(InstallProgress)>(bin: &Path, on_progress: &mut F) {
+    let total = DUCKDB_EXTENSIONS.len() as u32;
+    for (i, ext) in DUCKDB_EXTENSIONS.iter().enumerate() {
+        on_progress(InstallProgress::InstallingExtension {
+            name: (*ext).to_string(),
+            index: (i as u32) + 1,
+            total,
+        });
+        let sql = format!("INSTALL {ext}; LOAD {ext};");
+        // Best-effort: ignore the result; the next step (or a later run)
+        // will retry. Don't let one slow / unreachable extension block
+        // the whole engine install.
+        let _ = duckdb_command(bin)
+            .arg(":memory:")
+            .arg("-c")
+            .arg(&sql)
+            .output();
+    }
 }
 
 pub fn status(app_data: &Path) -> Vec<EngineStatus> {
@@ -251,7 +306,14 @@ fn install_spec<F: FnMut(InstallProgress)>(
     if bytes == 0 {
         return Err(format!("Installed {} binary is empty", s.name));
     }
-    let _ = std::process::Command::new(&target).arg("--version").output();
+    let _ = duckdb_command(&target).arg("--version").output();
+
+    // Pre-fetch the extensions Duckle uses so the first connector hit
+    // doesn't pause to download an extension. Only meaningful for the
+    // DuckDB engine; SlothDB has its own model.
+    if s.id == "duckdb" {
+        install_duckdb_extensions(&target, &mut on_progress);
+    }
 
     let path = target.to_string_lossy().to_string();
     on_progress(InstallProgress::Done { path: path.clone() });

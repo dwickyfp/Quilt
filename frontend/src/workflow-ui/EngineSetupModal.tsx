@@ -191,8 +191,14 @@ function ProgressLine({ progress }: { progress: InstallProgress }) {
         case 'verifying':
             label = 'Verifying…';
             break;
+        case 'installing_extension':
+            // Pre-fetching the extensions Duckle uses so the first
+            // Postgres / S3 / Excel touch is instant.
+            label = `Installing extensions (${progress.index}/${progress.total}): ${progress.name}`;
+            pct = Math.round((progress.index / progress.total) * 100);
+            break;
         case 'done':
-            label = 'Done';
+            label = 'Ready';
             pct = 100;
             break;
         case 'failed':

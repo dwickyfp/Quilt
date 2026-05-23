@@ -169,6 +169,7 @@ export type InstallProgress =
     | { phase: 'downloading'; received: number; total?: number }
     | { phase: 'extracting' }
     | { phase: 'verifying' }
+    | { phase: 'installing_extension'; name: string; index: number; total: number }
     | { phase: 'done'; path: string }
     // Set by the frontend on a caught install error (the Rust command
     // returns Err rather than streaming this).
