@@ -2218,6 +2218,51 @@ fn hash_adds_md5_column() {
 }
 
 #[test]
+fn geo_distance_computes_point_distance() {
+    // Same gate as the other spatial tests - the GDAL-backed extension
+    // is ~50 MB so only opt-in runs install it.
+    if std::env::var("DUCKLE_TEST_SPATIAL").ok().as_deref() != Some("1") {
+        eprintln!("skipping: set DUCKLE_TEST_SPATIAL=1 to run spatial tests");
+        return;
+    }
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    // Seed a parquet with GEOMETRY columns via duckdb_exec so the type
+    // survives into the pipeline (CSV would coerce to varchar).
+    let parquet = out_path(tmp.path(), "geoms.parquet");
+    duckdb_exec(
+        ":memory:",
+        &format!(
+            "INSTALL spatial; LOAD spatial; \
+             COPY (SELECT * FROM (VALUES \
+                 ('a', ST_Point(3, 4)), \
+                 ('b', ST_Point(6, 8)) \
+             ) t(name, loc)) TO '{}' (FORMAT PARQUET)",
+            parquet
+        ),
+    );
+    let out = out_path(tmp.path(), "out.csv");
+    let d = doc(
+        json!([
+            node("s", "src.parquet", json!({ "path": parquet })),
+            node("g", "xf.geo.distance", json!({
+                "geomColumn": "loc", "targetWkt": "POINT(0 0)", "outputColumn": "dist"
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s", "g"), main_edge("e2", "g", "k")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "geo_distance failed: {:?}", result.error);
+    // (3,4) -> (0,0) is 5; (6,8) -> (0,0) is 10.
+    let a = scalar_string(&format!(
+        "SELECT CAST(round(dist, 2) AS VARCHAR) FROM read_csv_auto('{}') WHERE name = 'a'",
+        out
+    ));
+    assert_eq!(a, "5.0", "got {}", a);
+}
+
+#[test]
 fn missing_source_file_errors_cleanly() {
     let tmp = tempfile::tempdir().unwrap();
     let out = out_path(tmp.path(), "never.parquet");

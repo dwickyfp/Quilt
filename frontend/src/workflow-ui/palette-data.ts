@@ -393,6 +393,14 @@ export const PALETTE: Category[] = [
                 ],
             },
             {
+                id: 'xf.geo',
+                label: 'Geospatial',
+                components: [
+                    xf('geo.distance', 'Spatial Distance', 'available', 'Distance from each row to a target point (ST_Distance)'),
+                    xf('geo.buffer', 'Spatial Buffer', 'available', 'A buffered geometry around each row (ST_Buffer)'),
+                ],
+            },
+            {
                 id: 'xf.debug',
                 label: 'Debug',
                 components: [

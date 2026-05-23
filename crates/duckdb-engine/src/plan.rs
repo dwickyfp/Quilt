@@ -576,6 +576,8 @@ fn build_view_sql(
         "xf.regex" | "xf.trim" | "xf.case" | "xf.length" | "xf.substring" | "xf.concat"
         | "xf.split" | "xf.format" => build_string(inputs, props, component_id),
         "xf.hash" => build_hash(inputs, props),
+        "xf.geo.distance" => build_geo_distance(inputs, props),
+        "xf.geo.buffer" => build_geo_buffer(inputs, props),
         "xf.num.round" | "xf.num.abs" | "xf.num.mod" | "xf.num.power" | "xf.num.sqrt"
         | "xf.num.log" => build_numeric(inputs, props, component_id),
         "xf.dt.parse" | "xf.dt.format" | "xf.dt.extract" | "xf.dt.trunc" | "xf.dt.tz" => {
@@ -2468,11 +2470,9 @@ fn attach_prelude(component_id: &str, props: &JsonValue) -> String {
         "snk.motherduck" => return md_attach(props, false),
         "src.ducklake" => return ducklake_attach(props, true),
         "snk.ducklake" => return ducklake_attach(props, false),
-        // snk.excel + snk.spatial both COPY through DuckDB extensions; LOAD
-        // is enough since the install paths pre-fetched them (spatial is
-        // the lazy one and still INSTALLs on first use too).
+        // snk.excel COPYs through the DuckDB excel extension; LOAD is
+        // enough since the install paths pre-fetched it.
         "snk.excel" => return "LOAD excel; ".into(),
-        "snk.spatial" => return "INSTALL spatial; LOAD spatial; ".into(),
         // Extensions are pre-installed (desktop: the first-launch
         // installer; CI: a dedicated pre-install step). Each fresh
         // DuckDB process still needs LOAD. Concurrent INSTALL would
@@ -2490,7 +2490,9 @@ fn attach_prelude(component_id: &str, props: &JsonValue) -> String {
         // the first-launch DUCKDB_EXTENSIONS pre-fetch so the install
         // stays small. INSTALL runs lazily on first use, then LOAD on
         // every subsequent run.
-        "src.spatial" => return "INSTALL spatial; LOAD spatial; ".into(),
+        "src.spatial" | "snk.spatial" | "xf.geo.distance" | "xf.geo.buffer" => {
+            return "INSTALL spatial; LOAD spatial; ".into();
+        }
         _ => {}
     }
     let db = match string_prop(props, "database").filter(|s| !s.is_empty()) {
@@ -2796,6 +2798,53 @@ fn build_text_search_spec(node_id: &str, inputs: &NodeInputs, props: &JsonValue)
         output_col,
         staging_table,
     })
+}
+
+/// Spatial Distance: add a column with the distance from each row's
+/// geometry to a fixed target point (WKT). Uses the spatial extension's
+/// ST_Distance over CAST geometries. Units come from the SRS of the
+/// input geometry (degrees for plain WGS84, metres for projected SRS).
+fn build_geo_distance(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.geo.distance"))?;
+    let column = string_prop(props, "geomColumn")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Geo Distance needs a geometry column".to_string())?;
+    let target = string_prop(props, "targetWkt")
+        .filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| "Geo Distance needs a target geometry (WKT, e.g. 'POINT(0 0)')".to_string())?;
+    let output = string_prop(props, "outputColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "distance".into());
+    Ok(format!(
+        "SELECT *, ST_Distance(CAST({col} AS GEOMETRY), ST_GeomFromText('{target}')) AS {out} FROM {up}",
+        col = quote_ident(&column),
+        target = target.replace('\'', "''"),
+        out = quote_ident(&output),
+        up = quote_ident(upstream)
+    ))
+}
+
+/// Spatial Buffer: add a column with ST_Buffer(geom, distance) - the
+/// area within `distance` of each row's geometry.
+fn build_geo_buffer(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.geo.buffer"))?;
+    let column = string_prop(props, "geomColumn")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Geo Buffer needs a geometry column".to_string())?;
+    let distance = props
+        .get("distance")
+        .and_then(|v| v.as_f64())
+        .ok_or_else(|| "Geo Buffer needs a distance".to_string())?;
+    let output = string_prop(props, "outputColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "buffer".into());
+    Ok(format!(
+        "SELECT *, ST_Buffer(CAST({col} AS GEOMETRY), {distance}) AS {out} FROM {up}",
+        col = quote_ident(&column),
+        distance = distance,
+        out = quote_ident(&output),
+        up = quote_ident(upstream)
+    ))
 }
 
 /// Hash: add a column with the md5 / sha1 / sha256 digest (or a

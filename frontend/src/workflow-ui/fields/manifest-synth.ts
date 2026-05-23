@@ -2579,6 +2579,41 @@ function synthAiTransform(comp: ComponentDef): ComponentManifest {
     return synthGeneric(comp, 'upstream');
 }
 
+function synthGeoTransform(comp: ComponentDef): ComponentManifest {
+    if (comp.id === 'xf.geo.distance') {
+        return base(comp, [
+            {
+                label: 'Spatial distance',
+                fields: [
+                    { key: 'geomColumn', label: 'Geometry column', kind: 'column', required: true },
+                    {
+                        key: 'targetWkt',
+                        label: 'Target geometry (WKT)',
+                        kind: 'text',
+                        required: true,
+                        placeholder: 'POINT(0 0)',
+                        description: 'Well-Known Text. Distance units come from the input SRS (degrees for WGS84, metres for projected).',
+                    },
+                    { key: 'outputColumn', label: 'Output column', kind: 'text', defaultValue: 'distance' },
+                ],
+            },
+        ], 'upstream');
+    }
+    if (comp.id === 'xf.geo.buffer') {
+        return base(comp, [
+            {
+                label: 'Spatial buffer',
+                fields: [
+                    { key: 'geomColumn', label: 'Geometry column', kind: 'column', required: true },
+                    { key: 'distance', label: 'Buffer distance', kind: 'number', required: true, defaultValue: 1.0 },
+                    { key: 'outputColumn', label: 'Output column', kind: 'text', defaultValue: 'buffer' },
+                ],
+            },
+        ], 'upstream');
+    }
+    return base(comp, [], 'upstream');
+}
+
 function synthDebugTransform(comp: ComponentDef): ComponentManifest {
     if (comp.id === 'xf.log') {
         return base(comp, [
@@ -2666,6 +2701,7 @@ export function synthesizeManifest(componentId: string): ComponentManifest | und
     if (groupId === 'xf.array') return synthArrayTransform(comp);
     if (groupId === 'xf.cdc') return synthCdcTransform(comp);
     if (groupId === 'xf.ai') return synthAiTransform(comp);
+    if (groupId === 'xf.geo') return synthGeoTransform(comp);
     if (groupId === 'xf.debug') return synthDebugTransform(comp);
 
     // Control
