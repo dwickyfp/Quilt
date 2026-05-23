@@ -2335,21 +2335,24 @@ fn num_sign_classifies_signed_values() {
         json!([main_edge("e1", "s", "g"), main_edge("e2", "g", "k")]),
     ));
     assert_eq!(r.status, "ok", "sign failed: {:?}", r.error);
+    // Cast to BIGINT for verification - sign() returns the input type,
+    // and CSV serialization of DOUBLE 1.0 vs INTEGER 1 differs across
+    // DuckDB platforms (Windows '-1.0', Linux '-1'). Normalize first.
     let s1 = scalar_string(&format!(
-        "SELECT CAST(sg AS VARCHAR) FROM read_csv_auto('{}') WHERE id = 1",
+        "SELECT CAST(CAST(sg AS BIGINT) AS VARCHAR) FROM read_csv_auto('{}') WHERE id = 1",
         out
     ));
     let s2 = scalar_string(&format!(
-        "SELECT CAST(sg AS VARCHAR) FROM read_csv_auto('{}') WHERE id = 2",
+        "SELECT CAST(CAST(sg AS BIGINT) AS VARCHAR) FROM read_csv_auto('{}') WHERE id = 2",
         out
     ));
     let s3 = scalar_string(&format!(
-        "SELECT CAST(sg AS VARCHAR) FROM read_csv_auto('{}') WHERE id = 3",
+        "SELECT CAST(CAST(sg AS BIGINT) AS VARCHAR) FROM read_csv_auto('{}') WHERE id = 3",
         out
     ));
-    assert_eq!(s1, "-1.0");
-    assert_eq!(s2, "0.0");
-    assert_eq!(s3, "1.0");
+    assert_eq!(s1, "-1", "sign(-7) on row 1");
+    assert_eq!(s2, "0", "sign(0) on row 2");
+    assert_eq!(s3, "1", "sign(42) on row 3");
 }
 
 #[test]
