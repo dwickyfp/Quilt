@@ -64,6 +64,14 @@ jobs:
           echo "using duckdb at: $bin"
           echo "DUCKLE_DUCKDB_BIN=$bin" >> "$GITHUB_ENV"
 
+      - name: Pre-install DuckDB extensions
+        shell: bash
+        # Install once up front so the per-stage LOAD doesn't race with
+        # parallel test threads downloading the same extension into the
+        # shared ~/.duckdb cache.
+        run: |
+          "$DUCKLE_DUCKDB_BIN" :memory: -c "INSTALL postgres; INSTALL mysql; INSTALL sqlite; INSTALL excel; INSTALL httpfs;"
+
       - name: Test
         run: cargo test --workspace
 
@@ -104,6 +112,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/duckdb"
           unzip -o duckdb.zip -d "$RUNNER_TEMP/duckdb"
           echo "DUCKLE_DUCKDB_BIN=$RUNNER_TEMP/duckdb/duckdb" >> "$GITHUB_ENV"
+      - name: Pre-install postgres extension
+        run: |
+          "$DUCKLE_DUCKDB_BIN" :memory: -c "INSTALL postgres;"
       - name: Run PostgreSQL integration tests
         env:
           DUCKLE_PG_HOST: localhost
@@ -139,6 +150,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/duckdb"
           unzip -o duckdb.zip -d "$RUNNER_TEMP/duckdb"
           echo "DUCKLE_DUCKDB_BIN=$RUNNER_TEMP/duckdb/duckdb" >> "$GITHUB_ENV"
+      - name: Pre-install mysql extension
+        run: |
+          "$DUCKLE_DUCKDB_BIN" :memory: -c "INSTALL mysql;"
       - name: Run MySQL integration tests
         env:
           DUCKLE_MYSQL_HOST: 127.0.0.1

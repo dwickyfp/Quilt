@@ -2430,18 +2430,12 @@ fn attach_prelude(component_id: &str, props: &JsonValue) -> String {
         "src.mysql" | "src.mariadb" => return db_attach(props, "mysql", 3306, true),
         "snk.mysql" | "snk.mariadb" => return db_attach(props, "mysql", 3306, false),
         "src.motherduck" => return md_attach(props),
-        // The avro reader lives in a community extension. The install
-        // step pre-fetches it, but a fresh DuckDB process still needs
-        // LOAD; INSTALL is idempotent and a safety net when the install
-        // step was skipped.
-        "src.avro" => {
-            return "INSTALL avro FROM community; LOAD avro; ".into();
-        }
-        // Excel uses the native excel extension (v1.2+). Same idempotent
-        // INSTALL + LOAD pattern as avro.
-        "src.excel" => {
-            return "INSTALL excel; LOAD excel; ".into();
-        }
+        // Extensions are pre-installed (desktop: the first-launch
+        // installer; CI: a dedicated pre-install step). Each fresh
+        // DuckDB process still needs LOAD. Concurrent INSTALL would
+        // race on the cached extension file and intermittently fail.
+        "src.avro" => return "LOAD avro; ".into(),
+        "src.excel" => return "LOAD excel; ".into(),
         _ => {}
     }
     let db = match string_prop(props, "database").filter(|s| !s.is_empty()) {
@@ -2492,7 +2486,7 @@ fn db_attach(props: &JsonValue, extension: &str, default_port: u64, read_only: b
     };
     let type_name = extension.to_uppercase();
     format!(
-        "INSTALL {ext}; LOAD {ext}; ATTACH '{conn}' AS {alias} (TYPE {type_name}{mode}); ",
+        "LOAD {ext}; ATTACH '{conn}' AS {alias} (TYPE {type_name}{mode}); ",
         ext = extension,
         conn = sql_escape(&connstr),
         alias = alias,
