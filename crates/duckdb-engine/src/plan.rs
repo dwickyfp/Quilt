@@ -2938,9 +2938,12 @@ fn build_geo_buffer(inputs: &NodeInputs, props: &JsonValue) -> Result<String, St
 }
 
 /// Numeric Bucketize: bin a numeric column into N equal-width
-/// buckets between low and high using DuckDB's width_bucket. The
-/// output column is the bucket index (1..N for in-range values, 0
-/// for below-low, N+1 for above-high - matches PostgreSQL semantics).
+/// buckets between low and high. Output is 1..N for in-range values,
+/// 0 for below-low, N+1 for above-high (PostgreSQL width_bucket
+/// semantics). DuckDB core doesn't ship width_bucket as a scalar
+/// function (only the Postgres extension defines it), so we expand
+/// to the explicit floor((v - low) / step) + 1 form, which works on
+/// every DuckDB build.
 fn build_bucketize(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
     let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.num.bucketize"))?;
     let column = string_prop(props, "column")
@@ -2954,20 +2957,26 @@ fn build_bucketize(inputs: &NodeInputs, props: &JsonValue) -> Result<String, Str
         .get("high")
         .and_then(|v| v.as_f64())
         .ok_or_else(|| "Bucketize needs a high bound".to_string())?;
+    if high <= low {
+        return Err("Bucketize needs high > low".to_string());
+    }
     let buckets = props
         .get("buckets")
         .and_then(|v| v.as_i64())
         .filter(|n| *n > 0)
         .unwrap_or(10);
+    let step = (high - low) / buckets as f64;
     let output = string_prop(props, "outputColumn")
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| format!("{}_bucket", column));
+    let qcol = quote_ident(&column);
     Ok(format!(
-        "SELECT *, width_bucket(CAST({col} AS DOUBLE), {low}, {high}, {n}) AS {out} FROM {up}",
-        col = quote_ident(&column),
+        "SELECT *, CASE WHEN CAST({col} AS DOUBLE) < {low} THEN 0 WHEN CAST({col} AS DOUBLE) >= {high} THEN {overflow} ELSE CAST(floor((CAST({col} AS DOUBLE) - {low}) / {step}) AS INTEGER) + 1 END AS {out} FROM {up}",
+        col = qcol,
         low = low,
         high = high,
-        n = buckets,
+        step = step,
+        overflow = buckets + 1,
         out = quote_ident(&output),
         up = quote_ident(upstream)
     ))
