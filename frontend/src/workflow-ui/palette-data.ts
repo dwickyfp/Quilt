@@ -489,7 +489,7 @@ export const PALETTE: Category[] = [
                 label: 'Cloud Warehouses',
                 components: [
                     snk('motherduck', 'MotherDuck', 'available', 'Write a table into MotherDuck via ATTACH md:'),
-                    snk('snowflake', 'Snowflake', 'planned', 'REST SQL API (separate commit) - planned next'),
+                    snk('snowflake', 'Snowflake', 'available', 'INSERT to a Snowflake table via the SQL API (/api/v2/statements) with PAT (Personal Access Token) bearer auth. Multi-row INSERTs batched at 1000 rows by default.'),
                     snk('bigquery', 'BigQuery', 'available', 'Write tables to BigQuery via the duckdb-bigquery community extension'),
                     snk('redshift', 'Redshift', 'available', 'Write Redshift via the postgres ATTACH path (Postgres wire on port 5439); overwrite / append / truncate / upsert all supported via the existing PG sink modes'),
                     snk('databricks', 'Databricks SQL', 'planned', 'REST SQL API (separate commit) - planned next'),

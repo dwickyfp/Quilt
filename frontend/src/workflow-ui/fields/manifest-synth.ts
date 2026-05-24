@@ -852,6 +852,34 @@ function synthWarehouseSource(comp: ComponentDef): ComponentManifest {
 }
 
 function synthWarehouseSink(comp: ComponentDef): ComponentManifest {
+    if (comp.id === 'snk.snowflake') {
+        return base(comp, [
+            {
+                label: 'Snowflake account',
+                fields: [
+                    { key: 'account', label: 'Account identifier', kind: 'text', required: true, placeholder: 'xy12345.us-east-1' },
+                    { key: 'pat', label: 'Personal Access Token', kind: 'text', required: true, placeholder: '••••••••' },
+                    { key: 'warehouse', label: 'Warehouse', kind: 'text', placeholder: 'compute_wh' },
+                    { key: 'role', label: 'Role', kind: 'text', placeholder: 'analyst' },
+                ],
+            },
+            {
+                label: 'Destination',
+                fields: [
+                    { key: 'database', label: 'Database', kind: 'text', required: true },
+                    { key: 'schema', label: 'Schema', kind: 'text', defaultValue: 'PUBLIC' },
+                    { key: 'tableName', label: 'Table', kind: 'text', required: true, placeholder: 'orders' },
+                    {
+                        key: 'batchSize',
+                        label: 'Insert batch size',
+                        kind: 'integer',
+                        defaultValue: 1000,
+                        description: 'Rows per multi-row INSERT. Larger = fewer round-trips, but the SQL API has a body-size limit (~16 MB).',
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
     if (comp.id === 'snk.redshift') {
         return base(comp, [
             { label: 'Redshift connection', fields: dbConnectionFields(comp.id) },

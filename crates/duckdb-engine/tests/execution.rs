@@ -2444,6 +2444,83 @@ fn text_reverse_repeat_and_compare() {
 }
 
 #[test]
+fn snk_snowflake_posts_multirow_insert() {
+    // Mock HTTP listener pretends to be Snowflake's /api/v2/statements.
+    // Verifies the engine sends a single multi-row INSERT for both rows
+    // with Bearer auth and correctly-quoted identifiers + literals.
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    let engine = engine_or_skip!();
+    let (tx, rx) = mpsc::channel::<Vec<u8>>();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().unwrap().port();
+
+    let handle = std::thread::spawn(move || {
+        for stream in listener.incoming().take(1) {
+            let mut stream = match stream { Ok(s) => s, Err(_) => break };
+            stream.set_read_timeout(Some(Duration::from_millis(250))).ok();
+            stream.set_nodelay(true).ok();
+            let mut buf = Vec::with_capacity(8192);
+            let mut chunk = [0u8; 4096];
+            for _ in 0..16 {
+                match stream.read(&mut chunk) {
+                    Ok(0) => break,
+                    Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                    Err(_) => break,
+                }
+            }
+            let _ = tx.send(buf);
+            // Snowflake-style success response shape.
+            let body = b"{\"resultSetMetaData\":{\"numRows\":2}}";
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(resp.as_bytes());
+            let _ = stream.write_all(body);
+            let _ = stream.flush();
+            let _ = stream.shutdown(std::net::Shutdown::Write);
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    });
+
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "id,name\n1,alice\n2,bob\n");
+    // Point at our mock via the `endpoint` override - production users
+    // just set `account` and the engine builds the snowflakecomputing.com URL.
+    let endpoint = format!("http://127.0.0.1:{}/api/v2/statements", port);
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("s", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("sf", "snk.snowflake", json!({
+                "account": "test-account",
+                "endpoint": endpoint,
+                "pat": "secret-pat",
+                "database": "MYDB",
+                "schema": "PUBLIC",
+                "tableName": "USERS",
+                "warehouse": "COMPUTE_WH"
+            })),
+        ]),
+        json!([main_edge("e1", "s", "sf")]),
+    ));
+    assert_eq!(r.status, "ok", "snowflake sink failed: {:?}", r.error);
+
+    let req = rx.recv_timeout(Duration::from_secs(5)).expect("expected 1 Snowflake request");
+    let _ = handle.join();
+    let body = String::from_utf8_lossy(&req).to_string();
+    assert!(body.contains("Bearer secret-pat"), "expected Bearer auth: {}", body);
+    assert!(body.contains("INSERT INTO \\\"MYDB\\\".\\\"PUBLIC\\\".\\\"USERS\\\""), "expected qualified INSERT: {}", body);
+    // The two rows should be in a single VALUES clause - 'alice' and 'bob' quoted.
+    assert!(body.contains("'alice'"), "expected 'alice' literal: {}", body);
+    assert!(body.contains("'bob'"), "expected 'bob' literal: {}", body);
+    assert!(body.contains("\\\"warehouse\\\":\\\"COMPUTE_WH\\\""), "expected warehouse in body: {}", body);
+}
+
+#[test]
 fn snk_elastic_emits_ndjson_bulk_pairs() {
     // ES bulk API: action line then doc line, repeated, separated by \n,
     // Content-Type: application/x-ndjson.

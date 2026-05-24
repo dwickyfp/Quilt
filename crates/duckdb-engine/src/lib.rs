@@ -27,7 +27,7 @@ pub mod history;
 pub mod plan;
 pub use history::{append_run_record, load_run_history, RunRecord};
 pub use plan::{CompiledPipeline, PipelineDoc, Stage, StageKind};
-use plan::WebhookSpec;
+use plan::{SnowflakeSinkSpec, WebhookSpec};
 
 #[derive(Debug, Error)]
 pub enum EngineError {
@@ -338,6 +338,11 @@ impl DuckdbEngine {
                     // upstream as JSON via DuckDB, then dispatch one
                     // request per row or one batched request via ureq.
                     self.run_webhook(&db_path, &secret_prefix, spec)
+                } else if let Some(spec) = stage.snowflake_sink.as_ref() {
+                    // Snowflake SQL API: multi-row INSERT statements
+                    // batched at spec.batch_size and POSTed to /api/v2/
+                    // statements with Bearer PAT auth.
+                    self.run_snowflake_sink(&db_path, &secret_prefix, spec)
                 } else if let Some(spec) = stage.upsert.as_ref() {
                     // Relational-DB upsert: DESCRIBE the upstream first to
                     // get the column list, then assemble INSERT ... ON
@@ -645,6 +650,115 @@ impl DuckdbEngine {
         }
     }
 
+    /// Snowflake SQL API sink. Reads the upstream view as JSON,
+    /// chunks rows into spec.batch_size groups, builds one multi-row
+    /// INSERT per chunk, and POSTs to /api/v2/statements with Bearer
+    /// PAT auth. Failures surface as a single Err for the run feedback.
+    fn run_snowflake_sink(
+        &self,
+        db: &Path,
+        secret_prefix: &str,
+        spec: &SnowflakeSinkSpec,
+    ) -> Result<String, EngineError> {
+        let select = format!(
+            "{}SELECT * FROM {}",
+            secret_prefix,
+            plan::quote_ident(&spec.from_view)
+        );
+        let rows = self.run_rows(Some(db), &select)?;
+        if rows.is_empty() {
+            return Ok(format!("snowflake: 0 rows to insert into {}", spec.table));
+        }
+        // Take column order from the first row (DuckDB CLI -json output
+        // preserves the SELECT order, which is the upstream view's order).
+        let cols: Vec<String> = match rows[0].as_object() {
+            Some(o) => o.keys().cloned().collect(),
+            None => return Err(EngineError::Query("snowflake: upstream rows aren't JSON objects".into())),
+        };
+        let schema_name = spec.schema.as_deref().unwrap_or("PUBLIC");
+        let qualified = format!(
+            "{}.{}.{}",
+            sf_quote_ident(&spec.database),
+            sf_quote_ident(schema_name),
+            sf_quote_ident(&spec.table)
+        );
+        let cols_list = cols
+            .iter()
+            .map(|c| sf_quote_ident(c))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let url = spec.endpoint.clone().unwrap_or_else(|| {
+            format!(
+                "https://{}.snowflakecomputing.com/api/v2/statements",
+                spec.account
+            )
+        });
+        let mut total_inserted = 0_usize;
+        for chunk in rows.chunks(spec.batch_size) {
+            let values: Vec<String> = chunk
+                .iter()
+                .map(|row| {
+                    let row_obj = row.as_object();
+                    let vals: Vec<String> = cols
+                        .iter()
+                        .map(|c| {
+                            let v = row_obj
+                                .and_then(|o| o.get(c))
+                                .unwrap_or(&JsonValue::Null);
+                            json_to_sql_literal(v)
+                        })
+                        .collect();
+                    format!("({})", vals.join(", "))
+                })
+                .collect();
+            let stmt = format!(
+                "INSERT INTO {} ({}) VALUES {}",
+                qualified,
+                cols_list,
+                values.join(", ")
+            );
+            let mut body_obj = serde_json::Map::new();
+            body_obj.insert("statement".into(), JsonValue::String(stmt));
+            body_obj.insert("timeout".into(), JsonValue::Number(60.into()));
+            body_obj.insert("database".into(), JsonValue::String(spec.database.clone()));
+            body_obj.insert("schema".into(), JsonValue::String(schema_name.into()));
+            if let Some(wh) = &spec.warehouse {
+                body_obj.insert("warehouse".into(), JsonValue::String(wh.clone()));
+            }
+            if let Some(role) = &spec.role {
+                body_obj.insert("role".into(), JsonValue::String(role.clone()));
+            }
+            let body = serde_json::to_string(&JsonValue::Object(body_obj))
+                .unwrap_or_else(|_| "{}".into());
+            let req = ureq::post(&url)
+                .set("Authorization", &format!("Bearer {}", spec.pat))
+                .set("Content-Type", "application/json")
+                .set("Accept", "application/json");
+            match req.send_string(&body) {
+                Ok(_) => total_inserted += chunk.len(),
+                Err(ureq::Error::Status(code, response)) => {
+                    let body = response.into_string().unwrap_or_default();
+                    return Err(EngineError::Query(format!(
+                        "Snowflake HTTP {} from {}: {}",
+                        code,
+                        url,
+                        body.chars().take(300).collect::<String>()
+                    )));
+                }
+                Err(e) => {
+                    return Err(EngineError::Query(format!(
+                        "Snowflake HTTP transport to {}: {}",
+                        url, e
+                    )));
+                }
+            }
+        }
+        Ok(format!(
+            "snowflake: inserted {} rows into {}",
+            total_inserted, spec.table
+        ))
+    }
+
     /// Full-Text Search runs in two CLI invocations sharing the same
     /// temp DB file. The first stages the upstream into a permanent
     /// table; the second builds the BM25 index and the final node
@@ -760,6 +874,32 @@ fn now_nanos() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0)
+}
+
+/// Snowflake identifier quoting: double quotes, internal quotes
+/// doubled, and the identifier is treated case-sensitive.
+fn sf_quote_ident(s: &str) -> String {
+    format!("\"{}\"", s.replace('"', "\"\""))
+}
+
+/// Render a serde_json::Value as a Snowflake SQL literal.
+/// - NULL  -> NULL
+/// - bool  -> TRUE / FALSE
+/// - num   -> verbatim
+/// - str   -> 'escaped' (single quotes doubled)
+/// - obj/arr -> PARSE_JSON('escaped json') so it lands in a VARIANT column
+fn json_to_sql_literal(v: &JsonValue) -> String {
+    match v {
+        JsonValue::Null => "NULL".into(),
+        JsonValue::Bool(true) => "TRUE".into(),
+        JsonValue::Bool(false) => "FALSE".into(),
+        JsonValue::Number(n) => n.to_string(),
+        JsonValue::String(s) => format!("'{}'", s.replace('\'', "''")),
+        JsonValue::Array(_) | JsonValue::Object(_) => {
+            let j = serde_json::to_string(v).unwrap_or_else(|_| "null".into());
+            format!("PARSE_JSON('{}')", j.replace('\'', "''"))
+        }
+    }
 }
 
 /// True for a local filesystem path (not a cloud / http URI).

@@ -52,6 +52,10 @@ pub struct Stage {
     /// executor materializes the upstream view and dispatches requests
     /// via ureq; stage SQL is empty (no DuckDB write).
     pub webhook: Option<WebhookSpec>,
+    /// Snowflake SQL API sink. When set, the executor builds multi-row
+    /// INSERT statements and POSTs them in batches to the configured
+    /// account; stage SQL is empty.
+    pub snowflake_sink: Option<SnowflakeSinkSpec>,
     /// Milliseconds the executor sleeps before running this stage.
     /// Set by ctl.wait and ctl.throttle. None = no delay.
     pub wait_ms: Option<u64>,
@@ -76,6 +80,30 @@ pub struct TextSearchSpec {
     /// Sanitized staging table name (so PRAGMA can reference a valid
     /// SQL identifier even when the node id has special characters).
     pub staging_table: String,
+}
+
+/// snk.snowflake: SQL API insert. The executor reads upstream rows,
+/// chunks them into batch_size groups, and POSTs one multi-row INSERT
+/// per chunk to the account's /api/v2/statements endpoint. PAT
+/// (Personal Access Token) bearer auth - simpler than JWT RS256
+/// which we'll add as a follow-up once a signing crate is on the
+/// dep budget.
+#[derive(Debug, Clone)]
+pub struct SnowflakeSinkSpec {
+    pub from_view: String,
+    /// Full Snowflake account identifier (e.g. "xy12345.us-east-1").
+    /// Used to build https://<account>.snowflakecomputing.com/api/v2/statements
+    /// unless `endpoint` overrides it (handy for tests + private link).
+    pub account: String,
+    /// Optional explicit endpoint override, e.g. http://127.0.0.1:8080/api/v2/statements.
+    pub endpoint: Option<String>,
+    pub pat: String,
+    pub database: String,
+    pub schema: Option<String>,
+    pub warehouse: Option<String>,
+    pub role: Option<String>,
+    pub table: String,
+    pub batch_size: usize,
 }
 
 /// snk.webhook / snk.rest / vendor HTTP sinks: one HTTP POST/PUT
@@ -408,6 +436,7 @@ fn build_stage(
     let mut upsert: Option<UpsertSpec> = None;
     let mut text_search: Option<TextSearchSpec> = None;
     let mut webhook: Option<WebhookSpec> = None;
+    let mut snowflake_sink: Option<SnowflakeSinkSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -595,6 +624,41 @@ fn build_stage(
                 serde_json::Value::String(collection),
             )],
             bulk_action: None,
+        });
+        (String::new(), StageKind::Sink, Some(from_view.to_string()))
+    } else if component_id == "snk.snowflake" {
+        // Snowflake SQL API sink. PAT (Personal Access Token) bearer
+        // auth - JWT RS256 follow-up. Engine batches into multi-row
+        // INSERT statements at batchSize rows each.
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let account = string_prop(&props, "account")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: account required (e.g. 'xy12345.us-east-1')", component_id)))?;
+        let pat = string_prop(&props, "pat")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: pat (Personal Access Token) required", component_id)))?;
+        let database = string_prop(&props, "database")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: database required", component_id)))?;
+        let table = string_prop(&props, "tableName")
+            .or_else(|| string_prop(&props, "table"))
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: tableName required", component_id)))?;
+        snowflake_sink = Some(SnowflakeSinkSpec {
+            from_view: from_view.to_string(),
+            account,
+            endpoint: string_prop(&props, "endpoint").filter(|s| !s.is_empty()),
+            pat,
+            database,
+            schema: string_prop(&props, "schema").filter(|s| !s.is_empty()),
+            warehouse: string_prop(&props, "warehouse").filter(|s| !s.is_empty()),
+            role: string_prop(&props, "role").filter(|s| !s.is_empty()),
+            table,
+            batch_size: props
+                .get("batchSize")
+                .and_then(|v| v.as_u64())
+                .filter(|n| *n > 0)
+                .unwrap_or(1000) as usize,
         });
         (String::new(), StageKind::Sink, Some(from_view.to_string()))
     } else if component_id == "snk.elastic" || component_id == "snk.opensearch" {
@@ -831,6 +895,7 @@ fn build_stage(
         upsert,
         text_search,
         webhook,
+        snowflake_sink,
         wait_ms,
         retry_attempts,
         retry_backoff_ms,
