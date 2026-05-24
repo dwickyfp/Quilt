@@ -30,8 +30,8 @@ pub use plan::{CompiledPipeline, PipelineDoc, Stage, StageKind};
 use plan::{
     CassandraSinkSpec, CassandraSourceSpec, ClickHouseSinkSpec, ClickHouseSourceSpec,
     DatabricksSinkSpec, DatabricksSourceSpec, ElasticSourceSpec, MongoSinkSpec, MongoSourceSpec,
-    RestPagination, RestSourceSpec, SnowflakeAuth, SnowflakeSinkSpec, SnowflakeSourceSpec,
-    SqlServerSinkSpec, SqlServerSourceSpec, WebhookSpec,
+    OracleSinkSpec, OracleSourceSpec, RestPagination, RestSourceSpec, SnowflakeAuth,
+    SnowflakeSinkSpec, SnowflakeSourceSpec, SqlServerSinkSpec, SqlServerSourceSpec, WebhookSpec,
 };
 
 #[derive(Debug, Error)]
@@ -385,6 +385,10 @@ impl DuckdbEngine {
                     self.run_cassandra_sink(&db_path, spec)
                 } else if let Some(spec) = stage.cassandra_source.as_ref() {
                     self.run_cassandra_source(&db_path, spec)
+                } else if let Some(spec) = stage.oracle_sink.as_ref() {
+                    self.run_oracle_sink(&db_path, spec)
+                } else if let Some(spec) = stage.oracle_source.as_ref() {
+                    self.run_oracle_source(&db_path, spec)
                 } else if let Some(spec) = stage.upsert.as_ref() {
                     // Relational-DB upsert: DESCRIBE the upstream first to
                     // get the column list, then assemble INSERT ... ON
@@ -808,6 +812,159 @@ impl DuckdbEngine {
         Ok(format!(
             "snowflake: inserted {} rows into {}",
             total_inserted, spec.table
+        ))
+    }
+
+    /// Oracle sink behind the `oracle` Cargo feature. Without the
+    /// feature this returns a clear error so the user knows what to
+    /// rebuild with. With the feature, builds multi-row INSERT ALL ...
+    /// SELECT * FROM dual statements (Oracle's idiom for multi-row
+    /// insert) in batches.
+    #[cfg(feature = "oracle")]
+    fn run_oracle_sink(
+        &self,
+        db: &Path,
+        spec: &OracleSinkSpec,
+    ) -> Result<String, EngineError> {
+        let select = format!("SELECT * FROM {}", plan::quote_ident(&spec.from_view));
+        let rows = self.run_rows(Some(db), &select)?;
+        if rows.is_empty() {
+            return Ok(format!("oracle: 0 rows to insert into {}", spec.table));
+        }
+        let cols: Vec<String> = match rows[0].as_object() {
+            Some(o) => o.keys().cloned().collect(),
+            None => {
+                return Err(EngineError::Query(
+                    "oracle: upstream rows aren't JSON objects".into(),
+                ));
+            }
+        };
+        let qualified = match &spec.schema {
+            Some(s) => format!("\"{}\".\"{}\"", s, spec.table),
+            None => format!("\"{}\"", spec.table),
+        };
+        let cols_list = cols
+            .iter()
+            .map(|c| format!("\"{}\"", c.replace('"', "\"\"")))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let conn = oracle::Connection::connect(&spec.user, &spec.password, &spec.connect)
+            .map_err(|e| EngineError::Query(format!("oracle connect: {}", e)))?;
+        let mut total = 0_usize;
+        for chunk in rows.chunks(spec.batch_size) {
+            // Oracle's "INSERT ALL" syntax:
+            //   INSERT ALL
+            //     INTO tbl (cols) VALUES (...)
+            //     INTO tbl (cols) VALUES (...)
+            //   SELECT 1 FROM dual;
+            let mut sql = String::from("INSERT ALL");
+            for row in chunk {
+                let row_obj = row.as_object();
+                let vals: Vec<String> = cols
+                    .iter()
+                    .map(|c| {
+                        let v = row_obj
+                            .and_then(|o| o.get(c))
+                            .unwrap_or(&JsonValue::Null);
+                        json_to_sql_literal(v)
+                    })
+                    .collect();
+                sql.push_str(&format!(
+                    " INTO {} ({}) VALUES ({})",
+                    qualified,
+                    cols_list,
+                    vals.join(", ")
+                ));
+            }
+            sql.push_str(" SELECT 1 FROM dual");
+            conn.execute(&sql, &[])
+                .map_err(|e| EngineError::Query(format!("oracle insert: {}", e)))?;
+            conn.commit()
+                .map_err(|e| EngineError::Query(format!("oracle commit: {}", e)))?;
+            total += chunk.len();
+        }
+        Ok(format!(
+            "oracle: inserted {} rows into {}",
+            total, qualified
+        ))
+    }
+
+    #[cfg(not(feature = "oracle"))]
+    fn run_oracle_sink(
+        &self,
+        _db: &Path,
+        _spec: &OracleSinkSpec,
+    ) -> Result<String, EngineError> {
+        Err(EngineError::Config(
+            "snk.oracle: this Duckle binary was built without Oracle support. \
+             Rebuild with `cargo build --features oracle` (requires Oracle \
+             Instant Client installed on the build + runtime hosts)."
+                .into(),
+        ))
+    }
+
+    /// Oracle source behind the `oracle` Cargo feature. Same gating
+    /// model as the sink.
+    #[cfg(feature = "oracle")]
+    fn run_oracle_source(
+        &self,
+        db: &Path,
+        spec: &OracleSourceSpec,
+    ) -> Result<String, EngineError> {
+        let conn = oracle::Connection::connect(&spec.user, &spec.password, &spec.connect)
+            .map_err(|e| EngineError::Query(format!("oracle connect: {}", e)))?;
+        let stmt = conn
+            .statement(&spec.query)
+            .build()
+            .map_err(|e| EngineError::Query(format!("oracle prepare: {}", e)))?;
+        let rs = conn
+            .query(&spec.query, &[])
+            .map_err(|e| EngineError::Query(format!("oracle query: {}", e)))?;
+        let _ = stmt; // suppress unused warning; rs owns the statement.
+        let cols: Vec<String> = rs
+            .column_info()
+            .iter()
+            .map(|c| c.name().to_string())
+            .collect();
+        let mut rows: Vec<JsonValue> = Vec::new();
+        for row_res in rs {
+            let row = row_res.map_err(|e| EngineError::Query(format!("oracle row: {}", e)))?;
+            let mut obj = serde_json::Map::new();
+            for (i, name) in cols.iter().enumerate() {
+                let v: JsonValue = if let Ok(Some(s)) = row.get::<usize, Option<String>>(i) {
+                    JsonValue::String(s)
+                } else if let Ok(Some(n)) = row.get::<usize, Option<i64>>(i) {
+                    JsonValue::from(n)
+                } else if let Ok(Some(f)) = row.get::<usize, Option<f64>>(i) {
+                    serde_json::Number::from_f64(f)
+                        .map(JsonValue::Number)
+                        .unwrap_or(JsonValue::Null)
+                } else {
+                    JsonValue::Null
+                };
+                obj.insert(name.clone(), v);
+            }
+            rows.push(JsonValue::Object(obj));
+        }
+        let count = rows.len();
+        materialize_jsonobjects_as_table(db, &spec.node_id, &rows)?;
+        Ok(format!(
+            "oracle: materialized {} rows into {}",
+            count, spec.node_id
+        ))
+    }
+
+    #[cfg(not(feature = "oracle"))]
+    fn run_oracle_source(
+        &self,
+        _db: &Path,
+        _spec: &OracleSourceSpec,
+    ) -> Result<String, EngineError> {
+        Err(EngineError::Config(
+            "src.oracle: this Duckle binary was built without Oracle support. \
+             Rebuild with `cargo build --features oracle` (requires Oracle \
+             Instant Client installed on the build + runtime hosts)."
+                .into(),
         ))
     }
 

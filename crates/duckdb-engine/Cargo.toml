@@ -44,6 +44,16 @@ futures-util = "0.3"
 # Cassandra / ScyllaDB via the pure-Rust scylla driver (also speaks
 # CQL to Cassandra). Async; same block_on pattern as mongo + sqlserver.
 scylla = "0.13"
+# Oracle support is opt-in. The `oracle` crate links against Oracle
+# Instant Client - a vendor C library that has to be installed on the
+# build host AND the runtime host. Default builds (and CI) skip it;
+# users who need Oracle install Instant Client + build with
+# `--features oracle`.
+oracle = { version = "0.6", optional = true }
+
+[features]
+default = []
+oracle = ["dep:oracle"]
 
 [dev-dependencies]
 tempfile = "3.10"

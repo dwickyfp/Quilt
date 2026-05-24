@@ -755,6 +755,37 @@ function synthLakehouseSink(comp: ComponentDef): ComponentManifest {
 }
 
 function synthDbSource(comp: ComponentDef): ComponentManifest {
+    if (comp.id === 'src.oracle') {
+        return base(comp, [
+            {
+                label: 'Oracle connection',
+                fields: [
+                    { key: 'connect', label: 'Easy Connect string', kind: 'text', required: true, placeholder: 'host:1521/SERVICE' },
+                    { key: 'user', label: 'User', kind: 'text', required: true },
+                    { key: 'password', label: 'Password', kind: 'text', placeholder: '••••••••' },
+                ],
+            },
+            {
+                label: 'Query',
+                fields: [
+                    { key: 'schema', label: 'Schema (optional)', kind: 'text' },
+                    { key: 'tableName', label: 'Table (for SELECT *)', kind: 'text' },
+                    { key: 'query', label: 'Or custom SQL', kind: 'expression', rows: 4, placeholder: 'SELECT * FROM ...' },
+                ],
+            },
+            {
+                label: 'Build requirement',
+                fields: [
+                    {
+                        key: 'oracleBuildNote',
+                        label: 'Heads-up',
+                        kind: 'text',
+                        description: 'This Duckle binary must be built with `--features oracle` and have Oracle Instant Client installed. Without the feature, runs will surface a clear error.',
+                    },
+                ],
+            },
+        ]);
+    }
     if (comp.id === 'src.sqlserver' || comp.id === 'src.synapse') {
         const vendor = comp.id === 'src.sqlserver' ? 'SQL Server' : 'Azure Synapse';
         return base(comp, [
@@ -801,6 +832,37 @@ function synthDbSource(comp: ComponentDef): ComponentManifest {
 }
 
 function synthDbSink(comp: ComponentDef): ComponentManifest {
+    if (comp.id === 'snk.oracle') {
+        return base(comp, [
+            {
+                label: 'Oracle connection',
+                fields: [
+                    { key: 'connect', label: 'Easy Connect string', kind: 'text', required: true, placeholder: 'host:1521/SERVICE' },
+                    { key: 'user', label: 'User', kind: 'text', required: true },
+                    { key: 'password', label: 'Password', kind: 'text', placeholder: '••••••••' },
+                ],
+            },
+            {
+                label: 'Destination',
+                fields: [
+                    { key: 'schema', label: 'Schema', kind: 'text' },
+                    { key: 'tableName', label: 'Table', kind: 'text', required: true },
+                    { key: 'batchSize', label: 'Insert batch size', kind: 'integer', defaultValue: 1000 },
+                ],
+            },
+            {
+                label: 'Build requirement',
+                fields: [
+                    {
+                        key: 'oracleBuildNote',
+                        label: 'Heads-up',
+                        kind: 'text',
+                        description: 'This Duckle binary must be built with `--features oracle` and have Oracle Instant Client installed. Without the feature, runs will surface a clear error.',
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
     if (comp.id === 'snk.sqlserver' || comp.id === 'snk.synapse') {
         const vendor = comp.id === 'snk.sqlserver' ? 'SQL Server' : 'Azure Synapse';
         return base(comp, [

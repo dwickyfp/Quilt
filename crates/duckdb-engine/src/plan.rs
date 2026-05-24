@@ -88,6 +88,11 @@ pub struct Stage {
     pub cassandra_sink: Option<CassandraSinkSpec>,
     /// Cassandra / ScyllaDB SELECT via the scylla CQL driver.
     pub cassandra_source: Option<CassandraSourceSpec>,
+    /// Oracle INSERT (opt-in behind `oracle` feature; spec always
+    /// present so the planner can validate the config either way).
+    pub oracle_sink: Option<OracleSinkSpec>,
+    /// Oracle SELECT (opt-in behind `oracle` feature).
+    pub oracle_source: Option<OracleSourceSpec>,
     /// Milliseconds the executor sleeps before running this stage.
     /// Set by ctl.wait and ctl.throttle. None = no delay.
     pub wait_ms: Option<u64>,
@@ -162,6 +167,33 @@ pub struct SnowflakeSourceSpec {
     pub schema: Option<String>,
     pub warehouse: Option<String>,
     pub role: Option<String>,
+    pub query: String,
+}
+
+/// snk.oracle: Oracle INSERT via the official `oracle` crate. Behind
+/// the `oracle` Cargo feature - the dep links against Oracle Instant
+/// Client which is a separate install. Without the feature the plan
+/// branch surfaces a clear "rebuild with --features oracle" error so
+/// the configuration is at least diagnosable.
+#[derive(Debug, Clone)]
+pub struct OracleSinkSpec {
+    pub from_view: String,
+    /// Oracle Easy Connect string (host:port/service_name) or full URL.
+    pub connect: String,
+    pub user: String,
+    pub password: String,
+    pub schema: Option<String>,
+    pub table: String,
+    pub batch_size: usize,
+}
+
+/// src.oracle: Oracle SELECT via the oracle crate. Same feature gate.
+#[derive(Debug, Clone)]
+pub struct OracleSourceSpec {
+    pub node_id: String,
+    pub connect: String,
+    pub user: String,
+    pub password: String,
     pub query: String,
 }
 
@@ -733,6 +765,8 @@ fn build_stage(
     let mut sqlserver_source: Option<SqlServerSourceSpec> = None;
     let mut cassandra_sink: Option<CassandraSinkSpec> = None;
     let mut cassandra_source: Option<CassandraSourceSpec> = None;
+    let mut oracle_sink: Option<OracleSinkSpec> = None;
+    let mut oracle_source: Option<OracleSourceSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -959,6 +993,30 @@ fn build_stage(
                 .and_then(|v| v.as_u64())
                 .filter(|n| *n > 0 && *n <= 50) // Databricks max is 50s
                 .unwrap_or(30),
+        });
+        (String::new(), StageKind::Sink, Some(from_view.to_string()))
+    } else if component_id == "snk.oracle" {
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let connect = string_prop(&props, "connect")
+            .or_else(|| string_prop(&props, "connectionString"))
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: connect required (host:port/service_name)", component_id)))?;
+        let user = string_prop(&props, "user")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: user required", component_id)))?;
+        let password = string_prop(&props, "password").unwrap_or_default();
+        let table = string_prop(&props, "tableName")
+            .or_else(|| string_prop(&props, "table"))
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: tableName required", component_id)))?;
+        oracle_sink = Some(OracleSinkSpec {
+            from_view: from_view.to_string(),
+            connect,
+            user,
+            password,
+            schema: string_prop(&props, "schema").filter(|s| !s.is_empty()),
+            table,
+            batch_size: props.get("batchSize").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(1000) as usize,
         });
         (String::new(), StageKind::Sink, Some(from_view.to_string()))
     } else if component_id == "snk.cassandra" || component_id == "snk.scylla" {
@@ -1323,6 +1381,34 @@ fn build_stage(
                 .unwrap_or(100),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "src.oracle" {
+        let connect = string_prop(&props, "connect")
+            .or_else(|| string_prop(&props, "connectionString"))
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: connect required", component_id)))?;
+        let user = string_prop(&props, "user")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: user required", component_id)))?;
+        let query = string_prop(&props, "query")
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| {
+                let table = string_prop(&props, "tableName").filter(|s| !s.is_empty())?;
+                let schema = string_prop(&props, "schema").filter(|s| !s.is_empty());
+                let qualified = match schema {
+                    Some(s) => format!("\"{}\".\"{}\"", s, table),
+                    None => format!("\"{}\"", table),
+                };
+                Some(format!("SELECT * FROM {}", qualified))
+            })
+            .ok_or_else(|| EngineError::Config(format!("{}: query or tableName required", component_id)))?;
+        oracle_source = Some(OracleSourceSpec {
+            node_id: node.id.clone(),
+            connect,
+            user,
+            password: string_prop(&props, "password").unwrap_or_default(),
+            query,
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "src.cassandra" || component_id == "src.scylla" {
         let contact_points = string_prop(&props, "contactPoints")
             .filter(|s| !s.is_empty())
@@ -1667,6 +1753,8 @@ fn build_stage(
         sqlserver_source,
         cassandra_sink,
         cassandra_source,
+        oracle_sink,
+        oracle_source,
         wait_ms,
         retry_attempts,
         retry_backoff_ms,
