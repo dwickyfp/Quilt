@@ -5744,6 +5744,59 @@ fn src_fixedwidth_extracts_positional_columns() {
 }
 
 #[test]
+fn src_avro_reads_container_file_records() {
+    // Write a small Avro container file (3 records) using the
+    // apache-avro crate itself, then verify the engine reads them
+    // back through src.avro. This proves the round-trip works
+    // without depending on the DuckDB community avro extension.
+    use apache_avro::{types::Record, Schema, Writer};
+
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let avro_path = format!("{}/data.avro", tmp.path().display());
+
+    // Build the file.
+    let schema_json = r#"{
+        "type": "record",
+        "name": "Person",
+        "fields": [
+            {"name": "id", "type": "long"},
+            {"name": "name", "type": "string"},
+            {"name": "active", "type": "boolean"}
+        ]
+    }"#;
+    let schema = Schema::parse_str(schema_json).expect("schema parse");
+    let file = std::fs::File::create(&avro_path).expect("create avro file");
+    {
+        let mut writer = Writer::new(&schema, file);
+        for (id, name, active) in [(1i64, "alice", true), (2, "bob", false), (3, "carol", true)] {
+            let mut rec = Record::new(&schema).unwrap();
+            rec.put("id", id);
+            rec.put("name", name);
+            rec.put("active", active);
+            writer.append(rec).expect("append record");
+        }
+        writer.flush().expect("flush avro");
+    }
+
+    let out = out_path(tmp.path(), "out.csv");
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("a", "src.avro", json!({ "path": &avro_path })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "a", "k")]),
+    ));
+    assert_eq!(r.status, "ok", "src.avro failed: {:?}", r.error);
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 3);
+    let alice = scalar_string(&format!(
+        "SELECT name FROM read_csv_auto('{}') WHERE id = 1",
+        out
+    ));
+    assert_eq!(alice, "alice");
+}
+
+#[test]
 fn src_yaml_reads_array_of_objects_as_rows() {
     // Top-level YAML array becomes one row per element.
     let engine = engine_or_skip!();

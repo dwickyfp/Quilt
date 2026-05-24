@@ -89,7 +89,7 @@ export const PALETTE: Category[] = [
                     src('jsonl', 'JSONL / NDJSON', 'available', 'Read newline-delimited JSON'),
                     src('xml', 'XML', 'planned'),
                     src('excel', 'Excel (XLSX)', 'available', 'Read .xlsx via the DuckDB excel extension'),
-                    src('avro', 'Avro', 'preview', 'Wired through the avro community extension; awaiting a v1.4+ build'),
+                    src('avro', 'Avro', 'available', 'Apache Avro container files (.avro / .ocf) via the pure-Rust `apache-avro` crate. The file carries its own schema; engine doesn\'t need any schema config. Pairs with Kafka topics that publish Avro-encoded payloads.'),
                     src('parquet', 'Parquet', 'available', 'Read columnar Parquet files'),
                     src('orc', 'ORC', 'planned'),
                     src('fixedwidth', 'Fixed-width', 'available', 'Read positional / fixed-width text files (mainframe / banking exports). Form provides a columns array - {name, start (1-based), width}; engine builds SUBSTR projections. Trailing whitespace stripped by default.'),

@@ -67,6 +67,10 @@ toml = "0.8"
 # build dance entirely, at the cost of fewer broker-protocol features
 # (good enough for batch produce + batch consume, no admin client).
 rskafka = "0.5"
+# Apache Avro container-file reader/writer. Pure Rust. Pairs with
+# Kafka topics that publish Avro-encoded payloads, and reads the
+# .avro / .ocf files that exporters drop on object storage.
+apache-avro = "0.17"
 
 [features]
 default = ["oracle"]
@@ -75,3 +79,7 @@ oracle = ["dep:oracle"]
 [dev-dependencies]
 tempfile = "3.10"
 rand = "0.8"
+# Re-imported as a dev-dep so the integration tests can call its
+# Writer to build a small .avro file inline before reading it back
+# through src.avro. Same version as the lib dep above.
+apache-avro = "0.17"

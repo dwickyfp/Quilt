@@ -51,7 +51,7 @@ Duckle is in **early development**. The visual designer, the DuckDB execution en
 
 **Scope, stated plainly:** Duckle is a single-machine, embedded studio. If you outgrow one box, point Duckle's output at the system that scales. It will not pretend to be a cluster.
 
-The component palette ships **301 nodes** so the roadmap is visible in the product itself. As of the latest engine cut: **255 available**, **12 preview**, **34 planned**. Each node is tagged by availability:
+The component palette ships **301 nodes** so the roadmap is visible in the product itself. As of the latest engine cut: **256 available**, **11 preview**, **34 planned**. Each node is tagged by availability:
 
 - **Available** runs on the DuckDB engine today.
 - **Preview** is configurable in the designer now (drag, wire, set properties); execution is being wired engine-by-engine. This currently covers the AI transforms and some vector DB read sources.
@@ -97,7 +97,7 @@ Duckle is not a CSV tool with extras. It reads a broad set of formats and source
 | **Object storage** | Amazon S3, Google Cloud Storage, Azure Blob, HTTP(S), MinIO, Cloudflare R2, Backblaze B2 | Available (live CI test for MinIO) |
 | **Cloud warehouses** | MotherDuck (DuckDB-native) | Available |
 | **Cloud warehouses** | **Snowflake** (SQL API + PAT/JWT auth, paginated), **BigQuery** (community extension), **Redshift** (postgres ATTACH), **Databricks SQL** (Statement Execution API + chunk follow), **Azure Synapse** (TDS) | Available |
-| **Avro files** | Apache Avro via the `avro` community extension | Preview (community extension awaiting a v1.4+ build) |
+| **Avro files** | Apache Avro container files (.avro / .ocf) via the pure-Rust `apache-avro` crate. The OCF header carries the schema; no schema config needed. | Available |
 | **Streaming** | **Apache Kafka / Redpanda** (batch-consume up to maxRecords via the pure-Rust `rskafka` driver) | Available |
 | **Streaming** | Pulsar, NATS, Kinesis, Event Hubs, Pub/Sub, RabbitMQ | Planned |
 | **APIs and SaaS** | **REST** (cursor / offset / page / Link header pagination), **GraphQL**. Vendor tiles: **Salesforce, HubSpot, Pipedrive, Zendesk, Intercom, Stripe, QuickBooks, Xero, Shopify, Notion, Airtable, GitHub, GitLab, Linear, Jira, Mailchimp, SendGrid, Segment** (thin pre-configured wrappers over REST/GraphQL) | Available |

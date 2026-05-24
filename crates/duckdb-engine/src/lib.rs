@@ -28,13 +28,13 @@ pub mod plan;
 pub use history::{append_run_record, load_run_history, RunRecord};
 pub use plan::{CompiledPipeline, PipelineDoc, Stage, StageKind};
 use plan::{
-    CassandraSinkSpec, CassandraSourceSpec, ClickHouseSinkSpec, ClickHouseSourceSpec,
-    DatabricksSinkSpec, DatabricksSourceSpec, ElasticSourceSpec, FormatFileSinkSpec,
-    FormatFileSourceSpec, FormatKind, KafkaSinkSpec, KafkaSourceSpec, MilvusSourceSpec,
-    MongoSinkSpec, MongoSourceSpec, OracleSinkSpec, OracleSourceSpec, QdrantSourceSpec,
-    RedisSinkSpec, RedisSourceSpec, RestPagination, RestSourceSpec, SnowflakeAuth,
-    SnowflakeSinkSpec, SnowflakeSourceSpec, SqlServerSinkSpec, SqlServerSourceSpec,
-    WeaviateSourceSpec, WebhookSpec,
+    AvroSourceSpec, CassandraSinkSpec, CassandraSourceSpec, ClickHouseSinkSpec,
+    ClickHouseSourceSpec, DatabricksSinkSpec, DatabricksSourceSpec, ElasticSourceSpec,
+    FormatFileSinkSpec, FormatFileSourceSpec, FormatKind, KafkaSinkSpec, KafkaSourceSpec,
+    MilvusSourceSpec, MongoSinkSpec, MongoSourceSpec, OracleSinkSpec, OracleSourceSpec,
+    QdrantSourceSpec, RedisSinkSpec, RedisSourceSpec, RestPagination, RestSourceSpec,
+    SnowflakeAuth, SnowflakeSinkSpec, SnowflakeSourceSpec, SqlServerSinkSpec,
+    SqlServerSourceSpec, WeaviateSourceSpec, WebhookSpec,
 };
 
 #[derive(Debug, Error)]
@@ -518,6 +518,8 @@ impl DuckdbEngine {
                     self.run_kafka_sink(&db_path, spec)
                 } else if let Some(spec) = stage.kafka_source.as_ref() {
                     self.run_kafka_source(&db_path, spec)
+                } else if let Some(spec) = stage.avro_source.as_ref() {
+                    self.run_avro_source(&db_path, spec)
                 } else if let Some(spec) = stage.upsert.as_ref() {
                     // Relational-DB upsert: DESCRIBE the upstream first to
                     // get the column list, then assemble INSERT ... ON
@@ -1732,6 +1734,38 @@ impl DuckdbEngine {
             spec.format,
             rows.len(),
             spec.path
+        ))
+    }
+
+    /// Apache Avro container-file reader via the pure-Rust apache-avro
+    /// crate. The .avro file header carries its own schema, so the
+    /// engine doesn't take any schema config - it iterates records,
+    /// deserializes each Value into JSON, and materializes via the
+    /// shared json-table helper. Works on every OS without depending
+    /// on the DuckDB community avro extension.
+    fn run_avro_source(
+        &self,
+        db: &Path,
+        spec: &AvroSourceSpec,
+    ) -> Result<String, EngineError> {
+        let file = std::fs::File::open(&spec.path)
+            .map_err(|e| EngineError::Query(format!("avro: open {}: {}", spec.path, e)))?;
+        let reader = apache_avro::Reader::new(file)
+            .map_err(|e| EngineError::Query(format!("avro: open container {}: {}", spec.path, e)))?;
+        let mut rows: Vec<JsonValue> = Vec::new();
+        for value in reader {
+            self.check_cancelled()?;
+            let v = value
+                .map_err(|e| EngineError::Query(format!("avro: read record: {}", e)))?;
+            let j: JsonValue = apache_avro::from_value(&v)
+                .map_err(|e| EngineError::Query(format!("avro: value -> json: {}", e)))?;
+            rows.push(j);
+        }
+        let count = rows.len();
+        materialize_jsonobjects_as_table(db, &spec.node_id, &rows)?;
+        Ok(format!(
+            "avro: materialized {} records into {}",
+            count, spec.node_id
         ))
     }
 

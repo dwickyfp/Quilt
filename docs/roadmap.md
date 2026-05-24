@@ -6,8 +6,8 @@ reel; this is the full ledger.
 
 The palette currently carries **301 components**, broken down:
 
-- **255 available** - executes on the DuckDB engine today
-- **12 preview** - configurable in the designer (drag, wire, set
+- **256 available** - executes on the DuckDB engine today
+- **11 preview** - configurable in the designer (drag, wire, set
   properties); execution is being wired engine-by-engine
 - **34 planned** - reserved in the palette so the roadmap is visible,
   not yet executable
@@ -88,12 +88,12 @@ Capabilities table in the README.
 
 | Component | Notes |
 |---|---|
-| `src.avro` / `snk.avro` | DuckDB community `avro` extension is on v1.3 and needs a v1.5 release for Linux x64; tile stays preview until the extension publishes |
-| `src.orc` / `snk.orc` | Apache ORC reader; no native DuckDB extension |
+| `snk.avro` | Writing Avro needs a schema choice (infer from data? take from the form? require an explicit JSON schema?); read path shipped first |
+| `src.orc` / `snk.orc` | Apache ORC reader; no native DuckDB extension; the `orc` Rust crate exists but is minimal |
 | `src.xml` / `snk.xml` | `quick-xml` - tractable; XML pulls in schema-validation scope so design needs care (row-path? attribute-vs-text handling?) |
 
-`src.yaml`, `snk.yaml`, `src.toml`, `snk.toml`, `src.fixedwidth`
-shipped - see the Capabilities table in the README.
+`src.yaml`, `snk.yaml`, `src.toml`, `snk.toml`, `src.fixedwidth`,
+`src.avro` shipped - see the Capabilities table in the README.
 
 ### Custom-code stages
 

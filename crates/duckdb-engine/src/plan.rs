@@ -139,6 +139,8 @@ pub struct Stage {
     pub kafka_sink: Option<KafkaSinkSpec>,
     /// Kafka consumer (also handles Redpanda).
     pub kafka_source: Option<KafkaSourceSpec>,
+    /// Apache Avro container-file reader (pure-Rust apache-avro crate).
+    pub avro_source: Option<AvroSourceSpec>,
     /// Milliseconds the executor sleeps before running this stage.
     /// Set by ctl.wait and ctl.throttle. None = no delay.
     pub wait_ms: Option<u64>,
@@ -376,6 +378,17 @@ pub struct KafkaSourceSpec {
     pub partition_id: i32,
     pub start_offset: i64,
     pub max_records: u64,
+}
+
+/// src.avro: read an Apache Avro container file (.avro / .ocf) via
+/// the pure-Rust apache-avro crate. Each Avro record becomes one
+/// row; complex types (records / maps / arrays) are flattened to
+/// JSON values which DuckDB handles natively. No schema config -
+/// the container file carries its own schema in the header.
+#[derive(Debug, Clone)]
+pub struct AvroSourceSpec {
+    pub node_id: String,
+    pub path: String,
 }
 
 /// snk.cassandra / snk.scylla: CQL INSERT via the scylla driver
@@ -973,6 +986,7 @@ fn build_stage(
     let mut format_sink: Option<FormatFileSinkSpec> = None;
     let mut kafka_sink: Option<KafkaSinkSpec> = None;
     let mut kafka_source: Option<KafkaSourceSpec> = None;
+    let mut avro_source: Option<AvroSourceSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -1859,6 +1873,20 @@ fn build_stage(
             max_records: props.get("maxRecords").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(1000),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "src.avro" {
+        // Apache Avro container-file reader via the pure-Rust apache-avro
+        // crate. Self-contained - works on every OS without DuckDB's
+        // community avro extension (which only ships for a subset of
+        // platform/version combos). The .avro file carries its own
+        // schema in the OCF header so no schema config is needed.
+        let path = string_prop(&props, "path")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: path required", component_id)))?;
+        avro_source = Some(AvroSourceSpec {
+            node_id: node.id.clone(),
+            path,
+        });
+        (String::new(), StageKind::View, None)
     } else if matches!(component_id, "src.yaml" | "src.toml") {
         // Single-file YAML / TOML reader. path is the absolute file
         // path; engine parses the doc with the relevant serde crate
@@ -2391,6 +2419,7 @@ fn build_stage(
         format_sink,
         kafka_sink,
         kafka_source,
+        avro_source,
         wait_ms,
         retry_attempts,
         retry_backoff_ms,
