@@ -155,6 +155,10 @@ pub struct Stage {
     pub xml_sink: Option<XmlSinkSpec>,
     /// Avro container-file writer (schema inferred from first row).
     pub avro_sink: Option<AvroSinkSpec>,
+    /// RabbitMQ / AMQP 0.9.1 publisher.
+    pub rabbit_sink: Option<RabbitSinkSpec>,
+    /// RabbitMQ / AMQP 0.9.1 batch consumer.
+    pub rabbit_source: Option<RabbitSourceSpec>,
     /// Milliseconds the executor sleeps before running this stage.
     /// Set by ctl.wait and ctl.throttle. None = no delay.
     pub wait_ms: Option<u64>,
@@ -508,6 +512,33 @@ pub struct AvroSinkSpec {
     pub schema_json: String,
     /// Record name to use when inferring (Avro requires a name).
     pub record_name: String,
+}
+
+/// snk.rabbit: publish one AMQP message per upstream row to
+/// (exchange, routing_key) via the pure-Rust lapin driver. value =
+/// JSON-stringified row. Persistent delivery mode (= survives broker
+/// restart). amqp:// URI carries the credentials inline.
+#[derive(Debug, Clone)]
+pub struct RabbitSinkSpec {
+    pub from_view: String,
+    pub url: String,
+    pub exchange: String,
+    pub routing_key: String,
+    pub batch_size: usize,
+}
+
+/// src.rabbit: pull up to max_messages from a queue, with a
+/// per-poll timeout. Emits {payload, routing_key, exchange,
+/// delivery_tag} rows. Auto-acks each message; if you need
+/// requeue-on-failure semantics use a downstream stage that
+/// errors-on-bad-shape and retries.
+#[derive(Debug, Clone)]
+pub struct RabbitSourceSpec {
+    pub node_id: String,
+    pub url: String,
+    pub queue: String,
+    pub max_messages: u64,
+    pub timeout_ms: u64,
 }
 
 /// snk.cassandra / snk.scylla: CQL INSERT via the scylla driver
@@ -1113,6 +1144,8 @@ fn build_stage(
     let mut xml_source: Option<XmlSourceSpec> = None;
     let mut xml_sink: Option<XmlSinkSpec> = None;
     let mut avro_sink: Option<AvroSinkSpec> = None;
+    let mut rabbit_sink: Option<RabbitSinkSpec> = None;
+    let mut rabbit_source: Option<RabbitSourceSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -1617,6 +1650,25 @@ fn build_stage(
             bulk_action: Some(action_line),
         });
         (String::new(), StageKind::Sink, Some(from_view.to_string()))
+    } else if component_id == "snk.rabbit" {
+        // RabbitMQ publisher. exchange='' means the default direct
+        // exchange (route to queue named by routingKey). exchange
+        // non-empty + routingKey = standard exchange routing.
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let url = string_prop(&props, "url")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: url required", component_id)))?;
+        let routing_key = string_prop(&props, "routingKey")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: routingKey required", component_id)))?;
+        rabbit_sink = Some(RabbitSinkSpec {
+            from_view: from_view.to_string(),
+            url,
+            exchange: string_prop(&props, "exchange").unwrap_or_default(),
+            routing_key,
+            batch_size: props.get("batchSize").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(500) as usize,
+        });
+        (String::new(), StageKind::Sink, Some(from_view.to_string()))
     } else if component_id == "snk.xml" {
         // XML wrapper-element writer. Default shape:
         //   <root><row><col>val</col>...</row>...</root>
@@ -2115,6 +2167,24 @@ fn build_stage(
             partition_id: props.get("partitionId").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
             start_offset: props.get("startOffset").and_then(|v| v.as_i64()).unwrap_or(-1),
             max_records: props.get("maxRecords").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(1000),
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "src.rabbit" {
+        // RabbitMQ batch consumer. queue must exist (declared by the
+        // producer or the broker admin). Pulls up to max_messages or
+        // until timeout_ms elapses.
+        let url = string_prop(&props, "url")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: url required (amqp://...)", component_id)))?;
+        let queue = string_prop(&props, "queue")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: queue required", component_id)))?;
+        rabbit_source = Some(RabbitSourceSpec {
+            node_id: node.id.clone(),
+            url,
+            queue,
+            max_messages: props.get("maxMessages").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(1000),
+            timeout_ms: props.get("timeoutMs").and_then(|v| v.as_u64()).unwrap_or(5000),
         });
         (String::new(), StageKind::View, None)
     } else if component_id == "src.xml" {
@@ -2685,6 +2755,8 @@ fn build_stage(
         xml_source,
         xml_sink,
         avro_sink,
+        rabbit_sink,
+        rabbit_source,
         wait_ms,
         retry_attempts,
         retry_backoff_ms,

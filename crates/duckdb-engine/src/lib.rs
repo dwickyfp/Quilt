@@ -33,9 +33,9 @@ use plan::{
     FormatFileSinkSpec, FormatFileSourceSpec, FormatKind, KafkaSinkSpec, KafkaSourceSpec,
     MilvusSourceSpec, MongoSinkSpec, MongoSourceSpec, NatsSinkSpec, NatsSourceSpec,
     OracleSinkSpec, OracleSourceSpec, PubSubSinkSpec, PubSubSourceSpec, QdrantSourceSpec,
-    RedisSinkSpec, RedisSourceSpec, RestPagination, RestSourceSpec, SnowflakeAuth,
-    SnowflakeSinkSpec, SnowflakeSourceSpec, SqlServerSinkSpec, SqlServerSourceSpec,
-    WeaviateSourceSpec, WebhookSpec, XmlSinkSpec, XmlSourceSpec,
+    RabbitSinkSpec, RabbitSourceSpec, RedisSinkSpec, RedisSourceSpec, RestPagination,
+    RestSourceSpec, SnowflakeAuth, SnowflakeSinkSpec, SnowflakeSourceSpec, SqlServerSinkSpec,
+    SqlServerSourceSpec, WeaviateSourceSpec, WebhookSpec, XmlSinkSpec, XmlSourceSpec,
 };
 
 #[derive(Debug, Error)]
@@ -535,6 +535,10 @@ impl DuckdbEngine {
                     self.run_xml_sink(&db_path, spec)
                 } else if let Some(spec) = stage.avro_sink.as_ref() {
                     self.run_avro_sink(&db_path, spec)
+                } else if let Some(spec) = stage.rabbit_sink.as_ref() {
+                    self.run_rabbit_sink(&db_path, spec)
+                } else if let Some(spec) = stage.rabbit_source.as_ref() {
+                    self.run_rabbit_source(&db_path, spec)
                 } else if let Some(spec) = stage.upsert.as_ref() {
                     // Relational-DB upsert: DESCRIBE the upstream first to
                     // get the column list, then assemble INSERT ... ON
@@ -2038,6 +2042,148 @@ impl DuckdbEngine {
             .flush()
             .map_err(|e| EngineError::Query(format!("avro: flush: {}", e)))?;
         Ok(format!("avro: wrote {} records to {}", total, spec.path))
+    }
+
+    /// RabbitMQ / AMQP 0.9.1 publisher via lapin. Each upstream row
+    /// becomes one persistent-delivery-mode message on (exchange,
+    /// routingKey). Payload is JSON-stringified row.
+    fn run_rabbit_sink(
+        &self,
+        db: &Path,
+        spec: &RabbitSinkSpec,
+    ) -> Result<String, EngineError> {
+        let select = format!("SELECT * FROM {}", plan::quote_ident(&spec.from_view));
+        let rows = self.run_rows(Some(db), &select)?;
+        if rows.is_empty() {
+            return Ok(format!("rabbit: 0 rows to publish to {}", spec.routing_key));
+        }
+        let cancel = self.cancel.clone();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| EngineError::Query(format!("rabbit: tokio rt: {}", e)))?;
+        let total: Result<usize, String> = rt.block_on(async {
+            use lapin::options::BasicPublishOptions;
+            use lapin::{BasicProperties, Connection, ConnectionProperties};
+            let conn = Connection::connect(&spec.url, ConnectionProperties::default())
+                .await
+                .map_err(|e| format!("connect: {}", e))?;
+            let channel = conn
+                .create_channel()
+                .await
+                .map_err(|e| format!("channel: {}", e))?;
+            let props = BasicProperties::default().with_delivery_mode(2); // persistent
+            let mut total = 0_usize;
+            for chunk in rows.chunks(spec.batch_size) {
+                if cancel.load(Ordering::Relaxed) {
+                    return Err("cancelled".into());
+                }
+                for row in chunk {
+                    let payload = serde_json::to_vec(row).unwrap_or_default();
+                    channel
+                        .basic_publish(
+                            &spec.exchange,
+                            &spec.routing_key,
+                            BasicPublishOptions::default(),
+                            &payload,
+                            props.clone(),
+                        )
+                        .await
+                        .map_err(|e| format!("publish: {}", e))?
+                        .await
+                        .map_err(|e| format!("publish confirm: {}", e))?;
+                }
+                total += chunk.len();
+            }
+            Ok(total)
+        });
+        match total {
+            Ok(n) => Ok(format!("rabbit: published {} message(s) to {}", n, spec.routing_key)),
+            Err(e) if e == "cancelled" => Err(EngineError::Cancelled),
+            Err(e) => Err(EngineError::Query(format!("rabbit sink: {}", e))),
+        }
+    }
+
+    /// RabbitMQ / AMQP 0.9.1 consumer via lapin. basic_get-polls
+    /// the queue (one message per call) until max_messages is
+    /// reached or timeout_ms total wall-clock elapses. Auto-acks
+    /// each pulled message; emits {payload, routing_key, exchange,
+    /// delivery_tag} rows.
+    fn run_rabbit_source(
+        &self,
+        db: &Path,
+        spec: &RabbitSourceSpec,
+    ) -> Result<String, EngineError> {
+        let cancel = self.cancel.clone();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| EngineError::Query(format!("rabbit: tokio rt: {}", e)))?;
+        let result: Result<Vec<JsonValue>, String> = rt.block_on(async {
+            use lapin::options::{BasicAckOptions, BasicGetOptions};
+            use lapin::{Connection, ConnectionProperties};
+            let conn = Connection::connect(&spec.url, ConnectionProperties::default())
+                .await
+                .map_err(|e| format!("connect: {}", e))?;
+            let channel = conn
+                .create_channel()
+                .await
+                .map_err(|e| format!("channel: {}", e))?;
+            let deadline = tokio::time::Instant::now()
+                + std::time::Duration::from_millis(spec.timeout_ms);
+            let mut out: Vec<JsonValue> = Vec::new();
+            while (out.len() as u64) < spec.max_messages {
+                if cancel.load(Ordering::Relaxed) {
+                    return Err("cancelled".into());
+                }
+                if tokio::time::Instant::now() >= deadline {
+                    break;
+                }
+                let got = channel
+                    .basic_get(&spec.queue, BasicGetOptions::default())
+                    .await
+                    .map_err(|e| format!("basic_get: {}", e))?;
+                let Some(delivery) = got else {
+                    // Empty queue - wait a tick and re-poll until the
+                    // deadline; an explicit zero-wait poll would
+                    // spin-CPU.
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    continue;
+                };
+                let payload = String::from_utf8_lossy(&delivery.data).to_string();
+                let mut obj = serde_json::Map::new();
+                obj.insert("payload".into(), JsonValue::String(payload));
+                obj.insert(
+                    "routing_key".into(),
+                    JsonValue::String(delivery.routing_key.to_string()),
+                );
+                obj.insert(
+                    "exchange".into(),
+                    JsonValue::String(delivery.exchange.to_string()),
+                );
+                obj.insert(
+                    "delivery_tag".into(),
+                    JsonValue::from(delivery.delivery_tag),
+                );
+                out.push(JsonValue::Object(obj));
+                channel
+                    .basic_ack(delivery.delivery_tag, BasicAckOptions::default())
+                    .await
+                    .map_err(|e| format!("ack: {}", e))?;
+            }
+            Ok(out)
+        });
+        let rows = match result {
+            Ok(r) => r,
+            Err(e) if e == "cancelled" => return Err(EngineError::Cancelled),
+            Err(e) => return Err(EngineError::Query(format!("rabbit source: {}", e))),
+        };
+        let count = rows.len();
+        materialize_jsonobjects_as_table(db, &spec.node_id, &rows)?;
+        Ok(format!(
+            "rabbit: materialized {} message(s) into {}",
+            count, spec.node_id
+        ))
     }
 
     /// NATS publisher via async-nats. Each upstream row becomes one

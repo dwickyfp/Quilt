@@ -4,12 +4,12 @@ This document is the source of truth for what's in the palette but
 not yet executable. The README's capability tables are the highlight
 reel; this is the full ledger.
 
-The palette currently carries **302 components**, broken down:
+The palette currently carries **303 components**, broken down:
 
-- **263 available** - executes on the DuckDB engine today
+- **265 available** - executes on the DuckDB engine today
 - **11 preview** - configurable in the designer (drag, wire, set
   properties); execution is being wired engine-by-engine
-- **28 planned** - reserved in the palette so the roadmap is visible,
+- **27 planned** - reserved in the palette so the roadmap is visible,
   not yet executable
 
 If you drop a planned or preview tile and try to run, the executor
@@ -27,17 +27,17 @@ it's a preview component.` rather than silently doing nothing.
 | `src.pulsar` / `snk.pulsar` | The `pulsar` Rust crate compiles its protobuf definitions with `prost-build` which requires `protoc` to be installed at build time. That breaks the self-contained build. Options: vendor protoc via `protoc-bin-vendored`; hand-roll the subset of Pulsar protobuf ops we need; wait for an alt crate. **Deferred until a build approach lands.** Pulsar has no REST data plane to fall back on. |
 | `src.kinesis` / `snk.kinesis` | AWS SDK for Rust; sizeable dep tree |
 | `src.eventhubs` | Azure AMQP via `azure_sdk_eventhubs` |
-| `src.rabbit` | `lapin` driver; AMQP 0.9.1 |
 
 `src.kafka`, `snk.kafka`, `src.redpanda`, `snk.redpanda` shipped via
 the pure-Rust `rskafka` driver (no C dep, builds cleanly on every
 CI runner). `src.nats`, `snk.nats` shipped via `async-nats`.
 `src.pubsub`, `snk.pubsub` shipped via direct REST calls
 (sidestepping the gRPC build requirement of the official Google
-client). Current semantics across all of them are **batch**:
-produce/consume up to N records per stage run. A true streaming
-mode (continuous run with checkpoint commits) is a separate engine
-workstream; lands alongside the next broker driver.
+client). `src.rabbit`, `snk.rabbit` shipped via the pure-Rust
+`lapin` AMQP 0.9.1 driver. Current semantics across all of them
+are **batch**: produce/consume up to N records per stage run. A
+true streaming mode (continuous run with checkpoint commits) is a
+separate engine workstream; lands alongside the next broker driver.
 
 ### Vector-DB read sources (vendor-specific scan APIs)
 

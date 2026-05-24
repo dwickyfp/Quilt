@@ -6325,6 +6325,59 @@ fn snk_and_src_kafka_roundtrip_via_real_broker() {
 }
 
 #[test]
+fn snk_and_src_rabbit_roundtrip_via_real_broker() {
+    // Env-gated. Set DUCKLE_RABBITMQ_URL to an amqp:// URL
+    // (e.g. amqp://guest:guest@127.0.0.1:5672/%2f) and
+    // DUCKLE_RABBITMQ_QUEUE to a queue name (must exist on the
+    // broker). Publishes 3 messages, consumes them back, asserts count.
+    let engine = engine_or_skip!();
+    let url = match std::env::var("DUCKLE_RABBITMQ_URL").ok() {
+        Some(u) if !u.is_empty() => u,
+        _ => {
+            eprintln!("skipping: set DUCKLE_RABBITMQ_URL to run RabbitMQ tests");
+            return;
+        }
+    };
+    let queue = std::env::var("DUCKLE_RABBITMQ_QUEUE")
+        .unwrap_or_else(|_| format!("duckle-test-{}", std::process::id()));
+
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "id,name\n1,alpha\n2,beta\n3,gamma\n");
+
+    // Publish (uses default direct exchange; routingKey = queue name).
+    let r1 = engine.execute_pipeline(&doc(
+        json!([
+            node("s", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("r", "snk.rabbit", json!({
+                "url": &url,
+                "exchange": "",
+                "routingKey": &queue,
+            })),
+        ]),
+        json!([main_edge("e", "s", "r")]),
+    ));
+    assert_eq!(r1.status, "ok", "rabbit sink failed: {:?}", r1.error);
+
+    // Consume back.
+    let out = out_path(tmp.path(), "rabbit.csv");
+    let r2 = engine.execute_pipeline(&doc(
+        json!([
+            node("r", "src.rabbit", json!({
+                "url": &url,
+                "queue": &queue,
+                "maxMessages": 3,
+                "timeoutMs": 5000,
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e", "r", "k")]),
+    ));
+    assert_eq!(r2.status, "ok", "rabbit source failed: {:?}", r2.error);
+    let n = count(&format!("read_csv_auto('{}')", out));
+    assert_eq!(n, 3, "expected 3 messages consumed, got {}", n);
+}
+
+#[test]
 fn snk_and_src_nats_roundtrip_via_real_urls() {
     // Env-gated like Kafka / Mongo / Redis. Set DUCKLE_NATS_URL to a
     // working comma-separated list (e.g. nats://127.0.0.1:4222). Uses
