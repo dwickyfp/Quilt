@@ -1464,10 +1464,9 @@ fn materialize_jsonobjects_as_table(
     node_id: &str,
     rows: &[JsonValue],
 ) -> Result<(), EngineError> {
-    let tmp_dir = std::env::temp_dir();
-    let tmp_path = tmp_dir.join(format!("duckle-rest-{}-{}.json", node_id, std::process::id()));
     let json_text = serde_json::to_string(&JsonValue::Array(rows.to_vec()))
         .map_err(|e| EngineError::Query(format!("rest source: JSON encode: {}", e)))?;
+    let tmp_path = unique_rest_tmp_path(node_id);
     std::fs::write(&tmp_path, json_text)
         .map_err(|e| EngineError::Query(format!("rest source: write tmp file: {}", e)))?;
     let sql = format!(
@@ -1476,6 +1475,26 @@ fn materialize_jsonobjects_as_table(
         tmp_path.display().to_string().replace('\\', "/").replace('\'', "''")
     );
     rest_source_apply(db, &sql)
+}
+
+/// Unique temp path for a REST/Snowflake/Databricks source's
+/// materialization. Includes node_id + process id + nanoseconds +
+/// thread id so cargo test's parallel runs can't clobber each
+/// other when two tests reuse the same node_id.
+fn unique_rest_tmp_path(node_id: &str) -> PathBuf {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
+    let tid = format!("{:?}", std::thread::current().id())
+        .replace(|c: char| !c.is_ascii_alphanumeric(), "");
+    std::env::temp_dir().join(format!(
+        "duckle-rest-{}-{}-{}-{}.json",
+        node_id,
+        std::process::id(),
+        nanos,
+        tid,
+    ))
 }
 
 /// Shared helper for src.snowflake / src.databricks: take an
@@ -1490,8 +1509,6 @@ fn materialize_arrayrows_as_table(
     cols: &[String],
     rows: &[JsonValue],
 ) -> Result<(), EngineError> {
-    let tmp_dir = std::env::temp_dir();
-    let tmp_path = tmp_dir.join(format!("duckle-rest-{}-{}.json", node_id, std::process::id()));
     let mut serialized = Vec::with_capacity(rows.len());
     for row in rows {
         let arr = row.as_array();
@@ -1507,6 +1524,7 @@ fn materialize_arrayrows_as_table(
     }
     let json_text = serde_json::to_string(&JsonValue::Array(serialized))
         .map_err(|e| EngineError::Query(format!("rest source: JSON encode: {}", e)))?;
+    let tmp_path = unique_rest_tmp_path(node_id);
     std::fs::write(&tmp_path, json_text).map_err(|e| {
         EngineError::Query(format!("rest source: write tmp file: {}", e))
     })?;
