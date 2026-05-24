@@ -6,8 +6,8 @@ reel; this is the full ledger.
 
 The palette currently carries **298 components**, broken down:
 
-- **243 available** - executes on the DuckDB engine today
-- **15 preview** - configurable in the designer (drag, wire, set
+- **246 available** - executes on the DuckDB engine today
+- **12 preview** - configurable in the designer (drag, wire, set
   properties); execution is being wired engine-by-engine
 - **40 planned** - reserved in the palette so the roadmap is visible,
   not yet executable
@@ -43,14 +43,13 @@ the first broker driver.
 | Component | Notes |
 |---|---|
 | `src.pinecone` | Pinecone has no "scan all vectors" API by design; reads happen via query (similarity search). The right shape is a query node, not a generic read source |
-| `src.qdrant` | `POST /collections/{id}/points/scroll` - cursor pagination; doable as a thin wrapper |
-| `src.weaviate` | `GET /v1/objects?class=X&limit=&after=` - cursor; doable |
 | `src.chroma` / `snk.chroma` | Chroma's API is in flux; pin to a stable version first |
-| `src.milvus` | `POST /v1/vector/query` with filter; doable |
 | `src.lancedb` / `snk.lancedb` | LanceDB Rust SDK; new dep |
 
-The corresponding **sinks** are all available today via vendor HTTP APIs:
-Pinecone, Qdrant, Weaviate, Milvus.
+`src.qdrant`, `src.weaviate`, and `src.milvus` shipped - each is a
+vendor-specific paginated HTTP scan implemented directly against the
+public REST API (no SDK). See the Capabilities table in the README.
+Corresponding **sinks** are all available too.
 
 ### OAuth-heavy SaaS
 

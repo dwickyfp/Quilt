@@ -5698,6 +5698,263 @@ fn snk_cockroach_routes_through_postgres_attach_path() {
 }
 
 #[test]
+fn src_qdrant_walks_scroll_pages_and_flattens_payload() {
+    // Mock returns one page with 2 points and a non-null
+    // next_page_offset, then a second page with 1 point and null
+    // offset. Engine should flatten payload into top-level columns
+    // and stop after the null cursor.
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    let engine = engine_or_skip!();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().unwrap().port();
+
+    let page1 = br#"{"result":{"points":[{"id":1,"payload":{"name":"alice","tag":"a"}},{"id":2,"payload":{"name":"bob","tag":"b"}}],"next_page_offset":42}}"#;
+    let page2 = br#"{"result":{"points":[{"id":3,"payload":{"name":"carol","tag":"c"}}],"next_page_offset":null}}"#;
+    let req_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let captured = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let rc = req_count.clone();
+    let cap = captured.clone();
+
+    let handle = std::thread::spawn(move || {
+        for stream in listener.incoming().take(2) {
+            let mut stream = match stream { Ok(s) => s, Err(_) => break };
+            stream.set_read_timeout(Some(Duration::from_millis(250))).ok();
+            stream.set_nodelay(true).ok();
+            let mut buf = Vec::with_capacity(8192);
+            let mut chunk = [0u8; 4096];
+            for _ in 0..16 {
+                match stream.read(&mut chunk) {
+                    Ok(0) => break,
+                    Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                    Err(_) => break,
+                }
+            }
+            cap.lock().unwrap().push(String::from_utf8_lossy(&buf).to_string());
+            let idx = rc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let body: &[u8] = if idx == 0 { page1 } else { page2 };
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(resp.as_bytes());
+            let _ = stream.write_all(body);
+            let _ = stream.flush();
+            let _ = stream.shutdown(std::net::Shutdown::Write);
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    });
+
+    let tmp = tempfile::tempdir().unwrap();
+    let out = out_path(tmp.path(), "qdrant.csv");
+    let cluster = format!("http://127.0.0.1:{}", port);
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("q", "src.qdrant", json!({
+                "clusterUrl": cluster,
+                "collection": "mydocs",
+                "apiKey": "test-key",
+                "pageSize": 100,
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "q", "k")]),
+    ));
+    let _ = handle.join();
+    assert_eq!(r.status, "ok", "src.qdrant failed: {:?}", r.error);
+    assert_eq!(
+        req_count.load(std::sync::atomic::Ordering::SeqCst),
+        2,
+        "expected 2 scroll requests"
+    );
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 3, "expected 3 points total");
+    // Second request must carry the cursor offset from page 1.
+    let reqs = captured.lock().unwrap();
+    assert!(
+        reqs[1].contains("\"offset\":42"),
+        "expected offset=42 in page-2 body: {}",
+        reqs[1].lines().last().unwrap_or("")
+    );
+    // api-key header set on both requests.
+    assert!(
+        reqs[0].contains("api-key: test-key"),
+        "expected api-key header in page-1 request: {}",
+        reqs[0].lines().next().unwrap_or("")
+    );
+}
+
+#[test]
+fn src_weaviate_paginates_via_after_cursor() {
+    // Mock returns a full page (size=2, 2 objects) then a short page
+    // (1 object). Engine should send the previous page's last id as
+    // `after` on the second request and stop after the short page.
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    let engine = engine_or_skip!();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().unwrap().port();
+
+    let page1 = br#"{"objects":[{"id":"uuid-1","class":"Article","properties":{"title":"hello"}},{"id":"uuid-2","class":"Article","properties":{"title":"world"}}]}"#;
+    let page2 = br#"{"objects":[{"id":"uuid-3","class":"Article","properties":{"title":"again"}}]}"#;
+    let req_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let captured = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let rc = req_count.clone();
+    let cap = captured.clone();
+
+    let handle = std::thread::spawn(move || {
+        for stream in listener.incoming().take(2) {
+            let mut stream = match stream { Ok(s) => s, Err(_) => break };
+            stream.set_read_timeout(Some(Duration::from_millis(250))).ok();
+            stream.set_nodelay(true).ok();
+            let mut buf = Vec::with_capacity(8192);
+            let mut chunk = [0u8; 4096];
+            for _ in 0..16 {
+                match stream.read(&mut chunk) {
+                    Ok(0) => break,
+                    Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                    Err(_) => break,
+                }
+            }
+            cap.lock().unwrap().push(String::from_utf8_lossy(&buf).to_string());
+            let idx = rc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let body: &[u8] = if idx == 0 { page1 } else { page2 };
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(resp.as_bytes());
+            let _ = stream.write_all(body);
+            let _ = stream.flush();
+            let _ = stream.shutdown(std::net::Shutdown::Write);
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    });
+
+    let tmp = tempfile::tempdir().unwrap();
+    let out = out_path(tmp.path(), "weaviate.csv");
+    let endpoint = format!("http://127.0.0.1:{}", port);
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("w", "src.weaviate", json!({
+                "endpoint": endpoint,
+                "class": "Article",
+                "apiKey": "wv-key",
+                "pageSize": 2,
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "w", "k")]),
+    ));
+    let _ = handle.join();
+    assert_eq!(r.status, "ok", "src.weaviate failed: {:?}", r.error);
+    assert_eq!(
+        req_count.load(std::sync::atomic::Ordering::SeqCst),
+        2,
+        "expected 2 requests (full page then short page)"
+    );
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 3, "expected 3 objects total");
+    let reqs = captured.lock().unwrap();
+    assert!(
+        reqs[1].contains("after=uuid-2"),
+        "expected after=uuid-2 in page-2 GET line: {}",
+        reqs[1].lines().next().unwrap_or("")
+    );
+    assert!(
+        reqs[0].contains("Authorization: Bearer wv-key"),
+        "expected Bearer header in page-1 request: {}",
+        reqs[0].lines().next().unwrap_or("")
+    );
+}
+
+#[test]
+fn src_milvus_paginates_via_offset() {
+    // Mock returns a full page (size=2, 2 rows) then a short page (1
+    // row). Engine should walk offset=0 -> offset=2 and stop after
+    // the short page.
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    let engine = engine_or_skip!();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().unwrap().port();
+
+    let page1 = br#"{"data":[{"id":1,"name":"alice"},{"id":2,"name":"bob"}]}"#;
+    let page2 = br#"{"data":[{"id":3,"name":"carol"}]}"#;
+    let req_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let captured = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let rc = req_count.clone();
+    let cap = captured.clone();
+
+    let handle = std::thread::spawn(move || {
+        for stream in listener.incoming().take(2) {
+            let mut stream = match stream { Ok(s) => s, Err(_) => break };
+            stream.set_read_timeout(Some(Duration::from_millis(250))).ok();
+            stream.set_nodelay(true).ok();
+            let mut buf = Vec::with_capacity(8192);
+            let mut chunk = [0u8; 4096];
+            for _ in 0..16 {
+                match stream.read(&mut chunk) {
+                    Ok(0) => break,
+                    Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                    Err(_) => break,
+                }
+            }
+            cap.lock().unwrap().push(String::from_utf8_lossy(&buf).to_string());
+            let idx = rc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let body: &[u8] = if idx == 0 { page1 } else { page2 };
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(resp.as_bytes());
+            let _ = stream.write_all(body);
+            let _ = stream.flush();
+            let _ = stream.shutdown(std::net::Shutdown::Write);
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    });
+
+    let tmp = tempfile::tempdir().unwrap();
+    let out = out_path(tmp.path(), "milvus.csv");
+    let endpoint = format!("http://127.0.0.1:{}", port);
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("m", "src.milvus", json!({
+                "endpoint": endpoint,
+                "collection": "products",
+                "apiKey": "mv-key",
+                "filter": "id > 0",
+                "pageSize": 2,
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "m", "k")]),
+    ));
+    let _ = handle.join();
+    assert_eq!(r.status, "ok", "src.milvus failed: {:?}", r.error);
+    assert_eq!(
+        req_count.load(std::sync::atomic::Ordering::SeqCst),
+        2,
+        "expected 2 query requests"
+    );
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 3, "expected 3 rows total");
+    let reqs = captured.lock().unwrap();
+    assert!(
+        reqs[1].contains("\"offset\":2"),
+        "expected offset=2 in page-2 body: {}",
+        reqs[1].lines().last().unwrap_or("")
+    );
+}
+
+#[test]
 fn snk_and_src_redis_roundtrip_via_real_url() {
     // Env-gated like the mongo / postgres / mysql tests. Set
     // DUCKLE_REDIS_URL to a working redis URL (e.g. redis://127.0.0.1:6379/0)

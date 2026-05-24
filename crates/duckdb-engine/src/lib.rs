@@ -29,10 +29,10 @@ pub use history::{append_run_record, load_run_history, RunRecord};
 pub use plan::{CompiledPipeline, PipelineDoc, Stage, StageKind};
 use plan::{
     CassandraSinkSpec, CassandraSourceSpec, ClickHouseSinkSpec, ClickHouseSourceSpec,
-    DatabricksSinkSpec, DatabricksSourceSpec, ElasticSourceSpec, MongoSinkSpec, MongoSourceSpec,
-    OracleSinkSpec, OracleSourceSpec, RedisSinkSpec, RedisSourceSpec, RestPagination,
-    RestSourceSpec, SnowflakeAuth, SnowflakeSinkSpec, SnowflakeSourceSpec, SqlServerSinkSpec,
-    SqlServerSourceSpec, WebhookSpec,
+    DatabricksSinkSpec, DatabricksSourceSpec, ElasticSourceSpec, MilvusSourceSpec, MongoSinkSpec,
+    MongoSourceSpec, OracleSinkSpec, OracleSourceSpec, QdrantSourceSpec, RedisSinkSpec,
+    RedisSourceSpec, RestPagination, RestSourceSpec, SnowflakeAuth, SnowflakeSinkSpec,
+    SnowflakeSourceSpec, SqlServerSinkSpec, SqlServerSourceSpec, WeaviateSourceSpec, WebhookSpec,
 };
 
 #[derive(Debug, Error)]
@@ -490,6 +490,12 @@ impl DuckdbEngine {
                     self.run_redis_sink(&db_path, spec)
                 } else if let Some(spec) = stage.redis_source.as_ref() {
                     self.run_redis_source(&db_path, spec)
+                } else if let Some(spec) = stage.qdrant_source.as_ref() {
+                    self.run_qdrant_source(&db_path, spec)
+                } else if let Some(spec) = stage.weaviate_source.as_ref() {
+                    self.run_weaviate_source(&db_path, spec)
+                } else if let Some(spec) = stage.milvus_source.as_ref() {
+                    self.run_milvus_source(&db_path, spec)
                 } else if let Some(spec) = stage.upsert.as_ref() {
                     // Relational-DB upsert: DESCRIBE the upstream first to
                     // get the column list, then assemble INSERT ... ON
@@ -1360,6 +1366,254 @@ impl DuckdbEngine {
         materialize_jsonobjects_as_table(db, &spec.node_id, &rows)?;
         Ok(format!(
             "redis: materialized {} rows into {}",
+            count, spec.node_id
+        ))
+    }
+
+    /// Qdrant scroll source. POSTs to /collections/{id}/points/scroll
+    /// with {limit, offset, with_payload, with_vector}. The response
+    /// puts the points in result.points[] and the next cursor in
+    /// result.next_page_offset (null when done). Engine walks pages
+    /// until max_pages or the cursor is null, then flattens each
+    /// point into {id, ...payload[, vector]}.
+    fn run_qdrant_source(
+        &self,
+        db: &Path,
+        spec: &QdrantSourceSpec,
+    ) -> Result<String, EngineError> {
+        let base = spec.cluster_url.trim_end_matches('/');
+        let url = format!("{}/collections/{}/points/scroll", base, spec.collection);
+        let mut all_points: Vec<JsonValue> = Vec::new();
+        let mut next_offset: Option<JsonValue> = None;
+        for _ in 0..spec.max_pages {
+            let mut body = serde_json::Map::new();
+            body.insert("limit".into(), JsonValue::from(spec.page_size));
+            body.insert("with_payload".into(), JsonValue::Bool(true));
+            body.insert("with_vector".into(), JsonValue::Bool(spec.with_vector));
+            if let Some(off) = &next_offset {
+                body.insert("offset".into(), off.clone());
+            }
+            let mut req = ureq::post(&url)
+                .set("Content-Type", "application/json")
+                .set("Accept", "application/json");
+            if !spec.api_key.is_empty() {
+                req = req.set("api-key", &spec.api_key);
+            }
+            let resp = match req.send_string(&serde_json::to_string(&body).unwrap_or_default()) {
+                Ok(r) => r.into_json::<JsonValue>().map_err(|e| {
+                    EngineError::Query(format!("qdrant: response not JSON: {}", e))
+                })?,
+                Err(ureq::Error::Status(code, r)) => {
+                    let body = r.into_string().unwrap_or_default();
+                    return Err(EngineError::Query(format!(
+                        "qdrant HTTP {} from {}: {}",
+                        code,
+                        url,
+                        body.chars().take(300).collect::<String>()
+                    )));
+                }
+                Err(e) => {
+                    return Err(EngineError::Query(format!(
+                        "qdrant transport to {}: {}",
+                        url, e
+                    )));
+                }
+            };
+            let result = resp.get("result").cloned().unwrap_or(JsonValue::Null);
+            if let Some(points) = result.get("points").and_then(|v| v.as_array()) {
+                for p in points {
+                    let mut obj = serde_json::Map::new();
+                    if let Some(id) = p.get("id") {
+                        obj.insert("id".into(), id.clone());
+                    }
+                    if let Some(payload) = p.get("payload").and_then(|v| v.as_object()) {
+                        for (k, v) in payload {
+                            obj.insert(k.clone(), v.clone());
+                        }
+                    }
+                    if spec.with_vector {
+                        if let Some(v) = p.get("vector") {
+                            obj.insert("vector".into(), v.clone());
+                        }
+                    }
+                    all_points.push(JsonValue::Object(obj));
+                }
+            }
+            match result.get("next_page_offset") {
+                Some(off) if !off.is_null() => next_offset = Some(off.clone()),
+                _ => break,
+            }
+        }
+        let count = all_points.len();
+        materialize_jsonobjects_as_table(db, &spec.node_id, &all_points)?;
+        Ok(format!(
+            "qdrant: materialized {} points into {}",
+            count, spec.node_id
+        ))
+    }
+
+    /// Weaviate object-list source. GET /v1/objects?class=&limit=&after=
+    /// returns {objects: [{id, class, properties, vector?}]}; cursor
+    /// is the last object's id, passed as `after` on the next request.
+    /// Loop terminates on a short page or max_pages.
+    fn run_weaviate_source(
+        &self,
+        db: &Path,
+        spec: &WeaviateSourceSpec,
+    ) -> Result<String, EngineError> {
+        let base = spec.endpoint.trim_end_matches('/');
+        let mut all_objects: Vec<JsonValue> = Vec::new();
+        let mut after: Option<String> = None;
+        for _ in 0..spec.max_pages {
+            let mut url = format!(
+                "{}/v1/objects?class={}&limit={}",
+                base,
+                urlencode_simple(&spec.class),
+                spec.page_size
+            );
+            if spec.with_vector {
+                url.push_str("&include=vector");
+            }
+            if let Some(a) = &after {
+                url.push_str(&format!("&after={}", urlencode_simple(a)));
+            }
+            let mut req = ureq::get(&url).set("Accept", "application/json");
+            if !spec.api_key.is_empty() {
+                req = req.set("Authorization", &format!("Bearer {}", spec.api_key));
+            }
+            let resp = match req.call() {
+                Ok(r) => r.into_json::<JsonValue>().map_err(|e| {
+                    EngineError::Query(format!("weaviate: response not JSON: {}", e))
+                })?,
+                Err(ureq::Error::Status(code, r)) => {
+                    let body = r.into_string().unwrap_or_default();
+                    return Err(EngineError::Query(format!(
+                        "weaviate HTTP {} from {}: {}",
+                        code,
+                        url,
+                        body.chars().take(300).collect::<String>()
+                    )));
+                }
+                Err(e) => {
+                    return Err(EngineError::Query(format!(
+                        "weaviate transport to {}: {}",
+                        url, e
+                    )));
+                }
+            };
+            let Some(objs) = resp.get("objects").and_then(|v| v.as_array()) else {
+                break;
+            };
+            let page_len = objs.len();
+            let mut last_id: Option<String> = None;
+            for o in objs {
+                let mut obj = serde_json::Map::new();
+                if let Some(id) = o.get("id").and_then(|v| v.as_str()) {
+                    obj.insert("id".into(), JsonValue::String(id.to_string()));
+                    last_id = Some(id.to_string());
+                }
+                if let Some(props) = o.get("properties").and_then(|v| v.as_object()) {
+                    for (k, v) in props {
+                        obj.insert(k.clone(), v.clone());
+                    }
+                }
+                if spec.with_vector {
+                    if let Some(v) = o.get("vector") {
+                        obj.insert("vector".into(), v.clone());
+                    }
+                }
+                all_objects.push(JsonValue::Object(obj));
+            }
+            if page_len < spec.page_size as usize {
+                break;
+            }
+            match last_id {
+                Some(id) => after = Some(id),
+                None => break,
+            }
+        }
+        let count = all_objects.len();
+        materialize_jsonobjects_as_table(db, &spec.node_id, &all_objects)?;
+        Ok(format!(
+            "weaviate: materialized {} objects into {}",
+            count, spec.node_id
+        ))
+    }
+
+    /// Milvus query source. POST /v1/vector/query with {collectionName,
+    /// filter, outputFields, limit, offset}. Response: {data: [...]}.
+    /// Walks offset += page_size until a short page or max_pages.
+    fn run_milvus_source(
+        &self,
+        db: &Path,
+        spec: &MilvusSourceSpec,
+    ) -> Result<String, EngineError> {
+        let base = spec.endpoint.trim_end_matches('/');
+        let url = format!("{}/v1/vector/query", base);
+        let mut all_rows: Vec<JsonValue> = Vec::new();
+        let mut offset: u64 = 0;
+        for _ in 0..spec.max_pages {
+            let mut body = serde_json::Map::new();
+            body.insert(
+                "collectionName".into(),
+                JsonValue::String(spec.collection.clone()),
+            );
+            body.insert("filter".into(), JsonValue::String(spec.filter.clone()));
+            if !spec.output_fields.is_empty() {
+                body.insert(
+                    "outputFields".into(),
+                    JsonValue::Array(
+                        spec.output_fields
+                            .iter()
+                            .map(|f| JsonValue::String(f.clone()))
+                            .collect(),
+                    ),
+                );
+            }
+            body.insert("limit".into(), JsonValue::from(spec.page_size));
+            body.insert("offset".into(), JsonValue::from(offset));
+            let mut req = ureq::post(&url)
+                .set("Content-Type", "application/json")
+                .set("Accept", "application/json");
+            if !spec.api_key.is_empty() {
+                req = req.set("Authorization", &format!("Bearer {}", spec.api_key));
+            }
+            let resp = match req.send_string(&serde_json::to_string(&body).unwrap_or_default()) {
+                Ok(r) => r.into_json::<JsonValue>().map_err(|e| {
+                    EngineError::Query(format!("milvus: response not JSON: {}", e))
+                })?,
+                Err(ureq::Error::Status(code, r)) => {
+                    let body = r.into_string().unwrap_or_default();
+                    return Err(EngineError::Query(format!(
+                        "milvus HTTP {} from {}: {}",
+                        code,
+                        url,
+                        body.chars().take(300).collect::<String>()
+                    )));
+                }
+                Err(e) => {
+                    return Err(EngineError::Query(format!(
+                        "milvus transport to {}: {}",
+                        url, e
+                    )));
+                }
+            };
+            let Some(arr) = resp.get("data").and_then(|v| v.as_array()) else {
+                break;
+            };
+            let page_len = arr.len();
+            for v in arr {
+                all_rows.push(v.clone());
+            }
+            if page_len < spec.page_size as usize {
+                break;
+            }
+            offset += spec.page_size;
+        }
+        let count = all_rows.len();
+        materialize_jsonobjects_as_table(db, &spec.node_id, &all_rows)?;
+        Ok(format!(
+            "milvus: materialized {} points into {}",
             count, spec.node_id
         ))
     }

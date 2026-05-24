@@ -103,8 +103,8 @@ Duckle is not a CSV tool with extras. It reads a broad set of formats and source
 | **APIs and SaaS** | gRPC, SOAP, OData, Google Sheets, Excel Online, webhook listener, more SaaS vendors | Planned |
 | **NoSQL and search** | **MongoDB** (official driver), **Cassandra / ScyllaDB** (CQL), **Elasticsearch / OpenSearch** (from+size + search_after), **Redis** (SCAN + GET via the sync client), **CouchDB** (via the `_all_docs` REST endpoint) | Available |
 | **NoSQL and search** | DynamoDB | Planned |
-| **Vector / AI databases** | **pgvector** (rides the postgres ATTACH; server needs `CREATE EXTENSION vector`) | Available |
-| **Vector / AI databases** | Pinecone, Qdrant, Weaviate, Chroma, Milvus, LanceDB | Preview (read paths need vendor scan endpoints; write paths shipped as sinks) |
+| **Vector / AI databases** | **pgvector** (postgres ATTACH; server needs `CREATE EXTENSION vector`), **Qdrant** (`/collections/{id}/points/scroll` with cursor pagination), **Weaviate** (`/v1/objects?class=&after=` with cursor pagination), **Milvus** (`/v1/vector/query` with offset pagination) | Available |
+| **Vector / AI databases** | Pinecone (no list-all-vectors API), Chroma, LanceDB | Preview |
 
 ### Transforms
 

@@ -122,6 +122,12 @@ pub struct Stage {
     pub redis_sink: Option<RedisSinkSpec>,
     /// Redis SCAN + GET via the redis sync client.
     pub redis_source: Option<RedisSourceSpec>,
+    /// Qdrant points scroll source (paginates /collections/{id}/points/scroll).
+    pub qdrant_source: Option<QdrantSourceSpec>,
+    /// Weaviate object list source (paginates /v1/objects?class=&after=).
+    pub weaviate_source: Option<WeaviateSourceSpec>,
+    /// Milvus vector query source (paginates /v1/vector/query via offset).
+    pub milvus_source: Option<MilvusSourceSpec>,
     /// Milliseconds the executor sleeps before running this stage.
     /// Set by ctl.wait and ctl.throttle. None = no delay.
     pub wait_ms: Option<u64>,
@@ -251,6 +257,51 @@ pub struct RedisSourceSpec {
     pub url: String,
     pub key_pattern: String,
     pub limit: u64,
+}
+
+/// src.qdrant: paginate /collections/{collection}/points/scroll. Each
+/// page returns `result.points: [{id, payload, vector?}]` plus
+/// `result.next_page_offset` (null when done). Engine flattens each
+/// point into {id, ...payload[, vector]}.
+#[derive(Debug, Clone)]
+pub struct QdrantSourceSpec {
+    pub node_id: String,
+    pub cluster_url: String,
+    pub collection: String,
+    pub api_key: String,
+    pub page_size: u64,
+    pub max_pages: u64,
+    pub with_vector: bool,
+}
+
+/// src.weaviate: paginate GET /v1/objects?class=&limit=&after=. Each
+/// page returns `objects: [{id, class, properties, vector?}]`; the
+/// cursor is the last object's id, passed back as `after` on the
+/// next request. Engine flattens each object into {id, ...properties[, vector]}.
+#[derive(Debug, Clone)]
+pub struct WeaviateSourceSpec {
+    pub node_id: String,
+    pub endpoint: String,
+    pub class: String,
+    pub api_key: String,
+    pub page_size: u64,
+    pub max_pages: u64,
+    pub with_vector: bool,
+}
+
+/// src.milvus: paginate POST /v1/vector/query with {collectionName,
+/// filter, outputFields, limit, offset}. Each page returns
+/// `data: [...]`; engine walks offset += limit until a short page.
+#[derive(Debug, Clone)]
+pub struct MilvusSourceSpec {
+    pub node_id: String,
+    pub endpoint: String,
+    pub collection: String,
+    pub api_key: String,
+    pub filter: String,
+    pub output_fields: Vec<String>,
+    pub page_size: u64,
+    pub max_pages: u64,
 }
 
 /// snk.cassandra / snk.scylla: CQL INSERT via the scylla driver
@@ -841,6 +892,9 @@ fn build_stage(
     let mut oracle_source: Option<OracleSourceSpec> = None;
     let mut redis_sink: Option<RedisSinkSpec> = None;
     let mut redis_source: Option<RedisSourceSpec> = None;
+    let mut qdrant_source: Option<QdrantSourceSpec> = None;
+    let mut weaviate_source: Option<WeaviateSourceSpec> = None;
+    let mut milvus_source: Option<MilvusSourceSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -1659,6 +1713,68 @@ fn build_stage(
             query,
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "src.qdrant" {
+        // Qdrant points scroll source. clusterUrl + collection +
+        // optional apiKey. with_vector defaults false (vectors are
+        // big - users usually want metadata for ETL).
+        let cluster = string_prop(&props, "clusterUrl")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: clusterUrl required (e.g. https://xyz.cloud.qdrant.io:6333)", component_id)))?;
+        let collection = string_prop(&props, "collection")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: collection required", component_id)))?;
+        qdrant_source = Some(QdrantSourceSpec {
+            node_id: node.id.clone(),
+            cluster_url: cluster,
+            collection,
+            api_key: string_prop(&props, "apiKey").unwrap_or_default(),
+            page_size: props.get("pageSize").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(100),
+            max_pages: props.get("maxPages").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(100),
+            with_vector: props.get("withVector").and_then(|v| v.as_bool()).unwrap_or(false),
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "src.weaviate" {
+        // Weaviate object list source. endpoint + class + optional apiKey.
+        let endpoint = string_prop(&props, "endpoint")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: endpoint required (e.g. https://my-cluster.weaviate.network)", component_id)))?;
+        let class = string_prop(&props, "class")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: class required", component_id)))?;
+        weaviate_source = Some(WeaviateSourceSpec {
+            node_id: node.id.clone(),
+            endpoint,
+            class,
+            api_key: string_prop(&props, "apiKey").unwrap_or_default(),
+            page_size: props.get("pageSize").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(100),
+            max_pages: props.get("maxPages").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(100),
+            with_vector: props.get("withVector").and_then(|v| v.as_bool()).unwrap_or(false),
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "src.milvus" {
+        // Milvus query source. endpoint + collection + filter expression
+        // (e.g. "id > 0") + optional outputFields (comma-separated) +
+        // apiKey. Walks via offset += pageSize until a short page.
+        let endpoint = string_prop(&props, "endpoint")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: endpoint required", component_id)))?;
+        let collection = string_prop(&props, "collection")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: collection required", component_id)))?;
+        let output_fields = string_prop(&props, "outputFields")
+            .map(|s| s.split(',').map(|p| p.trim().to_string()).filter(|p| !p.is_empty()).collect::<Vec<_>>())
+            .unwrap_or_default();
+        milvus_source = Some(MilvusSourceSpec {
+            node_id: node.id.clone(),
+            endpoint,
+            collection,
+            api_key: string_prop(&props, "apiKey").unwrap_or_default(),
+            filter: string_prop(&props, "filter").filter(|s| !s.trim().is_empty()).unwrap_or_else(|| "id > 0".into()),
+            output_fields,
+            page_size: props.get("pageSize").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(100),
+            max_pages: props.get("maxPages").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(100),
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "src.redis" {
         // Redis SCAN+GET source. Walks keys matching keyPattern (default
         // '*') up to `limit` keys; emits {key, value} rows. Hash / list /
@@ -2103,6 +2219,9 @@ fn build_stage(
         oracle_source,
         redis_sink,
         redis_source,
+        qdrant_source,
+        weaviate_source,
+        milvus_source,
         wait_ms,
         retry_attempts,
         retry_backoff_ms,
