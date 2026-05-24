@@ -5200,7 +5200,12 @@ fn build_dt_epoch(inputs: &NodeInputs, props: &JsonValue) -> Result<String, Stri
     let mode = string_prop(props, "mode").unwrap_or_else(|| "to".into());
     let qcol = quote_ident(&column);
     let expr = if mode == "from" {
-        format!("to_timestamp(CAST({} AS DOUBLE))", qcol)
+        // Stay in pure TIMESTAMP space - to_timestamp() returns
+        // TIMESTAMPTZ which round-trips wrong on non-UTC sessions.
+        format!(
+            "(TIMESTAMP '1970-01-01 00:00:00' + INTERVAL '1 second' * CAST({} AS BIGINT))",
+            qcol
+        )
     } else {
         format!("epoch(CAST({} AS TIMESTAMP))", qcol)
     };
@@ -5325,8 +5330,12 @@ fn build_dt_bin(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| format!("{}_bin", column));
     let qcol = quote_ident(&column);
+    // Subtract the timestamp's remainder seconds past its bucket boundary.
+    // Stays inside the TIMESTAMP type the whole way - to_timestamp() would
+    // return TIMESTAMPTZ which then serializes with a timezone offset and
+    // round-trips wrong on non-UTC session timezones (tests failed on IST).
     Ok(format!(
-        "SELECT *, to_timestamp(floor(epoch(CAST({col} AS TIMESTAMP)) / {bucket}) * {bucket}) AS {out} FROM {up}",
+        "SELECT *, CAST({col} AS TIMESTAMP) - (INTERVAL '1 second' * (CAST(epoch(CAST({col} AS TIMESTAMP)) AS BIGINT) % {bucket})) AS {out} FROM {up}",
         col = qcol,
         bucket = bucket_seconds,
         out = quote_ident(&output),
