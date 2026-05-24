@@ -111,6 +111,18 @@ impl DuckdbEngine {
         self.cancel.store(false, Ordering::Relaxed);
     }
 
+    /// Returns Err(Cancelled) if a cancel has been requested. Used at
+    /// the top of pagination / batch loops in source + sink runners so
+    /// a long HTTP scan can be interrupted between pages rather than
+    /// waiting for the whole walk to finish.
+    fn check_cancelled(&self) -> Result<(), EngineError> {
+        if self.cancel.load(Ordering::Relaxed) {
+            Err(EngineError::Cancelled)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Run SQL through the CLI against an optional db file. Returns raw
     /// stdout. Cancellation-aware: polls the child and kills it if a
     /// cancel was requested.
@@ -726,6 +738,7 @@ impl DuckdbEngine {
     /// view via DuckDB's -json output, then either
     ///   - row mode: one ureq request per row, body = row JSON
     ///   - batch mode: a single request with body = entire array JSON
+    ///
     /// Returns a synthetic 'sent N rows' report on success; aggregates
     /// per-row HTTP errors into a single Err for the run feedback layer.
     fn run_webhook(
@@ -877,6 +890,7 @@ impl DuckdbEngine {
         let auth_header = build_snowflake_auth_header(&spec.account, &spec.auth)?;
         let mut total_inserted = 0_usize;
         for chunk in rows.chunks(spec.batch_size) {
+            self.check_cancelled()?;
             let values: Vec<String> = chunk
                 .iter()
                 .map(|row| {
@@ -984,6 +998,7 @@ impl DuckdbEngine {
             .map_err(|e| EngineError::Query(format!("oracle connect: {}", e)))?;
         let mut total = 0_usize;
         for chunk in rows.chunks(spec.batch_size) {
+            self.check_cancelled()?;
             // Oracle's "INSERT ALL" syntax:
             //   INSERT ALL
             //     INTO tbl (cols) VALUES (...)
@@ -1267,6 +1282,7 @@ impl DuckdbEngine {
             .map_err(|e| EngineError::Query(format!("redis: connect: {}", e)))?;
         let mut total = 0_usize;
         for chunk in rows.chunks(spec.batch_size) {
+            self.check_cancelled()?;
             let mut pipe = redis::pipe();
             for row in chunk {
                 let Some(obj) = row.as_object() else {
@@ -1331,6 +1347,7 @@ impl DuckdbEngine {
         let mut keys: Vec<String> = Vec::new();
         let mut cursor: u64 = 0;
         loop {
+            self.check_cancelled()?;
             let (next, batch): (u64, Vec<String>) = redis::cmd("SCAN")
                 .arg(cursor)
                 .arg("MATCH")
@@ -1351,13 +1368,14 @@ impl DuckdbEngine {
         }
         let mut rows: Vec<JsonValue> = Vec::with_capacity(keys.len());
         for chunk in keys.chunks(500) {
+            self.check_cancelled()?;
             let mut pipe = redis::pipe();
             for k in chunk {
                 pipe.cmd("GET").arg(k);
             }
             let values: Vec<Option<String>> = redis::Pipeline::query(&pipe, &mut conn)
                 .map_err(|e| EngineError::Query(format!("redis: GET batch: {}", e)))?;
-            for (k, v) in chunk.iter().zip(values.into_iter()) {
+            for (k, v) in chunk.iter().zip(values) {
                 let mut obj = serde_json::Map::new();
                 obj.insert("key".into(), JsonValue::String(k.clone()));
                 obj.insert(
@@ -1391,6 +1409,7 @@ impl DuckdbEngine {
         let mut all_points: Vec<JsonValue> = Vec::new();
         let mut next_offset: Option<JsonValue> = None;
         for _ in 0..spec.max_pages {
+            self.check_cancelled()?;
             let mut body = serde_json::Map::new();
             body.insert("limit".into(), JsonValue::from(spec.page_size));
             body.insert("with_payload".into(), JsonValue::Bool(true));
@@ -1470,6 +1489,7 @@ impl DuckdbEngine {
         let mut all_objects: Vec<JsonValue> = Vec::new();
         let mut after: Option<String> = None;
         for _ in 0..spec.max_pages {
+            self.check_cancelled()?;
             let mut url = format!(
                 "{}/v1/objects?class={}&limit={}",
                 base,
@@ -1558,6 +1578,7 @@ impl DuckdbEngine {
         let mut all_rows: Vec<JsonValue> = Vec::new();
         let mut offset: u64 = 0;
         for _ in 0..spec.max_pages {
+            self.check_cancelled()?;
             let mut body = serde_json::Map::new();
             body.insert(
                 "collectionName".into(),
@@ -1908,6 +1929,7 @@ impl DuckdbEngine {
         );
         let mut total = 0_usize;
         for chunk in rows.chunks(spec.batch_size) {
+            self.check_cancelled()?;
             // NDJSON body: one row per line.
             let mut body = String::new();
             for row in chunk {
@@ -2180,6 +2202,7 @@ impl DuckdbEngine {
             ElasticPagination::FromSize => {
                 let mut from = 0_u64;
                 loop {
+                    self.check_cancelled()?;
                     let body = serde_json::json!({
                         "query": query_dsl,
                         "size": spec.size,
@@ -2211,6 +2234,7 @@ impl DuckdbEngine {
                 // Lifts the 10k max_result_window cap entirely.
                 let mut last_sort: Option<JsonValue> = None;
                 loop {
+                    self.check_cancelled()?;
                     let mut body = serde_json::json!({
                         "query": query_dsl,
                         "size": spec.size,
@@ -2289,6 +2313,7 @@ impl DuckdbEngine {
             _ => 1,
         };
         loop {
+            self.check_cancelled()?;
             // Build request
             let mut req = ureq::request(&spec.method, &url);
             let has_ct = spec
@@ -2545,6 +2570,7 @@ impl DuckdbEngine {
                 })?
                 .to_string();
             for i in 1..partition_count {
+                self.check_cancelled()?;
                 let part_url = format!("{}/{}?partition={}", base_url, handle, i);
                 let part = sf_request(&part_url, "GET", &auth_header, is_jwt, None)?;
                 if let Some(part_data) = part.get("data").and_then(|v| v.as_array()) {
@@ -2655,6 +2681,7 @@ impl DuckdbEngine {
             .map(String::from);
         let mut chunks = 1_usize;
         while let Some(link) = next_link {
+            self.check_cancelled()?;
             // If endpoint override is in play (tests), prepend the
             // override's scheme+host; otherwise use the workspace host.
             let chunk_url = if let Some(ep) = &spec.endpoint {
@@ -2741,6 +2768,7 @@ impl DuckdbEngine {
         });
         let mut total_inserted = 0_usize;
         for chunk in rows.chunks(spec.batch_size) {
+            self.check_cancelled()?;
             let values: Vec<String> = chunk
                 .iter()
                 .map(|row| {

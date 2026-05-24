@@ -557,7 +557,7 @@ pub struct DatabricksSourceSpec {
 /// auth), but the body fields and identifier quoting are different:
 ///   - URL: https://<workspace>/api/2.0/sql/statements/
 ///   - body: { statement, warehouse_id, catalog?, schema?, wait_timeout,
-///            on_wait_timeout: "CONTINUE" }
+///     on_wait_timeout: "CONTINUE" }
 ///   - identifiers quoted with backticks (`name`) instead of double quotes
 #[derive(Debug, Clone)]
 pub struct DatabricksSinkSpec {
@@ -5229,14 +5229,17 @@ fn build_dt_epoch(inputs: &NodeInputs, props: &JsonValue) -> Result<String, Stri
 
 /// Current Timestamp: add a column holding the time at which the
 /// pipeline runs - the standard 'loaded_at' / 'processed_at' /
-/// 'ingested_at' stamp every ETL output usually carries.
+/// 'ingested_at' stamp every ETL output usually carries. Cast to
+/// plain TIMESTAMP - current_timestamp returns TIMESTAMPTZ which
+/// serializes with a session-timezone offset and confuses
+/// downstream readers.
 fn build_dt_now(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
     let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.dt.now"))?;
     let output = string_prop(props, "outputColumn")
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "loaded_at".into());
     Ok(format!(
-        "SELECT *, current_timestamp AS {out} FROM {up}",
+        "SELECT *, CAST(current_timestamp AS TIMESTAMP) AS {out} FROM {up}",
         out = quote_ident(&output),
         up = quote_ident(upstream)
     ))
