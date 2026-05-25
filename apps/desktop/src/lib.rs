@@ -19,8 +19,10 @@ use tauri::ipc::Channel;
 use tauri::Manager;
 use tracing_subscriber::EnvFilter;
 
+mod ci_status;
 mod engine_manager;
 mod llama_chat;
+mod workspace_git;
 use engine_manager::{EngineStatus, InstallProgress};
 use llama_chat::{ChatEvent, ChatMessage};
 
@@ -84,7 +86,19 @@ pub fn run() {
             engine_status,
             engine_install,
             chat_send,
-            chat_extract_pipeline
+            chat_extract_pipeline,
+            workspace_git_status,
+            workspace_git_init,
+            workspace_git_commit,
+            workspace_git_push,
+            workspace_git_pull,
+            workspace_git_branches,
+            workspace_git_branch_create,
+            workspace_git_branch_checkout,
+            workspace_git_remote_set,
+            workspace_git_save_pat,
+            workspace_git_clear_pat,
+            workspace_ci_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running duckle");
@@ -394,4 +408,80 @@ async fn chat_send(
 #[tauri::command]
 fn chat_extract_pipeline(text: String) -> Result<JsonValue, String> {
     llama_chat::extract_pipeline(&text)
+}
+
+// ---- In-app Git integration -------------------------------------------
+// Wraps the system git CLI on the user's workspace folder so they can
+// commit / push / pull / branch from inside Duckle. Auth: try without
+// explicit creds first (system credential helper), fall back to a PAT
+// prompt from the frontend on 401.
+
+fn ws_path(workspace_path: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(workspace_path)
+}
+
+#[tauri::command]
+fn workspace_git_status(workspace_path: String) -> Result<workspace_git::GitStatus, String> {
+    workspace_git::status(&ws_path(&workspace_path))
+}
+
+#[tauri::command]
+fn workspace_git_init(workspace_path: String) -> Result<(), String> {
+    workspace_git::init(&ws_path(&workspace_path))
+}
+
+#[tauri::command]
+fn workspace_git_commit(workspace_path: String, message: String) -> Result<String, String> {
+    let p = ws_path(&workspace_path);
+    workspace_git::add_all(&p)?;
+    workspace_git::commit(&p, &message)
+}
+
+#[tauri::command]
+fn workspace_git_push(workspace_path: String) -> Result<String, String> {
+    workspace_git::push(&ws_path(&workspace_path))
+}
+
+#[tauri::command]
+fn workspace_git_pull(workspace_path: String) -> Result<String, String> {
+    workspace_git::pull(&ws_path(&workspace_path))
+}
+
+#[tauri::command]
+fn workspace_git_branches(workspace_path: String) -> Result<Vec<String>, String> {
+    workspace_git::branches(&ws_path(&workspace_path))
+}
+
+#[tauri::command]
+fn workspace_git_branch_create(workspace_path: String, name: String) -> Result<(), String> {
+    workspace_git::branch_create(&ws_path(&workspace_path), &name)
+}
+
+#[tauri::command]
+fn workspace_git_branch_checkout(workspace_path: String, name: String) -> Result<(), String> {
+    workspace_git::branch_checkout(&ws_path(&workspace_path), &name)
+}
+
+#[tauri::command]
+fn workspace_git_remote_set(workspace_path: String, url: String) -> Result<(), String> {
+    workspace_git::remote_set(&ws_path(&workspace_path), &url)
+}
+
+#[tauri::command]
+fn workspace_git_save_pat(workspace_path: String, token: String) -> Result<(), String> {
+    workspace_git::save_pat(&ws_path(&workspace_path), &token)
+}
+
+#[tauri::command]
+fn workspace_git_clear_pat(workspace_path: String) -> Result<(), String> {
+    workspace_git::clear_pat(&ws_path(&workspace_path))
+}
+
+#[tauri::command]
+async fn workspace_ci_status(workspace_path: String) -> Result<ci_status::CiStatus, String> {
+    // HTTP call - keep off the main runtime thread.
+    let p = ws_path(&workspace_path);
+    tokio::task::spawn_blocking(move || ci_status::poll(&p))
+        .await
+        .map_err(|e| e.to_string())?
 }

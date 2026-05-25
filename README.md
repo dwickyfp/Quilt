@@ -44,6 +44,7 @@
 - [Meet Duckie (AI)](#meet-duckie---the-local-ai-pipeline-assistant)
 - [How to use Duckle](#how-to-use-duckle)
 - [Recipes / examples](#recipes-and-examples)
+- [In-app Git (GitHub/GitLab)](#git-integration-github--gitlab)
 - [Workspace + Git flow](#workspace-and-git-flow)
 - [Schedules](#schedules-and-triggers)
 - [Connection management](#connection-management)
@@ -542,6 +543,43 @@ src.git (mode=log, maxRows=10000)
 ```
 
 More examples live in [`samples/`](samples) - drop the pipeline files into a workspace and open them.
+
+---
+
+## Git integration (GitHub + GitLab)
+
+> Push, pull, branch, and watch CI from inside Duckle. No terminal required.
+
+Click the **Git icon** in the topbar to open the workspace Git panel. Talend-style integration with GitHub and GitLab, built on the system `git` CLI (no FFI, no embedded git library):
+
+| Feature | What it does |
+|---|---|
+| **Status snapshot** | Current branch, ahead/behind counts, list of modified / staged / untracked / conflicted files |
+| **Stage all + commit** | One-click `git add -A && git commit -m "..."` with your message |
+| **Push / Pull** | `git push` and `git pull --ff-only` against `origin`. The button stays disabled when there's nothing to push |
+| **Branch list, switch, create** | Lists local branches; click to switch; create new branches inline |
+| **Remote URL config** | Add or change `origin` URL from inside the panel - auto-detects GitHub vs GitLab from the host |
+| **PAT-prompt fallback** | First tries `git push` using your system credential helper (GitHub CLI, osxkeychain, manager-core). On a 401, prompts for a Personal Access Token, saves it AES-encrypted in `<workspace>/.duckle/secrets/git.json` (auto-gitignored), retries with the token injected into the HTTPS URL |
+| **CI build badge in topbar** | Polls GitHub Actions or GitLab CI every 30 s for the latest pipeline on your current branch. Shows green / red / yellow / gray. Click to open the build in your browser |
+
+**Workflow.** Workspaces are plain folders (see [Workspace and Git flow](#workspace-and-git-flow)) - any standard Git workflow works:
+
+```
+Create / clone -> open in Duckle -> edit pipelines -> commit + push -> 
+PR / MR -> CI runs your pipeline tests -> merge -> pull
+```
+
+You can do the entire push / pull / merge loop without leaving Duckle. Heavy operations (interactive rebase, conflict resolution, log archaeology) still live in your terminal or external Git tool - the panel is designed for the everyday flow, not as a full Git replacement.
+
+**Provider detection.** The remote URL host determines which CI API the badge polls:
+
+| Provider | CI source | API |
+|---|---|---|
+| `github.com` | GitHub Actions | `GET /repos/{owner}/{repo}/actions/runs` |
+| `gitlab.com` or self-hosted GitLab | GitLab CI | `GET /api/v4/projects/{id}/pipelines` |
+| Other / bitbucket | (no CI badge for now) | - |
+
+The badge uses the same PAT you saved for pushes - no separate auth step.
 
 ---
 

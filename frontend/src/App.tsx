@@ -12,7 +12,7 @@ import {
     type OnSelectionChangeParams,
 } from '@xyflow/react';
 import type { ConnectionType } from './canvas/connection-types';
-import { Braces, FolderOpen, Moon, Sparkles, Sun } from 'lucide-react';
+import { Braces, FolderOpen, GitBranch, Moon, Sparkles, Sun } from 'lucide-react';
 import EditorTabs from './workflow-ui/EditorTabs';
 import EditorHeader, { type Job } from './workflow-ui/EditorHeader';
 import EngineSelector, { type EngineId } from './workflow-ui/EngineSelector';
@@ -31,6 +31,8 @@ import {
 import ScheduleEditorModal from './workflow-ui/ScheduleEditorModal';
 import EngineSetupModal from './workflow-ui/EngineSetupModal';
 import ChatPanel from './workflow-ui/ChatPanel';
+import GitPanel from './workflow-ui/GitPanel';
+import CiStatusBadge from './workflow-ui/CiStatusBadge';
 import WindowControls from './workflow-ui/WindowControls';
 import { engineStatus } from './tauri-bridge';
 import { RunStatusContext } from './canvas/run-status-context';
@@ -212,6 +214,7 @@ export default function App() {
         () => (isInTauri() ? 'checking' : 'ready'),
     );
     const [showChatPanel, setShowChatPanel] = useState(false);
+    const [showGitPanel, setShowGitPanel] = useState(false);
 
     useEffect(() => {
         if (!isInTauri()) return;
@@ -1463,6 +1466,18 @@ export default function App() {
                         </select>
                     </div>
                 ) : null}
+                {workspacePathState ? <CiStatusBadge workspacePath={workspacePathState} /> : null}
+                <button
+                    type="button"
+                    className="topbar-theme-toggle"
+                    onClick={() => setShowGitPanel(s => !s)}
+                    title="Git (workspace)"
+                    aria-label="Toggle Git panel"
+                    aria-pressed={showGitPanel}
+                    disabled={!workspacePathState}
+                >
+                    <GitBranch size={14} />
+                </button>
                 <button
                     type="button"
                     className="topbar-theme-toggle"
@@ -1591,6 +1606,13 @@ export default function App() {
                 <ChatPanel
                     onClose={() => setShowChatPanel(false)}
                     onInsertPipeline={handleInsertAiPipeline}
+                />
+            ) : null}
+
+            {showGitPanel && workspacePathState ? (
+                <GitPanel
+                    workspacePath={workspacePathState}
+                    onClose={() => setShowGitPanel(false)}
                 />
             ) : null}
 

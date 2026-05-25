@@ -241,6 +241,122 @@ export async function chatExtractPipeline(text: string): Promise<unknown | null>
     }
 }
 
+// ---- In-app Git integration --------------------------------------------
+
+export type ChangedFile = {
+    path: string;
+    status: 'staged' | 'modified' | 'untracked' | 'conflicted' | 'deleted' | 'renamed';
+};
+
+export type GitRemote = {
+    name: string;
+    url: string;
+    provider: 'github' | 'gitlab' | 'bitbucket' | 'other';
+};
+
+export type GitStatus = {
+    initialized: boolean;
+    branch: string | null;
+    ahead: number;
+    behind: number;
+    remote: GitRemote | null;
+    files: ChangedFile[];
+    has_pat: boolean;
+};
+
+export type CiState =
+    | 'success'
+    | 'failure'
+    | 'in_progress'
+    | 'pending'
+    | 'cancelled'
+    | 'none'
+    | 'unknown';
+
+export type CiStatus = {
+    provider: 'github' | 'gitlab' | 'unknown';
+    state: CiState;
+    label: string;
+    url: string | null;
+    sha: string | null;
+};
+
+export async function workspaceGitStatus(workspacePath: string): Promise<GitStatus | null> {
+    if (!isTauri() || !workspacePath) return null;
+    try {
+        return await invoke<GitStatus>('workspace_git_status', { workspacePath });
+    } catch (err) {
+        console.warn('workspace_git_status:', err);
+        return null;
+    }
+}
+
+export async function workspaceGitInit(workspacePath: string): Promise<void> {
+    await invoke('workspace_git_init', { workspacePath });
+}
+
+export async function workspaceGitCommit(
+    workspacePath: string,
+    message: string,
+): Promise<string> {
+    return await invoke<string>('workspace_git_commit', { workspacePath, message });
+}
+
+/** Returns 'AUTH_REQUIRED' (as Error.message prefix) when a PAT is needed. */
+export async function workspaceGitPush(workspacePath: string): Promise<string> {
+    return await invoke<string>('workspace_git_push', { workspacePath });
+}
+
+export async function workspaceGitPull(workspacePath: string): Promise<string> {
+    return await invoke<string>('workspace_git_pull', { workspacePath });
+}
+
+export async function workspaceGitBranches(workspacePath: string): Promise<string[]> {
+    return await invoke<string[]>('workspace_git_branches', { workspacePath });
+}
+
+export async function workspaceGitBranchCreate(
+    workspacePath: string,
+    name: string,
+): Promise<void> {
+    await invoke('workspace_git_branch_create', { workspacePath, name });
+}
+
+export async function workspaceGitBranchCheckout(
+    workspacePath: string,
+    name: string,
+): Promise<void> {
+    await invoke('workspace_git_branch_checkout', { workspacePath, name });
+}
+
+export async function workspaceGitRemoteSet(
+    workspacePath: string,
+    url: string,
+): Promise<void> {
+    await invoke('workspace_git_remote_set', { workspacePath, url });
+}
+
+export async function workspaceGitSavePat(
+    workspacePath: string,
+    token: string,
+): Promise<void> {
+    await invoke('workspace_git_save_pat', { workspacePath, token });
+}
+
+export async function workspaceGitClearPat(workspacePath: string): Promise<void> {
+    await invoke('workspace_git_clear_pat', { workspacePath });
+}
+
+export async function workspaceCiStatus(workspacePath: string): Promise<CiStatus | null> {
+    if (!isTauri() || !workspacePath) return null;
+    try {
+        return await invoke<CiStatus>('workspace_ci_status', { workspacePath });
+    } catch (err) {
+        console.warn('workspace_ci_status:', err);
+        return null;
+    }
+}
+
 export async function cancelPipeline(): Promise<void> {
     if (!isTauri()) return;
     try {
