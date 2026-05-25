@@ -730,6 +730,11 @@ pub enum RestPagination {
     Page { page_param: String, start_page: u64 },
     /// Follow RFC 5988 `Link` response header with rel="next".
     Link,
+    /// Take the value at `next_path` from the response body and use it
+    /// directly as the next URL (no token-append step). This is the
+    /// OData / Microsoft Graph style: `@odata.nextLink` is already a
+    /// complete URL including all query params for the next page.
+    NextUrl { next_path: String },
 }
 
 /// src.rest: generic HTTP-API source. Fetches a URL, parses the JSON
@@ -2522,12 +2527,15 @@ fn build_stage(
             | "src.shopify"
             | "src.intercom"
             | "src.couchdb"
+            | "src.odata"
     ) {
         // Generic REST source + thin vendor aliases. Vendors share
         // the same plumbing - the palette/form pre-fills url, auth
         // scheme, and pagination for the well-known APIs so users
         // don't have to look up each vendor's quirks; the engine
         // treats them identically. Any prefilled value is overridable.
+        // src.odata: defaults to responsePath=/value + nextUrl
+        // pagination at /@odata.nextLink (the OData v4 contract).
         let url = string_prop(&props, "url")
             .filter(|s| !s.is_empty())
             .ok_or_else(|| EngineError::Config(format!("{}: url required", component_id)))?;
@@ -2546,8 +2554,24 @@ fn build_stage(
                 _ => {}
             }
         }
-        let response_path = string_prop(&props, "responsePath").unwrap_or_default();
-        let pagination_type = string_prop(&props, "paginationType").unwrap_or_else(|| "none".into());
+        let response_path = string_prop(&props, "responsePath")
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| {
+                if component_id == "src.odata" {
+                    "/value".into()
+                } else {
+                    String::new()
+                }
+            });
+        let pagination_type = string_prop(&props, "paginationType")
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| {
+                if component_id == "src.odata" {
+                    "nextUrl".into()
+                } else {
+                    "none".into()
+                }
+            });
         let pagination = match pagination_type.as_str() {
             "cursor" => {
                 let next_path = string_prop(&props, "cursorNextPath").filter(|s| !s.is_empty());
@@ -2579,6 +2603,18 @@ fn build_stage(
                 RestPagination::Page { page_param: param, start_page }
             }
             "link" => RestPagination::Link,
+            "nextUrl" => {
+                let next_path = string_prop(&props, "nextUrlPath")
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| {
+                        if component_id == "src.odata" {
+                            "/@odata.nextLink".into()
+                        } else {
+                            "/next".into()
+                        }
+                    });
+                RestPagination::NextUrl { next_path }
+            }
             _ => {
                 // Back-compat: if cursor_next_path is set, use cursor mode.
                 let next_path = string_prop(&props, "cursorNextPath").filter(|s| !s.is_empty());

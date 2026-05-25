@@ -3436,6 +3436,17 @@ impl DuckdbEngine {
                         None => break,
                     }
                 }
+                RestPagination::NextUrl { next_path } => {
+                    let next = response
+                        .pointer(next_path)
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty())
+                        .map(String::from);
+                    match next {
+                        Some(next_url) => url = next_url,
+                        None => break,
+                    }
+                }
             }
         }
         materialize_jsonobjects_as_table(db, &spec.node_id, &all_rows)?;

@@ -171,7 +171,7 @@ export const PALETTE: Category[] = [
                     src('grpc', 'gRPC', 'planned'),
                     src('webhook', 'Webhook', 'planned'),
                     src('soap', 'SOAP', 'planned'),
-                    src('odata', 'OData', 'planned'),
+                    src('odata', 'OData', 'available', 'OData v4 source - thin alias over src.rest. Defaults: responsePath /value, pagination follows @odata.nextLink as a complete URL. Set authType (basic / bearer / apikey) on the form. Works with SAP, D365, Microsoft Graph, any OData v4 endpoint.'),
                 ],
             },
             {

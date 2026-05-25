@@ -51,7 +51,7 @@ Duckle is in **early development**. The visual designer, the DuckDB execution en
 
 **Scope, stated plainly:** Duckle is a single-machine, embedded studio. If you outgrow one box, point Duckle's output at the system that scales. It will not pretend to be a cluster.
 
-The component palette ships **303 nodes** so the roadmap is visible in the product itself. As of the latest engine cut: **266 available**, **11 preview**, **26 planned**. Each node is tagged by availability:
+The component palette ships **303 nodes** so the roadmap is visible in the product itself. As of the latest engine cut: **267 available**, **11 preview**, **25 planned**. Each node is tagged by availability:
 
 - **Available** runs on the DuckDB engine today.
 - **Preview** is configurable in the designer now (drag, wire, set properties); execution is being wired engine-by-engine. This currently covers the AI transforms and some vector DB read sources.
@@ -102,7 +102,8 @@ Duckle is not a CSV tool with extras. It reads a broad set of formats and source
 | **Streaming** | **Apache Kafka / Redpanda** (batch-consume via the pure-Rust `rskafka` driver), **NATS JetStream** (subscribe-with-timeout via `async-nats`), **GCP Pub/Sub** (pull via REST API + auto-ack), **RabbitMQ** (basic_get poll loop via the pure-Rust `lapin` AMQP driver) | Available |
 | **Streaming** | Pulsar, Kinesis, Event Hubs | Planned |
 | **APIs and SaaS** | **REST** (cursor / offset / page / Link header pagination), **GraphQL**. Vendor tiles: **Salesforce, HubSpot, Pipedrive, Zendesk, Intercom, Stripe, QuickBooks, Xero, Shopify, Notion, Airtable, GitHub, GitLab, Linear, Jira, Mailchimp, SendGrid, Segment** (thin pre-configured wrappers over REST/GraphQL) | Available |
-| **APIs and SaaS** | gRPC, SOAP, OData, Google Sheets, Excel Online, webhook listener, more SaaS vendors | Planned |
+| **APIs and SaaS** | **OData v4** (thin alias over src.rest; default responsePath `/value` + follows `@odata.nextLink` across pages; works with SAP, D365, Microsoft Graph) | Available |
+| **APIs and SaaS** | gRPC, SOAP, Google Sheets, Excel Online, webhook listener, more SaaS vendors | Planned |
 | **NoSQL and search** | **MongoDB** (official driver), **Cassandra / ScyllaDB** (CQL), **Elasticsearch / OpenSearch** (from+size + search_after), **Redis** (SCAN + GET via the sync client), **CouchDB** (via the `_all_docs` REST endpoint) | Available |
 | **NoSQL and search** | DynamoDB | Planned |
 | **Repos and engineering data** | **Git** (commit log or file tree from a local working copy; shells out to the system `git` CLI - no Rust dep) | Available |

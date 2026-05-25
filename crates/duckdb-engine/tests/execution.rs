@@ -6673,3 +6673,109 @@ fn src_git_files_lists_tracked_tree() {
     ));
     assert_eq!(nested, "sub/c.txt");
 }
+
+/// src.odata follows @odata.nextLink as a full URL across pages, with
+/// /value as the implicit responsePath. Stand up a tiny HTTP server,
+/// page 1 returns 2 rows + nextLink, page 2 returns 1 row + no
+/// nextLink. Engine should fetch both pages and materialize 3 rows.
+#[test]
+fn src_odata_follows_nextlink_across_pages() {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    let engine = engine_or_skip!();
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let port = listener.local_addr().unwrap().port();
+
+    let req_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let captured = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let rc = req_count.clone();
+    let cap = captured.clone();
+    let next_url = format!("http://127.0.0.1:{}/Products?$skiptoken=p2", port);
+    let nu = next_url.clone();
+
+    let handle = std::thread::spawn(move || {
+        for stream in listener.incoming().take(2) {
+            let mut stream = match stream {
+                Ok(s) => s,
+                Err(_) => break,
+            };
+            stream
+                .set_read_timeout(Some(Duration::from_millis(250)))
+                .ok();
+            stream.set_nodelay(true).ok();
+            let mut buf = Vec::with_capacity(8192);
+            let mut chunk = [0u8; 4096];
+            for _ in 0..16 {
+                match stream.read(&mut chunk) {
+                    Ok(0) => break,
+                    Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                    Err(_) => break,
+                }
+            }
+            cap.lock()
+                .unwrap()
+                .push(String::from_utf8_lossy(&buf).to_string());
+            let idx = rc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let body: String = if idx == 0 {
+                format!(
+                    r#"{{"value":[{{"id":1,"name":"Widget"}},{{"id":2,"name":"Gadget"}}],"@odata.nextLink":"{}"}}"#,
+                    nu
+                )
+            } else {
+                r#"{"value":[{"id":3,"name":"Sprocket"}]}"#.to_string()
+            };
+            let body_bytes = body.as_bytes();
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body_bytes.len()
+            );
+            let _ = stream.write_all(resp.as_bytes());
+            let _ = stream.write_all(body_bytes);
+            let _ = stream.flush();
+            let _ = stream.shutdown(std::net::Shutdown::Write);
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    });
+
+    let tmp = tempfile::tempdir().unwrap();
+    let out = out_path(tmp.path(), "out.csv");
+    let url = format!("http://127.0.0.1:{}/Products", port);
+    let r = engine.execute_pipeline(&doc(
+        // No responsePath, no paginationType set - both should default
+        // because component_id is src.odata. This is what makes the
+        // OData tile "feel" pre-configured: the form is almost empty.
+        json!([
+            node("o", "src.odata", json!({ "url": url })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "o", "k")]),
+    ));
+    let _ = handle.join();
+    assert_eq!(r.status, "ok", "src.odata failed: {:?}", r.error);
+    assert_eq!(
+        req_count.load(std::sync::atomic::Ordering::SeqCst),
+        2,
+        "expected 2 page requests"
+    );
+    let n = count(&format!("read_csv_auto('{}')", out));
+    assert_eq!(n, 3, "expected 3 OData rows total, got {}", n);
+    // Second request should be the full nextLink URL, not the base
+    // URL with a token appended.
+    let reqs = captured.lock().unwrap();
+    assert!(
+        reqs[1].contains("$skiptoken=p2"),
+        "expected 2nd request to follow nextLink: {}",
+        reqs[1]
+    );
+    // Verify the responsePath default unwrapped /value correctly -
+    // the row should have an `id` and `name` column, not be a single
+    // big JSON blob.
+    let names = scalar_string(&format!(
+        "SELECT string_agg(name, ',' ORDER BY id) FROM read_csv_auto('{}')",
+        out
+    ));
+    assert_eq!(names, "Widget,Gadget,Sprocket");
+}
