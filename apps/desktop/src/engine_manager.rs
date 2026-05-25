@@ -284,9 +284,18 @@ fn install_spec<F: FnMut(InstallProgress)>(
             std::env::consts::ARCH
         )
     })?;
+    // Tag naming convention varies per upstream: DuckDB + SlothDB
+    // both use v-prefixed semver tags (v1.5.3); llama.cpp uses raw
+    // build tags (b9305). Pre-prepending `v` to every version
+    // produces a 404 against ggml-org/llama.cpp.
+    let tag = if s.id == "llamacpp" {
+        s.version.to_string()
+    } else {
+        format!("v{}", s.version)
+    };
     let url = format!(
-        "https://github.com/{}/releases/download/v{}/{}",
-        s.repo, s.version, asset
+        "https://github.com/{}/releases/download/{}/{}",
+        s.repo, tag, asset
     );
 
     let dir = engine_dir(app_data, s);
