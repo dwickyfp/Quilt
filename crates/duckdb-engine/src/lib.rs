@@ -32,8 +32,8 @@ use plan::{
     AvroSinkSpec, AvroSourceSpec, CassandraSinkSpec, CassandraSourceSpec, ClickHouseSinkSpec,
     ClickHouseSourceSpec, ClipboardSourceSpec, DatabricksSinkSpec, DatabricksSourceSpec,
     ElasticSourceSpec, EmailSourceSpec, FormatFileSinkSpec, FormatFileSourceSpec, FormatKind,
-    FtpSourceSpec, GitSourceSpec, KafkaSinkSpec, KafkaSourceSpec, MilvusSourceSpec, MongoSinkSpec,
-    MongoSourceSpec, NatsSinkSpec, NatsSourceSpec, OracleSinkSpec, OracleSourceSpec,
+    FtpSourceSpec, GitSourceSpec, JavaScriptSpec, KafkaSinkSpec, KafkaSourceSpec, MilvusSourceSpec,
+    MongoSinkSpec, MongoSourceSpec, NatsSinkSpec, NatsSourceSpec, OracleSinkSpec, OracleSourceSpec,
     PubSubSinkSpec, PubSubSourceSpec, QdrantSourceSpec, RabbitSinkSpec, RabbitSourceSpec,
     RedisSinkSpec, RedisSourceSpec, RestPagination, RestResponseFormat, RestSourceSpec, ShellSpec,
     SnowflakeAuth, SnowflakeSinkSpec, SnowflakeSourceSpec, SqlServerSinkSpec, SqlServerSourceSpec,
@@ -553,6 +553,8 @@ impl DuckdbEngine {
                     self.run_ai_embed(&db_path, spec)
                 } else if let Some(spec) = stage.wasm.as_ref() {
                     self.run_wasm(&db_path, spec)
+                } else if let Some(spec) = stage.javascript.as_ref() {
+                    self.run_javascript(&db_path, spec)
                 } else if let Some(spec) = stage.ai_chunk.as_ref() {
                     self.run_ai_chunk(&db_path, spec)
                 } else if let Some(spec) = stage.ai_pii.as_ref() {
@@ -2561,6 +2563,77 @@ impl DuckdbEngine {
         Ok(format!(
             "email: materialized {} message(s) from {}@{}:{}/{} into {}",
             count, spec.user, spec.host, spec.port, spec.mailbox, spec.node_id
+        ))
+    }
+
+    /// code.javascript: per-row JS transform via boa_engine. The
+    /// user's script is evaluated once to define a `transform`
+    /// function, then transform(row) runs per row. Row goes in as a
+    /// JS object (marshalled from JSON), transformed row comes back
+    /// as a JS object and is converted back. Boa is sandboxed - no
+    /// fs, no fetch, no DOM, no setTimeout.
+    fn run_javascript(
+        &self,
+        db: &Path,
+        spec: &JavaScriptSpec,
+    ) -> Result<String, EngineError> {
+        use boa_engine::{js_string, Context, Source};
+        self.check_cancelled()?;
+        let rows = self.run_rows(
+            Some(db),
+            &format!("SELECT * FROM {};", quote_ident(&spec.from_view)),
+        )?;
+        if rows.is_empty() {
+            materialize_jsonobjects_as_table(db, &spec.node_id, &[])?;
+            return Ok(format!(
+                "code.javascript: 0 upstream rows -> {}",
+                spec.node_id
+            ));
+        }
+        // One context per stage - state is intentionally not shared
+        // across stages, but IS shared across rows within a stage so
+        // the user can declare helpers once at the top of the script.
+        let mut ctx = Context::default();
+        ctx.eval(Source::from_bytes(spec.script.as_bytes()))
+            .map_err(|e| EngineError::Query(format!("js: script eval: {}", e)))?;
+        let transform = ctx
+            .global_object()
+            .get(js_string!("transform"), &mut ctx)
+            .map_err(|e| EngineError::Query(format!("js: lookup transform: {}", e)))?;
+        if !transform.is_callable() {
+            return Err(EngineError::Query(
+                "js: script must define a global `transform` function".into(),
+            ));
+        }
+        let mut out: Vec<JsonValue> = Vec::with_capacity(rows.len());
+        for row in rows.iter() {
+            self.check_cancelled()?;
+            // JSON -> JsValue
+            let js_in = boa_engine::JsValue::from_json(row, &mut ctx).map_err(|e| {
+                EngineError::Query(format!("js: row -> JsValue: {}", e))
+            })?;
+            let result = transform
+                .as_callable()
+                .ok_or_else(|| EngineError::Query("js: transform not callable".into()))?
+                .call(&boa_engine::JsValue::Undefined, &[js_in], &mut ctx)
+                .map_err(|e| EngineError::Query(format!("js: transform call: {}", e)))?;
+            // JsValue -> JSON (only objects make sense as rows)
+            let json_out = result.to_json(&mut ctx).map_err(|e| {
+                EngineError::Query(format!("js: result -> JSON: {}", e))
+            })?;
+            if !json_out.is_object() {
+                return Err(EngineError::Query(format!(
+                    "js: transform must return an object, got: {}",
+                    json_out
+                )));
+            }
+            out.push(json_out);
+        }
+        let count = out.len();
+        materialize_jsonobjects_as_table(db, &spec.node_id, &out)?;
+        Ok(format!(
+            "code.javascript: transformed {} row(s) into {}",
+            count, spec.node_id
         ))
     }
 

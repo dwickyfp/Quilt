@@ -173,6 +173,8 @@ pub struct Stage {
     pub ai_embed: Option<AiEmbedSpec>,
     /// code.wasm (per-row WebAssembly transform).
     pub wasm: Option<WasmSpec>,
+    /// code.javascript (per-row JS transform via boa interpreter).
+    pub javascript: Option<JavaScriptSpec>,
     /// xf.ai.chunk (text splitter for RAG).
     pub ai_chunk: Option<AiChunkSpec>,
     /// xf.ai.pii (regex-based PII redaction).
@@ -667,6 +669,21 @@ pub struct WasmSpec {
     pub input_column: String,
     pub output_column: String,
     pub function: String,
+}
+
+/// code.javascript: per-row JS transform via boa_engine (pure-Rust
+/// JS interpreter). The user supplies a `script` that ends with a
+/// `transform` function expression, e.g.
+///   `(row) => ({ ...row, total: row.qty * row.price })`
+/// The engine evaluates the script once, then calls transform(row)
+/// for each upstream row passing the row as a JS object. The
+/// returned object replaces the row. Sandboxed - no globals, no
+/// fetch, no fs, no setTimeout.
+#[derive(Debug, Clone)]
+pub struct JavaScriptSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub script: String,
 }
 
 /// xf.ai.chunk: text splitter for RAG / embedding pipelines. No API
@@ -1383,6 +1400,7 @@ fn build_stage(
     let mut email_source: Option<EmailSourceSpec> = None;
     let mut ai_embed: Option<AiEmbedSpec> = None;
     let mut wasm: Option<WasmSpec> = None;
+    let mut javascript: Option<JavaScriptSpec> = None;
     let mut ai_chunk: Option<AiChunkSpec> = None;
     let mut ai_pii: Option<AiPiiSpec> = None;
     let mut ai_llm: Option<AiLlmSpec> = None;
@@ -3110,6 +3128,22 @@ fn build_stage(
         })?;
         text_search = Some(spec);
         (String::new(), StageKind::View, None)
+    } else if component_id == "code.javascript" {
+        // Per-row JS transform. Script must define a `transform`
+        // function (named or assigned) that takes a row object and
+        // returns one. No persistent state across rows.
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let script = string_prop(&props, "script")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: script required", component_id)))?;
+        javascript = Some(JavaScriptSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            script,
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "code.wasm" {
         // Per-row WASM transform via wasmi. The user supplies the
         // module either as base64 bytes (inline) or as a path to a
@@ -3415,6 +3449,7 @@ fn build_stage(
         clipboard_source,
         ai_embed,
         wasm,
+        javascript,
         ai_chunk,
         ai_pii,
         ai_llm,

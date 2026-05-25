@@ -6608,6 +6608,54 @@ fn src_git_log_emits_one_row_per_commit() {
     assert_eq!(tweak, "Tweak: pipe | in subject");
 }
 
+/// code.javascript: per-row JS transform. Script computes a new
+/// column `total = qty * price` and uppercases the name. Verifies
+/// values land correctly + helpers declared at the top of the
+/// script are accessible across rows.
+#[test]
+fn code_javascript_runs_transform_per_row_via_boa() {
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let in_csv = write_file(
+        tmp.path(),
+        "in.csv",
+        "id,name,qty,price\n1,widget,3,10.0\n2,gadget,2,5.5\n3,bolt,10,0.25\n",
+    );
+    let out = out_path(tmp.path(), "out.csv");
+    let script = r#"
+        function upper(s) { return s.toUpperCase(); }
+        function transform(row) {
+            return {
+                id: row.id,
+                name: upper(row.name),
+                total: row.qty * row.price,
+            };
+        }
+    "#;
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("s", "src.csv", json!({ "path": in_csv, "hasHeader": true })),
+            node("j", "code.javascript", json!({ "script": script })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s", "j"), main_edge("e2", "j", "k")]),
+    ));
+    assert_eq!(r.status, "ok", "code.javascript failed: {:?}", r.error);
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 3);
+    // qty 3 * price 10.0 = 30.0
+    let total1 = scalar_string(&format!(
+        "SELECT total FROM read_csv_auto('{}') WHERE id = 1",
+        out
+    ));
+    assert_eq!(total1, "30.0");
+    // upper("widget") = "WIDGET" - confirms the helper is callable
+    let name1 = scalar_string(&format!(
+        "SELECT name FROM read_csv_auto('{}') WHERE id = 1",
+        out
+    ));
+    assert_eq!(name1, "WIDGET");
+}
+
 /// xf.ai.dedupe: pre-stage rows with embedding column, run dedupe at
 /// a tight threshold, verify the near-duplicate row is dropped.
 /// Uses CSV input where the embedding column is a JSON array literal

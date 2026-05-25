@@ -51,7 +51,7 @@ Duckle is in **early development**. The visual designer, the DuckDB execution en
 
 **Scope, stated plainly:** Duckle is a single-machine, embedded studio. If you outgrow one box, point Duckle's output at the system that scales. It will not pretend to be a cluster.
 
-The component palette ships **307 nodes** so the roadmap is visible in the product itself. As of the latest engine cut: **283 available**, **5 preview**, **19 planned**. Each node is tagged by availability:
+The component palette ships **307 nodes** so the roadmap is visible in the product itself. As of the latest engine cut: **284 available**, **5 preview**, **18 planned**. Each node is tagged by availability:
 
 - **Available** runs on the DuckDB engine today.
 - **Preview** is configurable in the designer now (drag, wire, set properties); execution is being wired engine-by-engine. This currently covers the AI transforms and some vector DB read sources.
@@ -167,7 +167,8 @@ The whole group runs today. Validators split their input: passing rows continue 
 | **SQL routines** | Reusable, named SQL saved in the workspace and executable inside any pipeline | Available |
 | **Shell** | Run any shell command; one output row with `{stdout, stderr, exit_code, duration_ms}`. Platform-aware default shell (cmd.exe on Windows, /bin/sh on Unix). Optional `timeoutMs` kills the child; cancellation does the same | Available |
 | **WebAssembly UDF** | Per-row WASM transform via pure-Rust `wasmi` interpreter. Sandboxed (no fs/net/env). Module supplies a `transform(i32, i32) -> i64` export; engine writes the input column into module memory, calls transform, reads result back. Works with any WASM toolchain (Rust, AssemblyScript, C, Tinygo) | Available |
-| **Python / Rust / JavaScript UDFs** | Embedded-language stages | Planned |
+| **JavaScript UDF** | Per-row JS transform via the pure-Rust `boa` interpreter. Sandboxed (no fetch / fs / DOM). Define a `transform(row)` function; the engine calls it per row with the row as a JS object and uses the returned object as the output. Helpers at the top of the script are shared across rows within the stage | Available |
+| **Python / Rust UDFs** | Embedded-language stages | Planned |
 
 ### Sinks
 

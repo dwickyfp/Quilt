@@ -98,6 +98,12 @@ arboard = { version = "3", default-features = false }
 # execution, but per-row ETL transforms aren't throughput-critical.
 # The wasm module runs in a sandbox - no fs, no network, no env vars.
 wasmi = "0.40"
+# Pure-Rust JavaScript engine for code.javascript. Boa is an
+# interpreter (no JIT), sandboxed by default - no DOM, no fetch, no
+# fs. The user supplies a transform(row) -> object function and the
+# engine calls it per row, marshalling JSON in / out via the boa
+# JsValue<->serde_json bridge.
+boa_engine = "0.19"
 # Used by xf.ai.pii for regex-based PII detection (emails, phones,
 # SSNs, credit cards). Already in our dep graph transitively but
 # pinned explicitly here so it's stable across upstream churn.
