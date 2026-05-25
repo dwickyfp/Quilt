@@ -6608,6 +6608,88 @@ fn src_git_log_emits_one_row_per_commit() {
     assert_eq!(tweak, "Tweak: pipe | in subject");
 }
 
+/// code.wasm: compile an inline WAT (WebAssembly text) module that
+/// reverses its input string, supply it as base64 bytes, pipe 3 rows
+/// through it, verify each output is the reversed input. Proves the
+/// memory-in / packed-i64-out contract end-to-end without shipping a
+/// pre-compiled .wasm fixture.
+#[test]
+fn code_wasm_reverses_each_row_via_inline_module() {
+    let engine = engine_or_skip!();
+    // WAT module: copies input from in_ptr/in_len to out_ptr (256),
+    // reversed, then returns (out_ptr << 32) | out_len. Uses the
+    // first page of memory only - 64KB is plenty for the test rows.
+    let wat = r#"
+(module
+  (memory (export "memory") 1)
+  (func (export "transform") (param $in_ptr i32) (param $in_len i32) (result i64)
+    (local $out_ptr i32)
+    (local $i i32)
+    (local.set $out_ptr (i32.const 256))
+    (local.set $i (i32.const 0))
+    (loop $copy_loop
+      (i32.store8
+        (i32.add (local.get $out_ptr)
+                 (i32.sub (i32.sub (local.get $in_len) (local.get $i)) (i32.const 1)))
+        (i32.load8_u (i32.add (local.get $in_ptr) (local.get $i)))
+      )
+      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+      (br_if $copy_loop (i32.lt_s (local.get $i) (local.get $in_len)))
+    )
+    (i64.or
+      (i64.shl (i64.extend_i32_u (local.get $out_ptr)) (i64.const 32))
+      (i64.extend_i32_u (local.get $in_len))
+    )
+  )
+)
+"#;
+    let wasm_bytes = wat::parse_str(wat).expect("wat compile");
+    use base64::engine::general_purpose::STANDARD as B64;
+    use base64::Engine as _;
+    let wasm_b64 = B64.encode(&wasm_bytes);
+
+    let tmp = tempfile::tempdir().unwrap();
+    let in_csv = write_file(
+        tmp.path(),
+        "in.csv",
+        "id,text\n1,hello\n2,duckle\n3,abc\n",
+    );
+    let out = out_path(tmp.path(), "out.csv");
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("s", "src.csv", json!({ "path": in_csv, "hasHeader": true })),
+            node("w", "code.wasm", json!({
+                "wasmB64": wasm_b64,
+                "inputColumn": "text",
+                "outputColumn": "reversed",
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s", "w"), main_edge("e2", "w", "k")]),
+    ));
+    assert_eq!(r.status, "ok", "code.wasm failed: {:?}", r.error);
+    let n = count(&format!("read_csv_auto('{}')", out));
+    assert_eq!(n, 3);
+    // hello -> olleh
+    let h = scalar_string(&format!(
+        "SELECT reversed FROM read_csv_auto('{}') WHERE id = 1",
+        out
+    ));
+    assert_eq!(h, "olleh");
+    // duckle -> elkcud
+    let d = scalar_string(&format!(
+        "SELECT reversed FROM read_csv_auto('{}') WHERE id = 2",
+        out
+    ));
+    assert_eq!(d, "elkcud");
+    // abc -> cba
+    let a = scalar_string(&format!(
+        "SELECT reversed FROM read_csv_auto('{}') WHERE id = 3",
+        out
+    ));
+    assert_eq!(a, "cba");
+}
+
 /// xf.ai.embed: stand up a tiny HTTP server pretending to be the
 /// OpenAI /v1/embeddings endpoint. Pipe a CSV with 3 text rows in;
 /// verify the engine batched them into one POST, attached the mock

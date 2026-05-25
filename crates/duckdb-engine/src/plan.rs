@@ -169,6 +169,8 @@ pub struct Stage {
     pub clipboard_source: Option<ClipboardSourceSpec>,
     /// xf.ai.embed (per-row embedding).
     pub ai_embed: Option<AiEmbedSpec>,
+    /// code.wasm (per-row WebAssembly transform).
+    pub wasm: Option<WasmSpec>,
     /// Milliseconds the executor sleeps before running this stage.
     /// Set by ctl.wait and ctl.throttle. None = no delay.
     pub wait_ms: Option<u64>,
@@ -621,6 +623,23 @@ pub struct AiEmbedSpec {
     pub api_key: String,
     pub base_url: String,
     pub batch_size: usize,
+}
+
+/// code.wasm: per-row WASM transform. The user supplies bytes (via
+/// `wasm_b64`, base64-encoded) or a `path` to a .wasm file. The
+/// module must export memory and a function `transform(i32, i32)
+/// -> i64` where the i64 packs (out_ptr << 32) | out_len. For each
+/// upstream row, the engine writes the input text into module memory,
+/// calls transform, reads the result back. Modules run sandboxed -
+/// no imports allowed.
+#[derive(Debug, Clone)]
+pub struct WasmSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub wasm_bytes: Vec<u8>,
+    pub input_column: String,
+    pub output_column: String,
+    pub function: String,
 }
 
 /// snk.cassandra / snk.scylla: CQL INSERT via the scylla driver
@@ -1253,6 +1272,7 @@ fn build_stage(
     let mut ftp_source: Option<FtpSourceSpec> = None;
     let mut clipboard_source: Option<ClipboardSourceSpec> = None;
     let mut ai_embed: Option<AiEmbedSpec> = None;
+    let mut wasm: Option<WasmSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -2939,6 +2959,45 @@ fn build_stage(
         })?;
         text_search = Some(spec);
         (String::new(), StageKind::View, None)
+    } else if component_id == "code.wasm" {
+        // Per-row WASM transform via wasmi. The user supplies the
+        // module either as base64 bytes (inline) or as a path to a
+        // .wasm file. Module contract: must export `memory` and a
+        // function with signature (i32, i32) -> i64 packing
+        // (out_ptr << 32) | out_len.
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let wasm_bytes = if let Some(b64) = string_prop(&props, "wasmB64").filter(|s| !s.is_empty())
+        {
+            use base64::engine::general_purpose::STANDARD as B64;
+            use base64::Engine as _;
+            B64.decode(&b64)
+                .map_err(|e| EngineError::Config(format!("{}: wasmB64 decode: {}", component_id, e)))?
+        } else if let Some(path) = string_prop(&props, "path").filter(|s| !s.is_empty()) {
+            std::fs::read(&path)
+                .map_err(|e| EngineError::Config(format!("{}: read {}: {}", component_id, path, e)))?
+        } else {
+            return Err(EngineError::Config(format!(
+                "{}: either wasmB64 or path required",
+                component_id
+            )));
+        };
+        wasm = Some(WasmSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            wasm_bytes,
+            input_column: string_prop(&props, "inputColumn")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "text".into()),
+            output_column: string_prop(&props, "outputColumn")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "result".into()),
+            function: string_prop(&props, "function")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "transform".into()),
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "xf.ai.embed" {
         // Per-row embedding via an OpenAI-compatible API. The planner
         // resolves the upstream view name (the stage reads from it
@@ -3056,6 +3115,7 @@ fn build_stage(
         ftp_source,
         clipboard_source,
         ai_embed,
+        wasm,
         wait_ms,
         retry_attempts,
         retry_backoff_ms,

@@ -51,7 +51,7 @@ Duckle is in **early development**. The visual designer, the DuckDB execution en
 
 **Scope, stated plainly:** Duckle is a single-machine, embedded studio. If you outgrow one box, point Duckle's output at the system that scales. It will not pretend to be a cluster.
 
-The component palette ships **303 nodes** so the roadmap is visible in the product itself. As of the latest engine cut: **272 available**, **10 preview**, **21 planned**. Each node is tagged by availability:
+The component palette ships **303 nodes** so the roadmap is visible in the product itself. As of the latest engine cut: **273 available**, **10 preview**, **20 planned**. Each node is tagged by availability:
 
 - **Available** runs on the DuckDB engine today.
 - **Preview** is configurable in the designer now (drag, wire, set properties); execution is being wired engine-by-engine. This currently covers the AI transforms and some vector DB read sources.
@@ -165,7 +165,8 @@ The whole group runs today. Validators split their input: passing rows continue 
 | **SQL Template** | Parameterized SQL with `${context.var}` substitution | Available |
 | **SQL routines** | Reusable, named SQL saved in the workspace and executable inside any pipeline | Available |
 | **Shell** | Run any shell command; one output row with `{stdout, stderr, exit_code, duration_ms}`. Platform-aware default shell (cmd.exe on Windows, /bin/sh on Unix). Optional `timeoutMs` kills the child; cancellation does the same | Available |
-| **Python / Rust / JavaScript / Wasm UDFs** | Embedded-language stages | Planned |
+| **WebAssembly UDF** | Per-row WASM transform via pure-Rust `wasmi` interpreter. Sandboxed (no fs/net/env). Module supplies a `transform(i32, i32) -> i64` export; engine writes the input column into module memory, calls transform, reads result back. Works with any WASM toolchain (Rust, AssemblyScript, C, Tinygo) | Available |
+| **Python / Rust / JavaScript UDFs** | Embedded-language stages | Planned |
 
 ### Sinks
 

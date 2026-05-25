@@ -6,10 +6,10 @@ reel; this is the full ledger.
 
 The palette currently carries **303 components**, broken down:
 
-- **272 available** - executes on the DuckDB engine today
+- **273 available** - executes on the DuckDB engine today
 - **10 preview** - configurable in the designer (drag, wire, set
   properties); execution is being wired engine-by-engine
-- **21 planned** - reserved in the palette so the roadmap is visible,
+- **20 planned** - reserved in the palette so the roadmap is visible,
   not yet executable
 
 If you drop a planned or preview tile and try to run, the executor
@@ -105,7 +105,6 @@ Capabilities table in the README.
 | `code.python` | Sandboxing + Python embedding scope decision |
 | `code.javascript` | V8 or QuickJS embed; sandboxing |
 | `code.rust` | Cranelift JIT or Wasm; requires runtime crate |
-| `code.wasm` | `wasmtime`; tractable, sandboxing-friendly |
 
 `code.sql` and `code.sqltemplate` are **available** today (run user SQL
 as a real materialized stage; the upstream is exposed as `input`).

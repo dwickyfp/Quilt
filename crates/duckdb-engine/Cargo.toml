@@ -93,6 +93,11 @@ suppaftp = { version = "8", default-features = false, features = ["rustls-ring"]
 # at runtime (gracefully fails with a clear engine error when there's
 # no display, e.g. on a headless CI runner).
 arboard = { version = "3", default-features = false }
+# WebAssembly interpreter for code.wasm. wasmi is pure Rust, no JIT,
+# no cranelift - far smaller than wasmtime. Trade-off: slower
+# execution, but per-row ETL transforms aren't throughput-critical.
+# The wasm module runs in a sandbox - no fs, no network, no env vars.
+wasmi = "0.40"
 
 [features]
 default = ["oracle"]
@@ -109,3 +114,7 @@ apache-avro = "0.17"
 # system clipboard before running the pipeline. Same backend as the
 # lib dep -> writer and reader agree on the OS clipboard format.
 arboard = { version = "3", default-features = false }
+# Used by code.wasm tests to compile inline WAT (WebAssembly text
+# format) to bytes so we don't have to ship a pre-compiled .wasm
+# fixture in the repo.
+wat = "1"

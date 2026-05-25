@@ -664,7 +664,7 @@ export const PALETTE: Category[] = [
                     code('rust', 'Rust UDF', 'planned'),
                     code('javascript', 'JavaScript UDF', 'planned'),
                     code('shell', 'Shell Command', 'available', 'Run an arbitrary shell command and emit one row with {stdout, stderr, exit_code, duration_ms}. Defaults to cmd.exe on Windows, /bin/sh on Unix. Optional timeout + workingDir. Cancellation kills the child process.'),
-                    code('wasm', 'WebAssembly UDF', 'planned'),
+                    code('wasm', 'WebAssembly UDF', 'available', 'Per-row WASM transform via the pure-Rust wasmi interpreter (sandboxed - no fs / net / env access). Supply the module as `wasmB64` (base64) or `path` to a .wasm file. Module must export `memory` and a function `transform(i32, i32) -> i64` packing (out_ptr << 32) | out_len. Defaults: inputColumn=text, outputColumn=result, function=transform.'),
                 ],
             },
         ],

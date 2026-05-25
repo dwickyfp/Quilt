@@ -36,7 +36,7 @@ use plan::{
     PubSubSinkSpec, PubSubSourceSpec, QdrantSourceSpec, RabbitSinkSpec, RabbitSourceSpec,
     RedisSinkSpec, RedisSourceSpec, RestPagination, RestResponseFormat, RestSourceSpec, ShellSpec,
     SnowflakeAuth, SnowflakeSinkSpec, SnowflakeSourceSpec, SqlServerSinkSpec, SqlServerSourceSpec,
-    WeaviateSourceSpec, WebhookSpec, XmlSinkSpec, XmlSourceSpec,
+    WasmSpec, WeaviateSourceSpec, WebhookSpec, XmlSinkSpec, XmlSourceSpec,
 };
 
 #[derive(Debug, Error)]
@@ -550,6 +550,8 @@ impl DuckdbEngine {
                     self.run_clipboard_source(&db_path, spec)
                 } else if let Some(spec) = stage.ai_embed.as_ref() {
                     self.run_ai_embed(&db_path, spec)
+                } else if let Some(spec) = stage.wasm.as_ref() {
+                    self.run_wasm(&db_path, spec)
                 } else if let Some(spec) = stage.upsert.as_ref() {
                     // Relational-DB upsert: DESCRIBE the upstream first to
                     // get the column list, then assemble INSERT ... ON
@@ -2457,6 +2459,117 @@ impl DuckdbEngine {
             "ai.embed ({}): embedded {} row(s) into {}",
             spec.model, count, spec.node_id
         ))
+    }
+
+    /// code.wasm: per-row WebAssembly transform via wasmi (interpreter).
+    /// For each upstream row, the engine writes the input column text
+    /// into the module's linear memory, calls the exported transform
+    /// function (i32, i32) -> i64, then reads the (out_ptr, out_len)
+    /// pair back from the returned i64 to recover the result string.
+    ///
+    /// Each row gets a fresh module instance so state doesn't leak
+    /// between rows - safer for user-supplied modules. wasmi is an
+    /// interpreter so each call has interpretation overhead; for ETL
+    /// (rows in the thousands, not millions per second) it's fine.
+    ///
+    /// Modules run sandboxed: no host imports, no fs, no network. If
+    /// the module's exports don't match the contract we return a
+    /// clear EngineError rather than panicking.
+    fn run_wasm(&self, db: &Path, spec: &WasmSpec) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+        let rows = self.run_rows(
+            Some(db),
+            &format!("SELECT * FROM {};", quote_ident(&spec.from_view)),
+        )?;
+        if rows.is_empty() {
+            materialize_jsonobjects_as_table(db, &spec.node_id, &[])?;
+            return Ok(format!("wasm: 0 upstream rows -> {}", spec.node_id));
+        }
+        let engine = wasmi::Engine::default();
+        let module = wasmi::Module::new(&engine, &spec.wasm_bytes[..])
+            .map_err(|e| EngineError::Query(format!("wasm: parse module: {}", e)))?;
+        let mut out: Vec<JsonValue> = Vec::with_capacity(rows.len());
+        for row in rows.iter() {
+            self.check_cancelled()?;
+            let input_text = row
+                .get(&spec.input_column)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let result_text = self.invoke_wasm_transform(&engine, &module, &spec.function, &input_text)?;
+            let mut obj = match row {
+                JsonValue::Object(m) => m.clone(),
+                _ => serde_json::Map::new(),
+            };
+            obj.insert(
+                spec.output_column.clone(),
+                JsonValue::String(result_text),
+            );
+            out.push(JsonValue::Object(obj));
+        }
+        let count = out.len();
+        materialize_jsonobjects_as_table(db, &spec.node_id, &out)?;
+        Ok(format!(
+            "wasm ({}): processed {} row(s) into {}",
+            spec.function, count, spec.node_id
+        ))
+    }
+
+    /// Run a single transform invocation against a fresh module
+    /// instance. Returns the output string read back from module
+    /// memory. Pulled out so the per-row loop stays compact.
+    fn invoke_wasm_transform(
+        &self,
+        engine: &wasmi::Engine,
+        module: &wasmi::Module,
+        function: &str,
+        input: &str,
+    ) -> Result<String, EngineError> {
+        let mut store = wasmi::Store::new(engine, ());
+        let linker = wasmi::Linker::new(engine);
+        let instance = linker
+            .instantiate(&mut store, module)
+            .and_then(|p| p.start(&mut store))
+            .map_err(|e| EngineError::Query(format!("wasm: instantiate: {}", e)))?;
+        let memory = instance
+            .get_memory(&store, "memory")
+            .ok_or_else(|| EngineError::Query("wasm: module has no exported `memory`".into()))?;
+        let transform = instance
+            .get_typed_func::<(i32, i32), i64>(&store, function)
+            .map_err(|e| {
+                EngineError::Query(format!(
+                    "wasm: export `{}(i32, i32) -> i64` not found: {}",
+                    function, e
+                ))
+            })?;
+        // Write input at a fixed offset (1024). Modules that want
+        // dynamic alloc can ignore this offset and use their own
+        // allocator - we still pass our offset as in_ptr.
+        let in_ptr: u32 = 1024;
+        let in_len: u32 = input.len() as u32;
+        memory
+            .data_mut(&mut store)
+            .get_mut(in_ptr as usize..(in_ptr + in_len) as usize)
+            .ok_or_else(|| EngineError::Query("wasm: input doesn't fit in memory".into()))?
+            .copy_from_slice(input.as_bytes());
+        let packed = transform
+            .call(&mut store, (in_ptr as i32, in_len as i32))
+            .map_err(|e| EngineError::Query(format!("wasm: call {}: {}", function, e)))?;
+        let out_ptr = ((packed >> 32) & 0xFFFFFFFF) as u32;
+        let out_len = (packed & 0xFFFFFFFF) as u32;
+        let mem_data = memory.data(&store);
+        let out_slice = mem_data
+            .get(out_ptr as usize..(out_ptr + out_len) as usize)
+            .ok_or_else(|| {
+                EngineError::Query(format!(
+                    "wasm: out (ptr={}, len={}) out of memory bounds (mem_size={})",
+                    out_ptr,
+                    out_len,
+                    mem_data.len()
+                ))
+            })?;
+        String::from_utf8(out_slice.to_vec())
+            .map_err(|e| EngineError::Query(format!("wasm: output not utf-8: {}", e)))
     }
 
     /// src.clipboard: read the system clipboard as text. If it parses
