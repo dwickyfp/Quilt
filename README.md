@@ -51,7 +51,7 @@ Duckle is in **early development**. The visual designer, the DuckDB execution en
 
 **Scope, stated plainly:** Duckle is a single-machine, embedded studio. If you outgrow one box, point Duckle's output at the system that scales. It will not pretend to be a cluster.
 
-The component palette ships **307 nodes** so the roadmap is visible in the product itself. As of the latest engine cut: **284 available**, **5 preview**, **18 planned**. Each node is tagged by availability:
+The component palette ships **307 nodes** so the roadmap is visible in the product itself. As of the latest engine cut: **285 available**, **5 preview**, **17 planned**. Each node is tagged by availability:
 
 - **Available** runs on the DuckDB engine today.
 - **Preview** is configurable in the designer now (drag, wire, set properties); execution is being wired engine-by-engine. This currently covers the AI transforms and some vector DB read sources.
@@ -111,6 +111,7 @@ Duckle is not a CSV tool with extras. It reads a broad set of formats and source
 | **File transfer** | **FTP** (list + download via the pure-Rust `suppaftp` client; glob filter; each file becomes one row with base64-encoded content). SFTP is a separate protocol and a separate component. | Available |
 | **Desktop** | **Clipboard** (read system clipboard via pure-Rust `arboard`; auto-detects JSON-array shape and unfolds it into rows). Desktop-only by design - fails clearly on headless systems. | Available |
 | **Mailbox** | **IMAP** (fetch N most recent messages via the `imap` 3.x alpha crate with rustls TLS; messages parsed by `mail-parser`). Basic auth today; OAuth (gmail / o365) on the roadmap. | Available |
+| **Webhook listener** | **Webhook** (bind 127.0.0.1:port; collect up to `maxRequests` inbound HTTP requests with a `timeoutMs` deadline; JSON-object bodies become rows directly, JSON-array bodies unfold into rows, others fall back to `{method, path, body, headers}`). Local-only - point a tunnel at the port for public reach. | Available |
 | **Vector / AI databases** | **pgvector** (postgres ATTACH; server needs `CREATE EXTENSION vector`), **Qdrant** (`/collections/{id}/points/scroll` with cursor pagination), **Weaviate** (`/v1/objects?class=&after=` with cursor pagination), **Milvus** (`/v1/vector/query` with offset pagination) | Available |
 | **Vector / AI databases** | Pinecone (no list-all-vectors API), Chroma, LanceDB | Preview |
 

@@ -6801,6 +6801,77 @@ fn xf_ai_classify_constrains_to_supplied_categories() {
     );
 }
 
+/// src.webhook: bind a random port, fire two POSTs at it from a
+/// helper thread, run the pipeline (which collects up to 2 requests
+/// then closes), verify both bodies materialized as rows.
+#[test]
+fn src_webhook_collects_inbound_http_requests() {
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::time::Duration;
+
+    let engine = engine_or_skip!();
+    // Pick a port by binding+dropping; very small race but acceptable
+    // for a unit-test fixture.
+    let port = {
+        let l = TcpListener::bind("127.0.0.1:0").unwrap();
+        l.local_addr().unwrap().port()
+    };
+
+    // Helper thread: wait a moment for the engine to bind, then POST
+    // two JSON bodies.
+    let client = std::thread::spawn(move || {
+        for body in [r#"{"id":1,"event":"signup"}"#, r#"{"id":2,"event":"login"}"#] {
+            // Retry a few times in case the engine isn't bound yet.
+            for _ in 0..50 {
+                if let Ok(mut s) = TcpStream::connect(("127.0.0.1", port)) {
+                    let req = format!(
+                        "POST /hook HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    let _ = s.write_all(req.as_bytes());
+                    let _ = s.flush();
+                    let mut resp = Vec::new();
+                    let _ = s.set_read_timeout(Some(Duration::from_millis(500)));
+                    let _ = s.read_to_end(&mut resp);
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
+    });
+
+    let tmp = tempfile::tempdir().unwrap();
+    let out = out_path(tmp.path(), "out.csv");
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("w", "src.webhook", json!({
+                "port": port,
+                "maxRequests": 2,
+                "timeoutMs": 5000,
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e", "w", "k")]),
+    ));
+    let _ = client.join();
+    assert_eq!(r.status, "ok", "src.webhook failed: {:?}", r.error);
+    let n = count(&format!("read_csv_auto('{}')", out));
+    assert_eq!(n, 2, "expected 2 webhook rows, got {}", n);
+    // Both bodies parsed as JSON-object so id + event columns should exist
+    let ev1 = scalar_string(&format!(
+        "SELECT event FROM read_csv_auto('{}') WHERE id = 1",
+        out
+    ));
+    assert_eq!(ev1, "signup");
+    let ev2 = scalar_string(&format!(
+        "SELECT event FROM read_csv_auto('{}') WHERE id = 2",
+        out
+    ));
+    assert_eq!(ev2, "login");
+}
+
 /// xf.ai.llm: stand up a mock /v1/chat/completions endpoint, pipe 2
 /// rows through with a prompt template, verify each row got the
 /// completion text written back. Also asserts the prompt template

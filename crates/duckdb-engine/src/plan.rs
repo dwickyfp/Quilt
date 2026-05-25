@@ -169,6 +169,8 @@ pub struct Stage {
     pub clipboard_source: Option<ClipboardSourceSpec>,
     /// IMAP mailbox reader.
     pub email_source: Option<EmailSourceSpec>,
+    /// Local webhook listener (binds a TCP port, collects N requests).
+    pub webhook_source: Option<WebhookSourceSpec>,
     /// xf.ai.embed (per-row embedding).
     pub ai_embed: Option<AiEmbedSpec>,
     /// code.wasm (per-row WebAssembly transform).
@@ -634,6 +636,23 @@ pub struct EmailSourceSpec {
     pub password: String,
     pub mailbox: String,
     pub max_messages: u64,
+}
+
+/// src.webhook: bind 127.0.0.1:port, accept up to `max_requests`
+/// inbound HTTP requests with a global `timeout_ms` deadline, parse
+/// each request body as JSON (or fall back to a {body, method, path,
+/// headers} row), close the listener. Useful for local webhook
+/// receivers - dev tunnels (ngrok / cloudflared) point at our port.
+#[derive(Debug, Clone)]
+pub struct WebhookSourceSpec {
+    pub node_id: String,
+    pub port: u16,
+    pub max_requests: u64,
+    pub timeout_ms: u64,
+    /// Optional path filter - only requests whose URL starts with
+    /// this string count toward max_requests. Other requests get a
+    /// 404 but don't count.
+    pub path_filter: Option<String>,
 }
 
 /// xf.ai.embed: per-row embedding transform. Reads `input_column`
@@ -1398,6 +1417,7 @@ fn build_stage(
     let mut ftp_source: Option<FtpSourceSpec> = None;
     let mut clipboard_source: Option<ClipboardSourceSpec> = None;
     let mut email_source: Option<EmailSourceSpec> = None;
+    let mut webhook_source: Option<WebhookSourceSpec> = None;
     let mut ai_embed: Option<AiEmbedSpec> = None;
     let mut wasm: Option<WasmSpec> = None;
     let mut javascript: Option<JavaScriptSpec> = None;
@@ -2489,6 +2509,30 @@ fn build_stage(
                 .filter(|n| *n > 0),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "src.webhook" {
+        // Local HTTP listener that collects N requests then closes.
+        // Bound to 127.0.0.1 only; users punching through to the
+        // internet should run their own tunnel (ngrok / cloudflared).
+        webhook_source = Some(WebhookSourceSpec {
+            node_id: node.id.clone(),
+            port: props
+                .get("port")
+                .and_then(|v| v.as_u64())
+                .filter(|n| *n > 0 && *n < 65536)
+                .map(|n| n as u16)
+                .ok_or_else(|| EngineError::Config(format!("{}: port required", component_id)))?,
+            max_requests: props
+                .get("maxRequests")
+                .and_then(|v| v.as_u64())
+                .filter(|n| *n > 0)
+                .unwrap_or(1),
+            timeout_ms: props
+                .get("timeoutMs")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(30000),
+            path_filter: string_prop(&props, "pathFilter").filter(|s| !s.is_empty()),
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "src.email" {
         // IMAP source. host required (e.g. imap.fastmail.com); port
         // defaults to 993 (IMAPS). mailbox defaults to INBOX.
@@ -3456,6 +3500,7 @@ fn build_stage(
         ai_classify,
         ai_dedupe,
         email_source,
+        webhook_source,
         wait_ms,
         retry_attempts,
         retry_backoff_ms,

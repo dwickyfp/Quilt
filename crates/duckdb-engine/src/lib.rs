@@ -37,7 +37,7 @@ use plan::{
     PubSubSinkSpec, PubSubSourceSpec, QdrantSourceSpec, RabbitSinkSpec, RabbitSourceSpec,
     RedisSinkSpec, RedisSourceSpec, RestPagination, RestResponseFormat, RestSourceSpec, ShellSpec,
     SnowflakeAuth, SnowflakeSinkSpec, SnowflakeSourceSpec, SqlServerSinkSpec, SqlServerSourceSpec,
-    WasmSpec, WeaviateSourceSpec, WebhookSpec, XmlSinkSpec, XmlSourceSpec,
+    WasmSpec, WeaviateSourceSpec, WebhookSourceSpec, WebhookSpec, XmlSinkSpec, XmlSourceSpec,
 };
 
 #[derive(Debug, Error)]
@@ -567,6 +567,8 @@ impl DuckdbEngine {
                     self.run_ai_dedupe(&db_path, spec)
                 } else if let Some(spec) = stage.email_source.as_ref() {
                     self.run_email_source(&db_path, spec)
+                } else if let Some(spec) = stage.webhook_source.as_ref() {
+                    self.run_webhook_source(&db_path, spec)
                 } else if let Some(spec) = stage.upsert.as_ref() {
                     // Relational-DB upsert: DESCRIBE the upstream first to
                     // get the column list, then assemble INSERT ... ON
@@ -2473,6 +2475,100 @@ impl DuckdbEngine {
         Ok(format!(
             "ai.embed ({}): embedded {} row(s) into {}",
             spec.model, count, spec.node_id
+        ))
+    }
+
+    /// src.webhook: bind 127.0.0.1:port, collect up to max_requests
+    /// inbound HTTP requests with a global timeout deadline, close
+    /// the listener. Each request body becomes a row: if the body
+    /// parses as JSON object, the object is the row; if it parses
+    /// as a JSON array, each element becomes a row; otherwise a
+    /// fallback row {method, path, body} captures the raw request.
+    fn run_webhook_source(
+        &self,
+        db: &Path,
+        spec: &WebhookSourceSpec,
+    ) -> Result<String, EngineError> {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::time::{Duration, Instant};
+        self.check_cancelled()?;
+        let addr = format!("127.0.0.1:{}", spec.port);
+        let listener = TcpListener::bind(&addr)
+            .map_err(|e| EngineError::Query(format!("webhook bind {}: {}", addr, e)))?;
+        // Non-blocking so we can poll cancel + global deadline.
+        listener
+            .set_nonblocking(true)
+            .map_err(|e| EngineError::Query(format!("webhook set_nonblocking: {}", e)))?;
+        let deadline = Instant::now() + Duration::from_millis(spec.timeout_ms);
+        let mut rows: Vec<JsonValue> = Vec::new();
+        while (rows.len() as u64) < spec.max_requests {
+            self.check_cancelled()?;
+            if Instant::now() >= deadline {
+                break;
+            }
+            let (mut stream, _addr) = match listener.accept() {
+                Ok(s) => s,
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+                Err(e) => {
+                    return Err(EngineError::Query(format!("webhook accept: {}", e)));
+                }
+            };
+            stream
+                .set_read_timeout(Some(Duration::from_millis(1000)))
+                .ok();
+            // Read request bytes until headers parse + body fully consumed.
+            let (method, path, headers, body) = match read_http_request(&mut stream) {
+                Ok(req) => req,
+                Err(e) => {
+                    let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    let _ = stream.flush();
+                    eprintln!("webhook: skipping malformed request: {}", e);
+                    continue;
+                }
+            };
+            // Path filter: 404 anything that doesn't match.
+            if let Some(prefix) = &spec.path_filter {
+                if !path.starts_with(prefix) {
+                    let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    let _ = stream.flush();
+                    continue;
+                }
+            }
+            // Always send 200 OK so the caller knows we got it.
+            let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
+            let _ = stream.flush();
+            // Parse the body: prefer JSON shape, fall back to raw.
+            let body_str = String::from_utf8_lossy(&body).into_owned();
+            match serde_json::from_str::<JsonValue>(&body_str) {
+                Ok(JsonValue::Object(o)) => rows.push(JsonValue::Object(o)),
+                Ok(JsonValue::Array(arr)) => {
+                    for v in arr {
+                        rows.push(v);
+                    }
+                }
+                _ => {
+                    let mut row = serde_json::Map::new();
+                    row.insert("method".into(), JsonValue::String(method));
+                    row.insert("path".into(), JsonValue::String(path));
+                    row.insert("body".into(), JsonValue::String(body_str));
+                    let mut hdrs = serde_json::Map::new();
+                    for (k, v) in headers {
+                        hdrs.insert(k, JsonValue::String(v));
+                    }
+                    row.insert("headers".into(), JsonValue::Object(hdrs));
+                    rows.push(JsonValue::Object(row));
+                }
+            }
+        }
+        let count = rows.len();
+        materialize_jsonobjects_as_table(db, &spec.node_id, &rows)?;
+        Ok(format!(
+            "webhook: collected {} request(s) on :{} -> {}",
+            count, spec.port, spec.node_id
         ))
     }
 
@@ -5883,6 +5979,64 @@ fn parse_git_ls_tree(bytes: &[u8], max_rows: usize) -> Vec<JsonValue> {
         out.push(JsonValue::Object(row));
     }
     out
+}
+
+/// Read one HTTP/1.x request off `stream` and return (method, path,
+/// headers, body). Tiny ad-hoc parser - good enough for webhook
+/// receivers from well-behaved clients. Reads until Content-Length
+/// bytes of body have arrived; rejects requests with no
+/// Content-Length when there's a non-empty body indication.
+fn read_http_request(
+    stream: &mut std::net::TcpStream,
+) -> Result<(String, String, Vec<(String, String)>, Vec<u8>), String> {
+    use std::io::Read;
+    let mut buf: Vec<u8> = Vec::with_capacity(8192);
+    let mut chunk = [0u8; 4096];
+    // Read until we see end-of-headers (\r\n\r\n).
+    while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+        if buf.len() > 1_048_576 {
+            return Err("request too large".into());
+        }
+        match stream.read(&mut chunk) {
+            Ok(0) => return Err("connection closed before headers".into()),
+            Ok(n) => buf.extend_from_slice(&chunk[..n]),
+            Err(e) => return Err(format!("read: {}", e)),
+        }
+    }
+    let split_at = buf
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .ok_or_else(|| "no header/body split".to_string())?;
+    let head = String::from_utf8_lossy(&buf[..split_at]).into_owned();
+    let mut lines = head.split("\r\n");
+    let request_line = lines.next().ok_or_else(|| "empty request".to_string())?;
+    let mut parts = request_line.split_whitespace();
+    let method = parts.next().unwrap_or("").to_string();
+    let path = parts.next().unwrap_or("").to_string();
+    let mut headers: Vec<(String, String)> = Vec::new();
+    let mut content_length = 0usize;
+    for line in lines {
+        if let Some((k, v)) = line.split_once(':') {
+            let k = k.trim().to_string();
+            let v = v.trim().to_string();
+            if k.eq_ignore_ascii_case("content-length") {
+                content_length = v.parse().unwrap_or(0);
+            }
+            headers.push((k, v));
+        }
+    }
+    // Body: any bytes we've already read past the header split + more
+    // until we have content_length bytes total.
+    let mut body: Vec<u8> = buf[split_at + 4..].to_vec();
+    while body.len() < content_length {
+        match stream.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => body.extend_from_slice(&chunk[..n]),
+            Err(_) => break,
+        }
+    }
+    body.truncate(content_length);
+    Ok((method, path, headers, body))
 }
 
 /// Cosine similarity between two equal-length float vectors. Used by
