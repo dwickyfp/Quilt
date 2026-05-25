@@ -367,7 +367,7 @@ When the installer downloads the DuckDB CLI it also pre-fetches the extensions D
 
 ## Download / Install
 
-Pick the binary for your OS from the [latest release](https://github.com/SouravRoy-ETL/duckle/releases):
+Pick the binary for your OS from the [latest release](https://github.com/SouravRoy-ETL/duckle/releases/tag/v0.0.12):
 
 | OS | Asset | How to run |
 |---|---|---|
