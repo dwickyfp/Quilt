@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown } from 'lucide-react';
 
@@ -41,6 +42,7 @@ type Props = {
 };
 
 export default function EngineSelector({ value, onChange }: Props) {
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(
         null,
@@ -105,7 +107,7 @@ export default function EngineSelector({ value, onChange }: Props) {
                 onClick={() => setOpen(o => !o)}
             >
                 <span className="engine-dot" style={{ background: current.dot }} aria-hidden />
-                <span className="engine-trigger-label">Engine</span>
+                <span className="engine-trigger-label">{t('engine.label')}</span>
                 <span className="engine-trigger-value">{current.label}</span>
                 <ChevronDown size={12} className="engine-trigger-chevron" aria-hidden="true" />
             </button>
@@ -150,7 +152,7 @@ export default function EngineSelector({ value, onChange }: Props) {
                                           {e.label}
                                           {e.comingSoon ? (
                                               <span className="engine-option-soon">
-                                                  coming soon
+                                                  {t('engine.comingSoon')}
                                               </span>
                                           ) : null}
                                       </div>

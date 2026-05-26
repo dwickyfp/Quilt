@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     AlertCircle,
     CheckCircle2,
@@ -34,6 +35,7 @@ export default function BottomPanel({
     validation,
     openProblemsRequest,
 }: Props) {
+    const { t } = useTranslation();
     const [tab, setTab] = useState<TabId>('problems');
     const [collapsed, setCollapsed] = useState<boolean>(true);
     const [height, setHeight] = useState<number>(DEFAULT_HEIGHT);
@@ -100,9 +102,9 @@ export default function BottomPanel({
     const problemsBadge = validation.errorCount + validation.warningCount + runErrors.length;
 
     const tabs: { id: TabId; label: string; badge?: number }[] = [
-        { id: 'problems', label: 'Problems', badge: problemsBadge },
-        { id: 'output', label: 'Output' },
-        { id: 'console', label: 'Console' },
+        { id: 'problems', label: t('bottom.problems'), badge: problemsBadge },
+        { id: 'output', label: t('bottom.output') },
+        { id: 'console', label: t('bottom.console') },
     ];
 
     return (
@@ -132,7 +134,7 @@ export default function BottomPanel({
                     type="button"
                     className="bottom-panel-toggle"
                     onClick={() => setCollapsed(c => !c)}
-                    aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
+                    aria-label={collapsed ? t('bottom.expand') : t('bottom.collapse')}
                 >
                     {collapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
@@ -172,15 +174,15 @@ function ProblemsTab({
     runErrors: [string, { error?: string }][];
     nodeLabels: Record<string, string>;
 }) {
+    const { t } = useTranslation();
     const hasNothing = validation.issues.length === 0 && runErrors.length === 0;
     if (hasNothing) {
         return (
             <div className="bottom-empty">
                 <CheckCircle2 size={22} className="bottom-empty-icon bottom-empty-icon-ok" />
-                <div className="bottom-empty-title">No problems detected</div>
+                <div className="bottom-empty-title">{t('bottom.noProblems')}</div>
                 <div className="bottom-empty-desc">
-                    Required properties, dangling edges, cycles, and execution errors surface
-                    here. Validation runs live as you edit the pipeline.
+                    {t('bottom.noProblemsDesc')}
                 </div>
             </div>
         );
@@ -194,7 +196,7 @@ function ProblemsTab({
                     title={
                         issue.nodeId
                             ? nodeLabels[issue.nodeId] ?? issue.nodeId
-                            : 'Pipeline'
+                            : t('bottom.pipelineLabel')
                     }
                     detail={issue.message}
                     code={issue.code}
@@ -247,13 +249,14 @@ function OutputTab({
     nodeLabels: Record<string, string>;
     terminalNodeIds: string[];
 }) {
+    const { t } = useTranslation();
     if (isRunning) {
         return (
             <div className="bottom-empty">
                 <PlayCircle size={22} className="bottom-empty-icon bottom-empty-icon-ok" />
-                <div className="bottom-empty-title">Running…</div>
+                <div className="bottom-empty-title">{t('bottom.running')}</div>
                 <div className="bottom-empty-desc">
-                    Executing the pipeline through the DuckDB engine.
+                    {t('bottom.runningDesc')}
                 </div>
             </div>
         );
@@ -261,10 +264,9 @@ function OutputTab({
     if (!runResult) {
         return (
             <div className="bottom-empty">
-                <div className="bottom-empty-title">No run output yet</div>
+                <div className="bottom-empty-title">{t('bottom.noRunYet')}</div>
                 <div className="bottom-empty-desc">
-                    Press <kbd className="kbd">F5</kbd> or click <b>Run</b> to execute the
-                    pipeline. Logs, per-node row counts, and execution timings stream here.
+                    {t('bottom.noRunYetDesc')}
                 </div>
             </div>
         );
@@ -283,16 +285,16 @@ function OutputTab({
             <div className="bottom-output-summary">
                 <span className={'bottom-status status-' + runResult.status}>
                     {runResult.status === 'ok' ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                    {runResult.status === 'ok' ? 'Run succeeded' : 'Run failed'}
+                    {runResult.status === 'ok' ? t('bottom.runSucceeded') : t('bottom.runFailed')}
                 </span>
                 <span className="bottom-output-stat">
-                    <b>{totals.nodeCount}</b> nodes
+                    <b>{totals.nodeCount}</b> {t('bottom.nodesLabel')}
                 </span>
                 <span className="bottom-output-stat">
-                    <b>{totals.rowsWritten.toLocaleString()}</b> rows written
+                    <b>{totals.rowsWritten.toLocaleString()}</b> {t('bottom.rowsWritten')}
                 </span>
                 <span className="bottom-output-stat">
-                    <b>{runResult.duration_ms} ms</b> total
+                    <b>{runResult.duration_ms} ms</b> {t('bottom.total')}
                 </span>
             </div>
             <div className="bottom-output-rows">
@@ -344,10 +346,11 @@ function PreviewTable({
     preview: { node_id: string; columns: { name: string; type: string }[]; rows: Record<string, unknown>[] };
     label?: string;
 }) {
+    const { t } = useTranslation();
     return (
         <div className="bottom-preview">
             <div className="bottom-preview-head">
-                Preview · <b>{label ?? preview.node_id}</b> · {preview.rows.length} rows
+                {t('bottom.preview')} · <b>{label ?? preview.node_id}</b> · {preview.rows.length} rows
             </div>
             <div className="bottom-preview-scroll">
                 <table className="bottom-preview-table">
@@ -391,15 +394,15 @@ function ConsoleTab({
     runResult: RunResult | null;
     nodeLabels: Record<string, string>;
 }) {
+    const { t } = useTranslation();
     if (!runResult) {
         return (
             <div className="bottom-empty bottom-console">
                 <div className="bottom-console-line">
                     <Terminal size={12} className="bottom-console-icon" />
-                    <span className="bottom-console-time">[ready]</span>
+                    <span className="bottom-console-time">{t('bottom.ready')}</span>
                     <span className="bottom-console-msg">
-                        The execution log. Run a pipeline (▶ Run) and each stage's status,
-                        row count, and timing - plus any errors - appears here.
+                        {t('bottom.consoleDesc')}
                     </span>
                 </div>
             </div>
@@ -420,7 +423,7 @@ function ConsoleTab({
                 <Terminal size={12} className="bottom-console-icon" />
                 <span className="bottom-console-time">[run]</span>
                 <span className="bottom-console-msg">
-                    {runResult.status === 'ok' ? 'Pipeline finished' : 'Pipeline ' + runResult.status} ·{' '}
+                    {runResult.status === 'ok' ? t('bottom.pipelineFinished') : t('bottom.pipelineLabel') + ' ' + runResult.status} ·{' '}
                     {runResult.duration_ms} ms
                 </span>
             </div>

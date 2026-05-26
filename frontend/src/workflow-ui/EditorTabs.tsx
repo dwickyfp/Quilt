@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type {
     Connection,
     Edge,
@@ -17,11 +18,8 @@ import type { ConnectionType } from '../canvas/connection-types';
 
 type TabId = 'canvas' | 'plan' | 'run';
 
-const TABS: { id: TabId; label: string }[] = [
-    { id: 'canvas', label: 'Canvas' },
-    { id: 'plan', label: 'Plan' },
-    { id: 'run', label: 'Run' },
-];
+// Tab labels resolved per-render via useTranslation; we keep just the IDs here.
+const TAB_IDS: TabId[] = ['canvas', 'plan', 'run'];
 
 type Props = {
     engine: EngineId;
@@ -58,21 +56,22 @@ export default function EditorTabs({
     onEdgeEdit,
     nodeAutodetectAvailable,
 }: Props) {
+    const { t } = useTranslation();
     const [active, setActive] = useState<TabId>('canvas');
 
     return (
         <div className="editor">
-            <div className="tabbar" role="tablist" aria-label="Editor views">
-                {TABS.map(t => (
+            <div className="tabbar" role="tablist" aria-label={t('editorTabs.ariaLabel')}>
+                {TAB_IDS.map(id => (
                     <button
-                        key={t.id}
+                        key={id}
                         type="button"
                         role="tab"
-                        aria-selected={active === t.id}
+                        aria-selected={active === id}
                         className="tab"
-                        onClick={() => setActive(t.id)}
+                        onClick={() => setActive(id)}
                     >
-                        {t.label}
+                        {t(`editorTabs.${id}`)}
                     </button>
                 ))}
             </div>

@@ -45,8 +45,6 @@ const DEFAULT_EXPANDED = new Set<string>();
 const ALL_CATEGORY_IDS = PALETTE.map(c => c.id);
 
 // Map palette top-level category IDs to i18n keys under "palette.*".
-// Only top-level group labels are translated for now; subgroup labels
-// ("Files", "Databases", "APIs", etc.) and component names stay English.
 const CAT_LABEL_KEY: Record<string, string> = {
     sources: 'palette.sources',
     transforms: 'palette.transforms',
@@ -54,6 +52,54 @@ const CAT_LABEL_KEY: Record<string, string> = {
     control: 'palette.controlFlow',
     quality: 'palette.dataQuality',
     code: 'palette.customCode',
+};
+
+// Map subgroup English labels to i18n keys under "palette.groups.*".
+// Labels that appear in multiple categories ("Files" in src + snk,
+// "Databases" in src + snk + etc) share one key by design - the
+// translation is the same word in every category context.
+const GROUP_LABEL_KEY: Record<string, string> = {
+    'Files': 'palette.groups.files',
+    'Lakehouse table formats': 'palette.groups.lakehouse',
+    'Databases': 'palette.groups.databases',
+    'Cloud Warehouses': 'palette.groups.cloudWarehouses',
+    'Object Storage': 'palette.groups.objectStorage',
+    'Streaming': 'palette.groups.streaming',
+    'APIs': 'palette.groups.apis',
+    'NoSQL & Search': 'palette.groups.nosqlSearch',
+    'Other': 'palette.groups.other',
+    'Vector / AI Databases': 'palette.groups.vectorAi',
+    'Fields': 'palette.groups.fields',
+    'Rows': 'palette.groups.rows',
+    'Aggregate': 'palette.groups.aggregate',
+    'Join': 'palette.groups.join',
+    'Set Operations': 'palette.groups.setOps',
+    'Window': 'palette.groups.window',
+    'Strings': 'palette.groups.strings',
+    'Date / Time': 'palette.groups.dateTime',
+    'Numeric': 'palette.groups.numeric',
+    'Pivot / Shape': 'palette.groups.pivotShape',
+    'JSON / Nested': 'palette.groups.jsonNested',
+    'Array': 'palette.groups.array',
+    'CDC / SCD': 'palette.groups.cdcScd',
+    'AI': 'palette.groups.ai',
+    'Geospatial': 'palette.groups.geospatial',
+    'Debug': 'palette.groups.debug',
+    'Routing': 'palette.groups.routing',
+    'Timing': 'palette.groups.timing',
+    'Pipelines': 'palette.groups.pipelines',
+    'Error Handling': 'palette.groups.errorHandling',
+    'Validation': 'palette.groups.validation',
+    'Profiling': 'palette.groups.profiling',
+    'Cleansing': 'palette.groups.cleansing',
+    'SQL': 'palette.groups.sql',
+    'Scripting': 'palette.groups.scripting',
+    'CRM': 'palette.groups.crm',
+    'Finance': 'palette.groups.finance',
+    'Productivity': 'palette.groups.productivity',
+    'Dev Tools': 'palette.groups.devTools',
+    'Marketing': 'palette.groups.marketing',
+    'Communication': 'palette.groups.communication',
 };
 
 export default function Palette() {
@@ -103,7 +149,7 @@ export default function Palette() {
                     <input
                         type="text"
                         className="palette-search"
-                        placeholder="Search components…"
+                        placeholder={t('palette.searchPlaceholder')}
                         value={query}
                         onChange={e => setQuery(e.target.value)}
                         spellCheck={false}
@@ -113,7 +159,7 @@ export default function Palette() {
                             type="button"
                             className="palette-search-clear"
                             onClick={() => setQuery('')}
-                            aria-label="Clear search"
+                            aria-label={t('palette.clearSearch')}
                         >
                             <X size={12} />
                         </button>
@@ -121,28 +167,28 @@ export default function Palette() {
                 </div>
                 <div className="palette-stats">
                     <span>
-                        <b>{AVAILABLE_COUNT}</b> available
+                        <b>{AVAILABLE_COUNT}</b> {t('palette.available')}
                     </span>
                     <span className="palette-stats-sep">·</span>
                     <span>
-                        <b>{TOTAL_COMPONENT_COUNT}</b> total
+                        <b>{TOTAL_COMPONENT_COUNT}</b> {t('palette.total')}
                     </span>
                     <span className="palette-stats-spacer" />
                     <button
                         type="button"
                         className="palette-stats-btn"
                         onClick={() => setExpanded(new Set(ALL_CATEGORY_IDS))}
-                        title="Expand all categories"
+                        title={t('palette.expandAllTooltip')}
                     >
-                        Expand all
+                        {t('palette.expandAll')}
                     </button>
                     <button
                         type="button"
                         className="palette-stats-btn"
                         onClick={() => setExpanded(new Set())}
-                        title="Collapse all categories"
+                        title={t('palette.collapseAllTooltip')}
                     >
-                        Collapse all
+                        {t('palette.collapseAll')}
                     </button>
                 </div>
             </div>
@@ -150,7 +196,7 @@ export default function Palette() {
             <div className="palette-body">
                 {filtered.length === 0 ? (
                     <div className="palette-empty">
-                        No components match <span className="quote">{query}</span>
+                        {t('palette.noMatch')} <span className="quote">{query}</span>
                     </div>
                 ) : (
                     filtered.map(cat => {
@@ -181,7 +227,7 @@ export default function Palette() {
                                     <div className="palette-category-body">
                                         {cat.groups.map(g => (
                                             <div className="palette-group" key={g.id}>
-                                                <div className="palette-group-label">{g.label}</div>
+                                                <div className="palette-group-label">{GROUP_LABEL_KEY[g.label] ? t(GROUP_LABEL_KEY[g.label]) : g.label}</div>
                                                 {g.components.map(c => (
                                                     <div
                                                         key={c.id}

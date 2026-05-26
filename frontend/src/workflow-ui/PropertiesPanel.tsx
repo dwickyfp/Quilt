@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Edge, Node } from '@xyflow/react';
 import { CheckCircle2, MousePointer2, Workflow } from 'lucide-react';
 import { resolveUpstreamSchema, resolveUpstreamSampleRows } from '../schema-resolve';
@@ -85,6 +86,7 @@ export default function PropertiesPanel({
     onOpenMapper,
     focusNameRequest,
 }: Props) {
+    const { t } = useTranslation();
     const [tab, setTab] = useState<TabId>('basic');
     const [autodetecting, setAutodetecting] = useState(false);
     const nameInputRef = useRef<HTMLInputElement>(null);
@@ -123,10 +125,9 @@ export default function PropertiesPanel({
             <aside className="properties">
                 <div className="properties-empty">
                     <MousePointer2 size={32} strokeWidth={1.4} />
-                    <div className="properties-empty-title">Nothing selected</div>
+                    <div className="properties-empty-title">{t('properties.nothingSelected')}</div>
                     <div className="properties-empty-desc">
-                        Click a node on the canvas to edit its configuration, schema, and validation
-                        rules.
+                        {t('properties.nothingSelectedDesc')}
                     </div>
                 </div>
             </aside>
@@ -140,11 +141,11 @@ export default function PropertiesPanel({
     const declaredSchema = data.schema ?? [];
 
     const TABS: { id: TabId; label: string }[] = [
-        { id: 'basic', label: 'Basic' },
-        { id: 'schema', label: 'Schema' },
-        { id: 'preview', label: 'Preview' },
-        { id: 'advanced', label: 'Advanced' },
-        { id: 'validation', label: 'Validation' },
+        { id: 'basic', label: t('properties.tabBasic') },
+        { id: 'schema', label: t('properties.tabSchema') },
+        { id: 'preview', label: t('properties.tabPreview') },
+        { id: 'advanced', label: t('properties.tabAdvanced') },
+        { id: 'validation', label: t('properties.tabValidation') },
     ];
 
     const setLabel = (label: string) => onUpdate(selected.id, { label });
@@ -184,7 +185,7 @@ export default function PropertiesPanel({
                     className="properties-name-input"
                     value={data.label}
                     onChange={e => setLabel(e.target.value)}
-                    placeholder="Component name"
+                    placeholder={t('properties.componentName')}
                     spellCheck={false}
                 />
                 {manifest ? (
@@ -263,7 +264,7 @@ export default function PropertiesPanel({
                                     onClick={() => onOpenMapper(selected.id)}
                                 >
                                     <Workflow size={14} />
-                                    Open visual mapper
+                                    {t('properties.openVisualMapper')}
                                 </button>
                             ) : null}
                             {manifest ? (
@@ -286,8 +287,7 @@ export default function PropertiesPanel({
                                 ))
                             ) : (
                                 <div className="properties-hint">
-                                    Generic component. Add a note in the field above to describe
-                                    what this node should do.
+                                    {t('properties.genericComponent')}
                                 </div>
                             )}
                         </div>
@@ -297,7 +297,7 @@ export default function PropertiesPanel({
                         <div className="properties-section">
                             {manifest?.schemaSource === 'upstream' ? (
                                 <div className="schema-source-banner">
-                                    Schema inherited from upstream
+                                    {t('properties.schemaInherited')}
                                 </div>
                             ) : null}
                             {manifest?.schemaSource === 'autodetect' ? (
@@ -308,16 +308,16 @@ export default function PropertiesPanel({
                                         onClick={runAutodetect}
                                         disabled={autodetecting}
                                     >
-                                        {autodetecting ? 'Detecting…' : 'Autodetect from source'}
+                                        {autodetecting ? t('properties.detecting') : t('properties.autodetect')}
                                     </button>
                                     <span className="schema-autodetect-hint">
-                                        Reads the file header and a sample of rows to infer types.
+                                        {t('properties.autodetectHelp')}
                                     </span>
                                 </div>
                             ) : null}
                             {manifest?.schemaSource === 'declared' ? (
                                 <div className="schema-source-banner schema-source-banner-declared">
-                                    Declared schema - define the output columns explicitly.
+                                    {t('properties.declaredSchema')}
                                 </div>
                             ) : null}
                             <SchemaEditor
@@ -358,7 +358,7 @@ export default function PropertiesPanel({
                     {tab === 'advanced' ? (
                         <div className="properties-section">
                             <div className="form-section">
-                                <div className="form-section-label">Reliability</div>
+                                <div className="form-section-label">{t('properties.reliability')}</div>
                                 {ADVANCED_FIELDS.map(field => (
                                     <FieldRenderer
                                         key={field.key}
@@ -379,11 +379,10 @@ export default function PropertiesPanel({
                         <div className="properties-section">
                             <div className="validation-summary validation-ok">
                                 <CheckCircle2 size={14} className="validation-icon" aria-hidden="true" />
-                                <span>No issues detected for this node.</span>
+                                <span>{t('properties.noIssues')}</span>
                             </div>
                             <div className="properties-hint">
-                                Schema mismatches, missing required properties, and engine
-                                compatibility warnings will surface here.
+                                {t('properties.noIssuesDesc')}
                             </div>
                         </div>
                     ) : null}
@@ -400,13 +399,13 @@ type PreviewProps = {
 };
 
 function PreviewTab({ schema, rows, inheritedRows }: PreviewProps) {
+    const { t } = useTranslation();
     if (schema.length === 0) {
         return (
             <div className="preview-empty">
-                <div className="preview-empty-title">No schema yet</div>
+                <div className="preview-empty-title">{t('properties.noSchema')}</div>
                 <div className="preview-empty-desc">
-                    Run schema autodetect (Schema tab) or connect an upstream node to see sample
-                    data here.
+                    {t('properties.noSchemaDesc')}
                 </div>
             </div>
         );
@@ -415,11 +414,8 @@ function PreviewTab({ schema, rows, inheritedRows }: PreviewProps) {
     if (rows.length === 0) {
         return (
             <div className="preview-empty">
-                <div className="preview-empty-title">No sample rows</div>
-                <div className="preview-empty-desc">
-                    Click <b>Autodetect</b> on the Schema tab to pull a sample, or run the pipeline
-                    to fill this in.
-                </div>
+                <div className="preview-empty-title">{t('properties.noSample')}</div>
+                <div className="preview-empty-desc" dangerouslySetInnerHTML={{ __html: t('properties.noSampleDescHtml') }} />
             </div>
         );
     }

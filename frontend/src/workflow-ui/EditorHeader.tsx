@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     CircleCheck,
     Clipboard,
@@ -56,6 +57,7 @@ export default function EditorHeader({
     onExportSqlFile,
     onImportJson,
 }: Props) {
+    const { t } = useTranslation();
     const [moreOpen, setMoreOpen] = useState(false);
     const moreRef = useRef<HTMLDivElement>(null);
 
@@ -104,7 +106,7 @@ export default function EditorHeader({
                                 {job.dirty ? (
                                     <span
                                         className="job-tab-dirty"
-                                        aria-label="unsaved changes"
+                                        aria-label={t('header.unsavedChanges')}
                                     />
                                 ) : null}
                             </button>
@@ -112,7 +114,7 @@ export default function EditorHeader({
                                 type="button"
                                 className="job-tab-close"
                                 onClick={() => onCloseJob(job.id)}
-                                aria-label={'Close ' + job.name}
+                                aria-label={t('header.closeTab', { name: job.name })}
                             >
                                 <X size={12} />
                             </button>
@@ -123,8 +125,8 @@ export default function EditorHeader({
                     type="button"
                     className="job-tab-new"
                     onClick={onNewJob}
-                    title="New pipeline"
-                    aria-label="New pipeline"
+                    title={t('header.newPipeline')}
+                    aria-label={t('header.newPipeline')}
                 >
                     <Plus size={14} />
                 </button>
@@ -136,20 +138,20 @@ export default function EditorHeader({
                         type="button"
                         className="toolbar-button toolbar-stop"
                         onClick={onStop}
-                        title="Stop pipeline (F6)"
+                        title={t('header.stopTooltip')}
                     >
                         <Square size={11} fill="currentColor" />
-                        <span>Stop</span>
+                        <span>{t('header.stop')}</span>
                     </button>
                 ) : (
                     <button
                         type="button"
                         className="toolbar-button toolbar-run"
                         onClick={onRun}
-                        title="Run pipeline (F5)"
+                        title={t('header.runTooltip')}
                     >
                         <Play size={11} fill="currentColor" />
-                        <span>Run</span>
+                        <span>{t('header.run')}</span>
                     </button>
                 )}
 
@@ -159,8 +161,8 @@ export default function EditorHeader({
                     type="button"
                     className="toolbar-icon-button"
                     onClick={onSave}
-                    title="Save (Ctrl+S)"
-                    aria-label="Save"
+                    title={t('header.saveTooltip')}
+                    aria-label={t('header.save')}
                 >
                     <Save size={14} />
                 </button>
@@ -169,8 +171,8 @@ export default function EditorHeader({
                     type="button"
                     className="toolbar-icon-button"
                     onClick={onValidate}
-                    title="Validate pipeline"
-                    aria-label="Validate"
+                    title={t('header.validateTooltip')}
+                    aria-label={t('header.validate')}
                 >
                     <CircleCheck size={14} />
                 </button>
@@ -179,8 +181,8 @@ export default function EditorHeader({
                     type="button"
                     className="toolbar-icon-button"
                     onClick={onAutoLayout}
-                    title="Auto-layout"
-                    aria-label="Auto-layout"
+                    title={t('header.autoLayout')}
+                    aria-label={t('header.autoLayout')}
                 >
                     <LayoutGrid size={14} />
                 </button>
@@ -192,8 +194,8 @@ export default function EditorHeader({
                             'toolbar-icon-button' + (moreOpen ? ' is-active' : '')
                         }
                         onClick={() => setMoreOpen(o => !o)}
-                        title="More actions"
-                        aria-label="More"
+                        title={t('header.moreTooltip')}
+                        aria-label={t('header.more')}
                         aria-expanded={moreOpen}
                     >
                         <MoreHorizontal size={14} />
@@ -208,9 +210,9 @@ export default function EditorHeader({
                             >
                                 <Clipboard size={13} />
                                 <div>
-                                    <div>Copy SQL</div>
+                                    <div>{t('header.copySql')}</div>
                                     <div className="toolbar-more-desc">
-                                        Compile to DuckDB SQL, copy to clipboard
+                                        {t('header.copySqlDesc')}
                                     </div>
                                 </div>
                             </button>
@@ -222,9 +224,9 @@ export default function EditorHeader({
                             >
                                 <FileCode size={13} />
                                 <div>
-                                    <div>Export as .sql</div>
+                                    <div>{t('header.exportSql')}</div>
                                     <div className="toolbar-more-desc">
-                                        Download the compiled SQL as a file
+                                        {t('header.exportSqlDesc')}
                                     </div>
                                 </div>
                             </button>
@@ -236,9 +238,9 @@ export default function EditorHeader({
                             >
                                 <Download size={13} />
                                 <div>
-                                    <div>Export as .duckle.json</div>
+                                    <div>{t('header.exportJson')}</div>
                                     <div className="toolbar-more-desc">
-                                        Download nodes + edges as portable JSON
+                                        {t('header.exportJsonDesc')}
                                     </div>
                                 </div>
                             </button>
@@ -250,9 +252,9 @@ export default function EditorHeader({
                             >
                                 <Upload size={13} />
                                 <div>
-                                    <div>Import .duckle.json…</div>
+                                    <div>{t('header.importJson')}</div>
                                     <div className="toolbar-more-desc">
-                                        Open a portable JSON as a new pipeline
+                                        {t('header.importJsonDesc')}
                                     </div>
                                 </div>
                             </button>

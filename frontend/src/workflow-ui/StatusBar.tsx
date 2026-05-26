@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { EngineId } from './EngineSelector';
 
 const ENGINE_LABEL: Record<EngineId, string> = {
@@ -27,6 +28,7 @@ export default function StatusBar({
     warningCount,
     pipelineName,
 }: Props) {
+    const { t } = useTranslation();
     const dotClass =
         errorCount > 0
             ? 'statusbar-dot-error'
@@ -36,34 +38,34 @@ export default function StatusBar({
     return (
         <footer className="statusbar" role="status">
             <div className="statusbar-section">
-                <span className="statusbar-label">Pipeline:</span>
-                <span className="statusbar-value">{pipelineName ?? 'untitled-1'}</span>
+                <span className="statusbar-label">{t('status.pipelineLabel')}</span>
+                <span className="statusbar-value">{pipelineName ?? t('status.untitled')}</span>
             </div>
             <div className="statusbar-sep" />
             <div className="statusbar-section">
                 <span className={'statusbar-dot ' + dotClass} aria-hidden="true" />
                 <span>
-                    {errorCount} {errorCount === 1 ? 'error' : 'errors'}
+                    {errorCount} {errorCount === 1 ? t('status.error') : t('status.errors')}
                 </span>
                 <span className="statusbar-comma">·</span>
                 <span>
-                    {warningCount} {warningCount === 1 ? 'warning' : 'warnings'}
+                    {warningCount} {warningCount === 1 ? t('status.warning') : t('status.warnings')}
                 </span>
             </div>
             <div className="statusbar-sep" />
             <div className="statusbar-section">
-                <span>{nodeCount} nodes</span>
+                <span>{nodeCount} {t('status.nodes')}</span>
                 <span className="statusbar-comma">·</span>
-                <span>{edgeCount} edges</span>
+                <span>{edgeCount} {t('status.edges')}</span>
             </div>
             <div className="statusbar-spacer" />
             <div className="statusbar-section">
-                <span className="statusbar-label">Engine:</span>
+                <span className="statusbar-label">{t('status.engineLabel')}</span>
                 <span>{ENGINE_LABEL[engine]}</span>
             </div>
             <div className="statusbar-sep" />
             <div className="statusbar-section">
-                <span className="statusbar-label">Runtime:</span>
+                <span className="statusbar-label">{t('status.runtimeLabel')}</span>
                 <span className={'statusbar-runtime statusbar-runtime-' + runtime}>{runtime}</span>
             </div>
         </footer>

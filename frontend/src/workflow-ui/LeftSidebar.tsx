@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Boxes, FolderTree } from 'lucide-react';
 import Palette from './Palette';
 import ProjectTree from './ProjectTree';
@@ -41,11 +42,12 @@ export default function LeftSidebar({
     onDeleteRepoItem,
     onSchedulePipeline,
 }: Props) {
+    const { t } = useTranslation();
     const [tab, setTab] = useState<SideTab>('palette');
 
     return (
         <aside className="left-sidebar">
-            <div className="left-sidebar-tabs" role="tablist" aria-label="Sidebar">
+            <div className="left-sidebar-tabs" role="tablist" aria-label={t('sidebar.ariaLabel')}>
                 <button
                     type="button"
                     role="tab"
@@ -54,7 +56,7 @@ export default function LeftSidebar({
                     onClick={() => setTab('project')}
                 >
                     <FolderTree className="left-sidebar-tab-icon" size={13} aria-hidden="true" />
-                    Project
+                    {t('sidebar.project')}
                 </button>
                 <button
                     type="button"
@@ -64,7 +66,7 @@ export default function LeftSidebar({
                     onClick={() => setTab('palette')}
                 >
                     <Boxes className="left-sidebar-tab-icon" size={13} aria-hidden="true" />
-                    Components
+                    {t('sidebar.components')}
                 </button>
             </div>
             <div className="left-sidebar-body">

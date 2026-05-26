@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Handle,
     Position,
@@ -19,6 +20,7 @@ import { deriveNodeSubtitle } from '../../node-subtitle';
 export type DuckleFlowNode = Node<DuckleNodeData>;
 
 export default function DuckleNode({ id, data, selected, type }: NodeProps<DuckleFlowNode>) {
+    const { t } = useTranslation();
     const kind = type ?? 'transform';
     const manifest = getManifest(data.componentId);
     const ports = manifest?.ports;
@@ -60,12 +62,12 @@ export default function DuckleNode({ id, data, selected, type }: NodeProps<Duckl
         <div className={classes}>
             <div className="node-header">
                 <div className="node-header-row">
-                    <div className="node-kind">{kind}</div>
+                    <div className="node-kind">{t(`node.${kind}`, { defaultValue: kind })}</div>
                     {runStatus ? <RunStatusBadge status={runStatus.status} /> : null}
                     {needsConfig ? (
                         <span
                             className="node-needs-config"
-                            title="Required fields missing - open the Basic tab to configure"
+                            title={t('node.needsConfig')}
                         >
                             <AlertCircle size={12} />
                         </span>
@@ -86,10 +88,10 @@ export default function DuckleNode({ id, data, selected, type }: NodeProps<Duckl
                 })()}
                 {effectiveSchema.length > 0 ? (
                     <div className="node-schema-badge">
-                        {effectiveSchema.length} col{effectiveSchema.length === 1 ? '' : 's'}
+                        {effectiveSchema.length} {effectiveSchema.length === 1 ? t('node.colsSingular') : t('node.colsPlural')}
                     </div>
                 ) : null}
-                {data.disabled ? <div className="node-disabled-badge">disabled</div> : null}
+                {data.disabled ? <div className="node-disabled-badge">{t('node.disabled')}</div> : null}
             </div>
             {portCount > 0 ? (
                 <div className="node-ports">
@@ -110,22 +112,23 @@ export default function DuckleNode({ id, data, selected, type }: NodeProps<Duckl
 }
 
 function RunStatusBadge({ status }: { status: 'running' | 'ok' | 'error' }) {
+    const { t } = useTranslation();
     if (status === 'running') {
         return (
-            <span className="node-run-badge node-run-badge-running" title="Running">
+            <span className="node-run-badge node-run-badge-running" title={t('node.running')}>
                 <Loader2 size={11} />
             </span>
         );
     }
     if (status === 'error') {
         return (
-            <span className="node-run-badge node-run-badge-error" title="Failed">
+            <span className="node-run-badge node-run-badge-error" title={t('node.failed')}>
                 <XCircle size={11} />
             </span>
         );
     }
     return (
-        <span className="node-run-badge node-run-badge-ok" title="OK">
+        <span className="node-run-badge node-run-badge-ok" title={t('node.ok')}>
             <CheckCircle2 size={11} />
         </span>
     );

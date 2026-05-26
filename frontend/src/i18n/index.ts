@@ -49,7 +49,10 @@ import ro from './locales/ro.json';
 import tl from './locales/tl.json';
 import ms from './locales/ms.json';
 
-const RESOURCES: Record<LangCode, { common: typeof en }> = {
+// Locales may be missing newer keys (filled in by scripts/i18n-translate.py).
+// i18next's fallbackLng resolves missing keys to en, so loose typing is safe.
+type LocaleBundle = { common: Record<string, unknown> };
+const RESOURCES: Record<LangCode, LocaleBundle> = {
     'en':    { common: en },
     'es':    { common: es },
     'zh-CN': { common: zhCN },
