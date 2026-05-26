@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Werkruimte: {{path}}\nKlik om te schakelen",
+    "activeContextHint": "Actieve context - velden kunnen zich binden aan de variabelen",
+    "noContext": "Geen context",
+    "git": "Git (werkruimte)",
+    "gitAriaToggle": "Git-paneel in-/uitschakelen",
+    "duckieAssistant": "Duckie AI-assistent",
+    "duckieAssistantAriaToggle": "Schakel Duckie AI-assistent in of uit",
+    "switchLight": "Overschakelen naar lichtmodus",
+    "switchDark": "Wisselen naar modus:",
+    "themeAriaToggle": "Thema wisselen",
+    "runtime": "looptijd: {{name}}",
+    "languageAriaLabel": "Kies uw taal"
+  },
+  "palette": {
+    "sources": "Vindplaatsen",
+    "transforms": "Transformaties",
+    "sinks": "Gootstenen",
+    "controlFlow": "controlestroom",
+    "dataQuality": "datakwaliteit",
+    "customCode": "Aangepaste code"
+  },
+  "chat": {
+    "title": "Duckie AI-assistent",
+    "localTag": "lokaal",
+    "checking": "AI-engine controleren...",
+    "installTitle": "Installeer de Duckie AI-assistent",
+    "installBody": "Duckle downloadt een klein lokaal model (~ 1,1 GB) zodat de assistent volledig op uw machine draait - geen API-sleutels, geen cloud-oproepen.",
+    "installCta": "Installeren (~ 1,1 GB)",
+    "installFailedTitle": "Installatie mislukt",
+    "retry": "Opnieuw proberen",
+    "emptyTitle": "Beschrijf een pijplijn",
+    "emptyHint": "De assistent voert een Duckle-pijpleiding uit die u kunt aanklikken om in het canvas in te voegen.",
+    "insertIntoCanvas": "Invoegen in canvas",
+    "thinking": "Aan het denken…",
+    "placeholder": "Beschrijf wat je nodig hebt...",
+    "sendAria": "Versturen",
+    "sendTooltip": "Verzenden (Enter)"
+  },
+  "common": {
+    "save": "Opslaan",
+    "cancel": "Annuleren",
+    "close": "Sluiten",
+    "delete": "Verwijderen",
+    "confirm": "Bevestig",
+    "create": "Creëren",
+    "ok": "OK",
+    "loading": "Bezig met laden...",
+    "error": "Fout",
+    "success": "Succes"
+  }
+}

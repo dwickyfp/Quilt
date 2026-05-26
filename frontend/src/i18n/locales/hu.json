@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Munkaterület: {{path}}\nKattints a váltáshoz",
+    "activeContextHint": "Aktív kontextus - a mezők kötődhetnek a változóikhoz",
+    "noContext": "Nincs kontextus",
+    "git": "Git (munkaterület)",
+    "gitAriaToggle": "Git panel ki-/bekapcsolása",
+    "duckieAssistant": "Duckie AI Asszisztens",
+    "duckieAssistantAriaToggle": "Kacsa AI-asszisztens be- és kikapcsolása",
+    "switchLight": "Váltás világítás üzemmódra",
+    "switchDark": "Váltás ebbe a módba:",
+    "themeAriaToggle": "Téma váltása",
+    "runtime": "futásidő: {{name}}",
+    "languageAriaLabel": "Válasszon nyelvet"
+  },
+  "palette": {
+    "sources": "Források",
+    "transforms": "Átalakító fájlok",
+    "sinks": "Mosogatók",
+    "controlFlow": "Áramlás vezérlés",
+    "dataQuality": "Adatminőség",
+    "customCode": "Egyedi kód"
+  },
+  "chat": {
+    "title": "Duckie AI Asszisztens",
+    "localTag": "helyi",
+    "checking": "AI-motor ellenőrzése folyamatban...",
+    "installTitle": "A Duckie AI Assistant telepítése",
+    "installBody": "A Duckle letölt egy kis helyi modellt (~ 1,1 GB), így az asszisztens teljes mértékben az Ön gépén fut - nincs API-kulcs, nincs felhőhívás.",
+    "installCta": "Telepítés (~ 1,1 GB)",
+    "installFailedTitle": "A telepítés nem sikerült",
+    "retry": "Újrapróbálkozás",
+    "emptyTitle": "Ismertess egy csővezetéket",
+    "emptyHint": "Az asszisztens kiadja a Duckle csővezetéket, amelyre kattintva beillesztheti a vászonba.",
+    "insertIntoCanvas": "Beszúrás a vászonba",
+    "thinking": "Gondolkodom...",
+    "placeholder": "Írd le, mire van szükséged...",
+    "sendAria": "Elküldés",
+    "sendTooltip": "Küldés (Enter)"
+  },
+  "common": {
+    "save": "Mentés",
+    "cancel": "Mégse",
+    "close": "Bezárás",
+    "delete": "Törlés",
+    "confirm": "Megerősítés",
+    "create": "Létrehozás",
+    "ok": "OK",
+    "loading": "Betöltés...",
+    "error": "Hiba",
+    "success": "Sikeres"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "พื้นที่ทำงาน: {{path}}\nคลิกเพื่อเปลี่ยน",
+    "activeContextHint": "บริบทที่ใช้งานอยู่ - เขตข้อมูลสามารถผูกกับตัวแปรได้",
+    "noContext": "ไม่มีบริบท",
+    "git": "GIT (พื้นที่ทำงาน)",
+    "gitAriaToggle": "สลับแผง Git",
+    "duckieAssistant": "ผู้ช่วย Duckie AI",
+    "duckieAssistantAriaToggle": "สลับผู้ช่วย Duckie AI",
+    "switchLight": "เปลี่ยนเป็นโหมดสว่าง",
+    "switchDark": "เปลี่ยนเป็นโหมดสีเข้ม",
+    "themeAriaToggle": "สลับธีม",
+    "runtime": "รันไทม์: {{name}}",
+    "languageAriaLabel": "เลือกภาษา"
+  },
+  "palette": {
+    "sources": "Sources",
+    "transforms": "แปลงร่าง",
+    "sinks": "อ่างล้างมือ",
+    "controlFlow": "การควบคุมการไหล",
+    "dataQuality": "คุณภาพของข้อมูล",
+    "customCode": "รหัสที่กำหนดเอง"
+  },
+  "chat": {
+    "title": "ผู้ช่วย Duckie AI",
+    "localTag": "สถานที่",
+    "checking": "กำลังตรวจสอบเครื่องมือ AI...",
+    "installTitle": "ติดตั้ง Duckie AI Assistant",
+    "installBody": "Duckle ดาวน์โหลดโมเดลในเครื่องขนาดเล็ก (~1.1 GB) เพื่อให้ผู้ช่วยทำงานบนเครื่องของคุณทั้งหมด - ไม่มีคีย์ API ไม่มีการโทรผ่านคลาวด์",
+    "installCta": "ติดตั้ง (~1.1 GB)",
+    "installFailedTitle": "ติดตั้ง PSP ล้มเหลว",
+    "retry": "ลองใหม่",
+    "emptyTitle": "อธิบายไปป์ไลน์",
+    "emptyHint": "ผู้ช่วยส่งออกท่อ Duckle ที่คุณสามารถคลิกเพื่อแทรกลงในผืนผ้าใบ",
+    "insertIntoCanvas": "ใส่ลงในผ้าใบ",
+    "thinking": "กำลังคิด...",
+    "placeholder": "อธิบายสิ่งที่คุณต้องการ...",
+    "sendAria": "ส่ง",
+    "sendTooltip": "ส่ง (Enter)"
+  },
+  "common": {
+    "save": "บันทึก",
+    "cancel": "ยกเลิก",
+    "close": "ปิด",
+    "delete": "ลบ",
+    "confirm": "ยืนยัน",
+    "create": "สร้างโดย",
+    "ok": "ตกลง",
+    "loading": "กำลังโหลด...",
+    "error": "ข้อผิดพลาด",
+    "success": "สำเร็จ"
+  }
+}

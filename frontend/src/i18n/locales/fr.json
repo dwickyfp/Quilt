@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Espace de travail : {{path}}\nCliquez pour changer",
+    "activeContextHint": "Contexte actif - les champs peuvent se lier à ses variables",
+    "noContext": "Aucun contexte",
+    "git": "Git (espace de travail)",
+    "gitAriaToggle": "Basculer le panneau Git",
+    "duckieAssistant": "Duckie AI Assistant",
+    "duckieAssistantAriaToggle": "Basculer Duckie AI Assistant",
+    "switchLight": "Activer l’affichage clair",
+    "switchDark": "Activer l’affichage sombre",
+    "themeAriaToggle": "Basculer le thème",
+    "runtime": "durée d'exécution : {{name}}",
+    "languageAriaLabel": "Choisir la langue"
+  },
+  "palette": {
+    "sources": "Sources",
+    "transforms": "Transformations",
+    "sinks": "Éviers",
+    "controlFlow": "Structure de contrôle",
+    "dataQuality": "Qualité des données",
+    "customCode": "Code Douanier"
+  },
+  "chat": {
+    "title": "Duckie AI Assistant",
+    "localTag": "local",
+    "checking": "Vérification du moteur d'IA...",
+    "installTitle": "Installez l'assistant IA Duckie",
+    "installBody": "Duckle télécharge un petit modèle local (~ 1,1 Go) afin que l'assistant s'exécute entièrement sur votre machine - pas de clés API, pas d'appels cloud.",
+    "installCta": "Installation (~ 1,1 Go)",
+    "installFailedTitle": "Échec de l’installation",
+    "retry": "Réessayer",
+    "emptyTitle": "Décrire un pipeline",
+    "emptyHint": "L'assistant sort un pipeline Duckle que vous pouvez cliquer pour insérer dans le canevas.",
+    "insertIntoCanvas": "Insérer dans la toile",
+    "thinking": "Réflexion ",
+    "placeholder": "Décrivez le contexte de la mission et les tâches à réaliser",
+    "sendAria": "Envoyer",
+    "sendTooltip": "Envoyer (Entrée)"
+  },
+  "common": {
+    "save": "Sauvegarder",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "delete": "Effacer",
+    "confirm": "Confirmer",
+    "create": "Créer",
+    "ok": "OK",
+    "loading": "Chargement en cours...",
+    "error": "Erreur",
+    "success": "Réussis"
+  }
+}

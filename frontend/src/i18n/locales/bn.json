@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "কর্মক্ষেত্র: {{path}}\nস্যুইচ করতে ক্লিক করুন",
+    "activeContextHint": "সক্রিয় প্রসঙ্গ - ক্ষেত্রগুলি তার ভেরিয়েবলের সাথে আবদ্ধ হতে পারে",
+    "noContext": "কোন প্রসঙ্গ নেই",
+    "git": "গিট (কর্মক্ষেত্র)",
+    "gitAriaToggle": "গিট প্যানেল টগল করুন",
+    "duckieAssistant": "Duckie AI অ্যাসিস্ট্যান্ট",
+    "duckieAssistantAriaToggle": "Duckie AI অ্যাসিস্ট্যান্ট টগল করুন",
+    "switchLight": "লাইট মোডে স্যুইচ করুন",
+    "switchDark": "ডার্ক মোডে স্যুইচ করুন",
+    "themeAriaToggle": "থিম টগল করুন",
+    "runtime": "রানটাইম: {{name}}",
+    "languageAriaLabel": "ভাষা বাছাই করুন"
+  },
+  "palette": {
+    "sources": "উৎস",
+    "transforms": "রূপান্তর",
+    "sinks": "ডুবা",
+    "controlFlow": "কন্ট্রোল ফ্লো",
+    "dataQuality": "ডেটার গুণমান",
+    "customCode": "কাস্টম কোড"
+  },
+  "chat": {
+    "title": "Duckie AI অ্যাসিস্ট্যান্ট",
+    "localTag": "স্থানীয়",
+    "checking": "AI ইঞ্জিন পরীক্ষা করা হচ্ছে...",
+    "installTitle": "Duckie AI অ্যাসিস্ট্যান্ট ইনস্টল করুন",
+    "installBody": "Duckle একটি ছোট স্থানীয় মডেল (~ ১. ১ গিগাবাইট) ডাউনলোড করে যাতে সহকারী আপনার মেশিনে সম্পূর্ণরূপে চলতে পারে - কোনও API কী নেই, কোনও ক্লাউড কল নেই ।",
+    "installCta": "ইনস্টল করুন (~ ১. ১ গিগাবাইট)",
+    "installFailedTitle": "ইনস্টল ব্যর্থ হয়েছে",
+    "retry": "পুনরায় চেষ্টা করুন",
+    "emptyTitle": "একটি পাইপলাইন বর্ণনা করুন",
+    "emptyHint": "সহকারী একটি ডকল পাইপলাইন আউটপুট করে যা আপনি ক্যানভাসে সন্নিবেশ করতে ক্লিক করতে পারেন ।",
+    "insertIntoCanvas": "ক্যানভাসে ঢোকান",
+    "thinking": "ভাবছি...",
+    "placeholder": "আপনার যা প্রয়োজন তা বর্ণনা করুন...",
+    "sendAria": "পাঠান",
+    "sendTooltip": "পাঠান (লিখুন)"
+  },
+  "common": {
+    "save": "সংরক্ষণ করুন",
+    "cancel": "বাতিল করুন",
+    "close": "বন্ধ",
+    "delete": "মুছুন",
+    "confirm": "নিশ্চিত করুন",
+    "create": "তৈরি করুন",
+    "ok": "ঠিক আছে",
+    "loading": "বোঝাই...",
+    "error": "ত্রুটি",
+    "success": "সফল"
+  }
+}

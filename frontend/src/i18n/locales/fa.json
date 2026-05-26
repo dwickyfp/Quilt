@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "فضای کاری: {{path}}&#10; برای تعویض کلیک کنید",
+    "activeContextHint": "زمینه فعال - فیلدها می‌توانند به متغیرهای آن متصل شوند",
+    "noContext": "بدون زمینه",
+    "git": "گیت (فضای کاری)",
+    "gitAriaToggle": "پنل گیت را تغییر دهید",
+    "duckieAssistant": "دستیار هوش مصنوعی داکی",
+    "duckieAssistantAriaToggle": "دستیار هوش مصنوعی Duckie را فعال یا غیرفعال کنید",
+    "switchLight": "به حالت روشن تغییر دهید",
+    "switchDark": "تغییر به حالت تاریک",
+    "themeAriaToggle": "تغییر تم",
+    "runtime": "زمان اجرا: {{name}}",
+    "languageAriaLabel": "انتخاب زبان"
+  },
+  "palette": {
+    "sources": "منابع",
+    "transforms": "جابه جایی ها",
+    "sinks": ". ",
+    "controlFlow": "روند کنترل.",
+    "dataQuality": "کیفیت داده",
+    "customCode": "کد سفارشی"
+  },
+  "chat": {
+    "title": "دستیار هوش مصنوعی داکی",
+    "localTag": "local",
+    "checking": "بررسی موتور هوش مصنوعی...",
+    "installTitle": "دستیار هوش مصنوعی Duckie را نصب کنید",
+    "installBody": "Duckle یک مدل محلی کوچک (حدود ۱.۱ گیگابایت) دانلود می‌کند، بنابراین دستیار کاملاً روی دستگاه شما اجرا می‌شود - بدون کلید API، بدون تماس‌های ابری.",
+    "installCta": "نصب (حدود ۱.۱ گیگابایت)",
+    "installFailedTitle": "نصب با مشکل روبرو شد",
+    "retry": "تلاش مجدد",
+    "emptyTitle": "توصیف یک خط لوله",
+    "emptyHint": "دستیار یک خط لوله Duckle را نمایش می‌دهد که می‌توانید روی آن کلیک کنید تا در بوم وارد شود.",
+    "insertIntoCanvas": "داخل بوم نقاشی قرار دهید",
+    "thinking": "فکر کردن",
+    "placeholder": "توضیح بدید دقیقا چه کاری باید برای شما انجام بشه",
+    "sendAria": "ارسال",
+    "sendTooltip": "ارسال (وارد کردن)"
+  },
+  "common": {
+    "save": "ذخیره",
+    "cancel": "لغو کنید",
+    "close": "بستن",
+    "delete": "حذف",
+    "confirm": "تایید",
+    "create": "ایجاد",
+    "ok": "تایید",
+    "loading": "در حال بارگذاری...",
+    "error": "خطا",
+    "success": "موفقیت"
+  }
+}

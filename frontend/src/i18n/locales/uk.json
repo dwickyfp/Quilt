@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Робочий простір: {{path}}\nНатисніть, щоб перемкнутися",
+    "activeContextHint": "Активний контекст - поля можуть прив 'язуватися до змінних",
+    "noContext": "Без контексту",
+    "git": "Git (робочий простір)",
+    "gitAriaToggle": "Перемкнути панель Git",
+    "duckieAssistant": "Duckie AI Assistant",
+    "duckieAssistantAriaToggle": "Увімкнути або вимкнути Duckie AI Assistant",
+    "switchLight": "Перемкнутися в світлий режим",
+    "switchDark": "Перейти в темний режим",
+    "themeAriaToggle": "Перемкнути тему",
+    "runtime": "час виконання: {{name}}",
+    "languageAriaLabel": "Оберіть мову"
+  },
+  "palette": {
+    "sources": "Sources",
+    "transforms": "Трансформує",
+    "sinks": "Мийки",
+    "controlFlow": "Режим потокового керування",
+    "dataQuality": "Якість даних",
+    "customCode": "Custom Code"
+  },
+  "chat": {
+    "title": "Duckie AI Assistant",
+    "localTag": "місцева",
+    "checking": "Перевірка рушія штучного інтелекту...",
+    "installTitle": "Встановіть Duckie AI Assistant",
+    "installBody": "Duckle завантажує невелику локальну модель (~ 1,1 ГБ), тому асистент повністю працює на вашому комп 'ютері - без ключів API, без хмарних викликів.",
+    "installCta": "Встановити (~ 1,1 ГБ)",
+    "installFailedTitle": "Не вдалося встановити",
+    "retry": "Повторити спробу",
+    "emptyTitle": "Опис конвеєра",
+    "emptyHint": "Помічник виводить конвеєр качки, який можна натиснути, щоб вставити в полотно.",
+    "insertIntoCanvas": "Вставити в полотно",
+    "thinking": "Мислення...",
+    "placeholder": "Опишіть, що вам потрібно...",
+    "sendAria": "Надіслати",
+    "sendTooltip": "Надіслати (Enter)"
+  },
+  "common": {
+    "save": "Зберегти",
+    "cancel": "Скасувати",
+    "close": "Закрити",
+    "delete": "Видалити",
+    "confirm": "Підтвердити",
+    "create": "Створити",
+    "ok": "Гаразд",
+    "loading": "Завантаження...",
+    "error": "Помилка",
+    "success": "Успіх"
+  }
+}

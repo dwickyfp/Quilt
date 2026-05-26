@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/inter';
+import './i18n';            // bootstraps i18next; sets document.dir for RTL
 import App from './App';
 import { ThemeProvider } from './theme';
 import { isTauri } from './tauri-dialog';

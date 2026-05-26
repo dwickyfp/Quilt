@@ -13,6 +13,8 @@ import {
 } from '@xyflow/react';
 import type { ConnectionType } from './canvas/connection-types';
 import { Braces, FolderOpen, GitBranch, Moon, Sparkles, Sun } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import LanguageSelector from './i18n/LanguageSelector';
 import EditorTabs from './workflow-ui/EditorTabs';
 import EditorHeader, { type Job } from './workflow-ui/EditorHeader';
 import EngineSelector, { type EngineId } from './workflow-ui/EngineSelector';
@@ -186,6 +188,7 @@ function seedTemplate(template: PipelineTemplate): PipelineState {
 const EMPTY_PIPELINE: PipelineState = { nodes: [], edges: [] };
 
 export default function App() {
+    const { t } = useTranslation();
     const { theme, toggle: toggleTheme } = useTheme();
     const [runtime, setRuntime] = useState<RuntimeState>('connecting');
     const [engine, setEngine] = useState<EngineId>(() =>
@@ -1439,7 +1442,7 @@ export default function App() {
                         type="button"
                         className="topbar-workspace"
                         onClick={handleSwitchWorkspace}
-                        title={`Workspace: ${workspacePathState}\nClick to switch`}
+                        title={t('topbar.workspaceTooltip', { path: workspacePathState })}
                     >
                         <FolderOpen size={12} />
                         <span className="topbar-workspace-name">{workspaceFolderName}</span>
@@ -1448,16 +1451,16 @@ export default function App() {
                 {contexts.length > 0 ? (
                     <div
                         className="topbar-context"
-                        title="Active context - fields can bind to its variables"
+                        title={t('topbar.activeContextHint')}
                     >
                         <Braces size={12} aria-hidden="true" />
                         <select
                             className="topbar-context-select"
                             value={activeContextId ?? ''}
                             onChange={e => setActiveContextId(e.target.value || null)}
-                            aria-label="Active context"
+                            aria-label={t('topbar.activeContextHint')}
                         >
-                            <option value="">No context</option>
+                            <option value="">{t('topbar.noContext')}</option>
                             {contexts.map(c => (
                                 <option key={c.id} value={c.id}>
                                     {c.name}
@@ -1471,8 +1474,8 @@ export default function App() {
                     type="button"
                     className="topbar-theme-toggle"
                     onClick={() => setShowGitPanel(s => !s)}
-                    title="Git (workspace)"
-                    aria-label="Toggle Git panel"
+                    title={t('topbar.git')}
+                    aria-label={t('topbar.gitAriaToggle')}
                     aria-pressed={showGitPanel}
                     disabled={!workspacePathState}
                 >
@@ -1482,23 +1485,24 @@ export default function App() {
                     type="button"
                     className="topbar-theme-toggle"
                     onClick={() => setShowChatPanel(s => !s)}
-                    title="Duckie AI Assistant"
-                    aria-label="Toggle Duckie AI Assistant"
+                    title={t('topbar.duckieAssistant')}
+                    aria-label={t('topbar.duckieAssistantAriaToggle')}
                     aria-pressed={showChatPanel}
                 >
                     <Sparkles size={14} />
                 </button>
+                <LanguageSelector />
                 <button
                     type="button"
                     className="topbar-theme-toggle"
                     onClick={toggleTheme}
-                    title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-                    aria-label="Toggle theme"
+                    title={theme === 'dark' ? t('topbar.switchLight') : t('topbar.switchDark')}
+                    aria-label={t('topbar.themeAriaToggle')}
                 >
                     {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
                 </button>
                 <div className="status" data-state={runtime}>
-                    <span className="status-dot" /> runtime: {runtime}
+                    <span className="status-dot" /> {t('topbar.runtime', { name: runtime })}
                 </div>
                 <WindowControls />
             </header>

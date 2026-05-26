@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Ruang kerja: {{path}}\nKlik untuk beralih",
+    "activeContextHint": "Konteks aktif - bidang dapat mengikat variabelnya",
+    "noContext": "Tidak ada konteks",
+    "git": "Git (ruang kerja)",
+    "gitAriaToggle": "Alihkan panel Git",
+    "duckieAssistant": "Asisten AI Duckie",
+    "duckieAssistantAriaToggle": "Alihkan Asisten AI Duckie",
+    "switchLight": "Beralih ke Mode Terang",
+    "switchDark": "Beralih ke mode gelap",
+    "themeAriaToggle": "Alihkan tema",
+    "runtime": "waktu proses: {{name}}",
+    "languageAriaLabel": "Pilih bahasa"
+  },
+  "palette": {
+    "sources": "Sumber",
+    "transforms": "Penggeseran",
+    "sinks": "Wastafel",
+    "controlFlow": "Alur Kontrol",
+    "dataQuality": "Kualitas data",
+    "customCode": "Kode Kustom"
+  },
+  "chat": {
+    "title": "Asisten AI Duckie",
+    "localTag": "local",
+    "checking": "Memeriksa mesin AI...",
+    "installTitle": "Pasang Asisten AI Duckie",
+    "installBody": "Duckle mengunduh model lokal kecil (~ 1,1 GB) sehingga asisten berjalan sepenuhnya di komputer Anda - tidak ada kunci api, tidak ada panggilan cloud.",
+    "installCta": "Instal (~ 1,1 GB)",
+    "installFailedTitle": "Instalasi gagal",
+    "retry": "Coba lagi",
+    "emptyTitle": "Jelaskan pipa",
+    "emptyHint": "Asisten mengeluarkan pipa Duckle yang dapat Anda klik untuk dimasukkan ke dalam kanvas.",
+    "insertIntoCanvas": "Masukkan ke dalam kanvas",
+    "thinking": "Berpikir...",
+    "placeholder": "Jelaskan apa yang perlu Anda lakukan",
+    "sendAria": "Kirim",
+    "sendTooltip": "Kirim (Enter)"
+  },
+  "common": {
+    "save": "Simpan",
+    "cancel": "Batal",
+    "close": "Tutup",
+    "delete": "Hapus",
+    "confirm": "Konfirmasi",
+    "create": "Buat",
+    "ok": "OK",
+    "loading": "Memuat...",
+    "error": "Kesalahan",
+    "success": "Berhasil"
+  }
+}

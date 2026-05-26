@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "कार्यक्षेत्र: {{path}}\nस्विच करण्यासाठी क्लिक करा",
+    "activeContextHint": "सक्रिय संदर्भ - फील्ड त्याच्या व्हेरिएबल्सशी बांधू शकतात",
+    "noContext": "संदर्भ नाही",
+    "git": "Git (वर्कस्पेस)",
+    "gitAriaToggle": "Git पटल टॉगल करा",
+    "duckieAssistant": "Duckie AI असिस्टंट",
+    "duckieAssistantAriaToggle": "टॉगल डकी एआय असिस्टंट",
+    "switchLight": "लाइट मोडवर स्विच करा",
+    "switchDark": "डार्क मोडवर स्विच करा",
+    "themeAriaToggle": "सुत्रयोजना टॉगल करा",
+    "runtime": "रनटाइम: {{name}}",
+    "languageAriaLabel": "भाषा निवडा"
+  },
+  "palette": {
+    "sources": "स्त्रोत",
+    "transforms": "ट्रान्सफॉर्म्स",
+    "sinks": "सिंक्स",
+    "controlFlow": "नियंत्रण प्रवाह",
+    "dataQuality": "डेटा गुणवत्ता",
+    "customCode": "सानुकूल कोड"
+  },
+  "chat": {
+    "title": "Duckie AI असिस्टंट",
+    "localTag": "स्थानिक",
+    "checking": "एआय इंजिन तपासत आहे...",
+    "installTitle": "डकी एआय सहाय्यक स्थापित करा",
+    "installBody": "Duckle एक लहान स्थानिक मॉडेल डाउनलोड (~ 1.1 GB) त्यामुळे सहाय्यक आपल्या मशीनवर पूर्णपणे चालते - नाही API की, नाही मेघ कॉल.",
+    "installCta": "प्रतिष्ठापीत करा (~ 1. 1 GB)",
+    "installFailedTitle": "प्रतिष्ठापन अपयशी",
+    "retry": "पुन्हप्रयत्न",
+    "emptyTitle": "पाइपलाइनचे वर्णन करा",
+    "emptyHint": "सहाय्यक एक डक पाइपलाइन आउटपुट करतो आपण कॅनव्हासमध्ये घालण्यासाठी क्लिक करू शकता.",
+    "insertIntoCanvas": "कॅनव्हासमध्ये घाला",
+    "thinking": "विचार करत आहे.",
+    "placeholder": "आपल्याला काय आवश्यक आहे ते वर्णन करा...",
+    "sendAria": "पाठवा",
+    "sendTooltip": "पाठवा (प्रविष्ट करा)"
+  },
+  "common": {
+    "save": "सुरक्षीत करा",
+    "cancel": "रद्द करा",
+    "close": "बंद",
+    "delete": "काढून टाका",
+    "confirm": "पुष्टी करा",
+    "create": "बनवा",
+    "ok": "ठीक",
+    "loading": "भारण… कृपया थांबा…",
+    "error": "त्रुटी",
+    "success": "यश"
+  }
+}

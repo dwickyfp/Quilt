@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download, Loader2, Send, Sparkles, X, Workflow } from 'lucide-react';
 import {
     chatExtractPipeline,
@@ -36,6 +37,7 @@ const EXAMPLE_PROMPTS = [
 ];
 
 export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
+    const { t } = useTranslation();
     const [setup, setSetup] = useState<SetupState>({ phase: 'checking' });
     const [messages, setMessages] = useState<Bubble[]>([]);
     const [draft, setDraft] = useState('');
@@ -154,21 +156,21 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
     }, [messages]);
 
     return (
-        <aside className="chat-panel" role="complementary" aria-label="AI assistant">
+        <aside className="chat-panel" role="complementary" aria-label={t('chat.title')}>
             <header className="chat-panel-head">
                 <div className="chat-panel-title">
                     <Sparkles size={14} aria-hidden="true" />
-                    <span>Duckie AI Assistant</span>
+                    <span>{t('chat.title')}</span>
                     {setup.phase === 'ready' ? (
-                        <span className="chat-panel-tag">local</span>
+                        <span className="chat-panel-tag">{t('chat.localTag')}</span>
                     ) : null}
                 </div>
                 <button
                     type="button"
                     className="chat-panel-close"
                     onClick={onClose}
-                    title="Close (Esc)"
-                    aria-label="Close chat"
+                    title={t('common.close')}
+                    aria-label={t('common.close')}
                 >
                     <X size={14} />
                 </button>
@@ -177,20 +179,20 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
             {setup.phase === 'checking' ? (
                 <div className="chat-panel-state">
                     <Loader2 size={18} className="spin" />
-                    <span>Checking AI engine...</span>
+                    <span>{t('chat.checking')}</span>
                 </div>
             ) : setup.phase === 'not-installed' ? (
                 <SetupCard
-                    title="Install the Duckie AI Assistant"
-                    body="Duckle downloads a small local model (~1.1 GB) so the assistant runs entirely on your machine - no API keys, no cloud calls."
-                    cta="Install (~1.1 GB)"
+                    title={t('chat.installTitle')}
+                    body={t('chat.installBody')}
+                    cta={t('chat.installCta')}
                     onCta={installEngine}
                 />
             ) : setup.phase === 'install-failed' ? (
                 <SetupCard
-                    title="Install failed"
+                    title={t('chat.installFailedTitle')}
                     body={setup.error}
-                    cta="Retry"
+                    cta={t('chat.retry')}
                     onCta={installEngine}
                 />
             ) : setup.phase === 'installing' ? (
@@ -205,11 +207,10 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
                             <div className="chat-panel-empty">
                                 <Workflow size={26} className="chat-panel-empty-icon" />
                                 <div className="chat-panel-empty-title">
-                                    Describe a pipeline
+                                    {t('chat.emptyTitle')}
                                 </div>
                                 <div className="chat-panel-empty-hint">
-                                    The assistant outputs a Duckle pipeline you can click to insert
-                                    into the canvas.
+                                    {t('chat.emptyHint')}
                                 </div>
                                 <div className="chat-panel-prompts">
                                     {EXAMPLE_PROMPTS.map(p => (
@@ -237,7 +238,7 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
                                             className="chat-bubble-insert"
                                             onClick={() => onInsertPipeline(m.pipeline)}
                                         >
-                                            <Workflow size={12} /> Insert into canvas
+                                            <Workflow size={12} /> {t('chat.insertIntoCanvas')}
                                         </button>
                                     ) : null}
                                 </div>
@@ -256,7 +257,7 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
                             className="chat-panel-input"
                             value={draft}
                             onChange={e => setDraft(e.target.value)}
-                            placeholder={busy ? 'Thinking...' : 'Describe what you need...'}
+                            placeholder={busy ? t('chat.thinking') : t('chat.placeholder')}
                             rows={2}
                             disabled={busy}
                             onKeyDown={e => {
@@ -270,8 +271,8 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
                             type="submit"
                             className="chat-panel-send"
                             disabled={busy || !draft.trim()}
-                            aria-label="Send"
-                            title="Send (Enter)"
+                            aria-label={t('chat.sendAria')}
+                            title={t('chat.sendTooltip')}
                         >
                             {busy ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
                         </button>

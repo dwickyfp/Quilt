@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Pracovní prostor: {{path}}\nKliknutím přepnete",
+    "activeContextHint": "Aktivní kontext - pole se mohou vázat na své proměnné",
+    "noContext": "Bez kontextu",
+    "git": "Git (pracovní plocha)",
+    "gitAriaToggle": "Přepnout panel Git",
+    "duckieAssistant": "Asistent umělé inteligence Duckie",
+    "duckieAssistantAriaToggle": "Přepnout asistenta umělé inteligence Duckie",
+    "switchLight": "Přepnout do světelného režimu",
+    "switchDark": "Přepnout do tmavého režimu",
+    "themeAriaToggle": "Přepnout motiv",
+    "runtime": "runtime: {{name}}",
+    "languageAriaLabel": "Vyberte jazyk"
+  },
+  "palette": {
+    "sources": "Zdroje",
+    "transforms": "Transformace",
+    "sinks": "Dřezy a umyvadla",
+    "controlFlow": "Řídicí struktura",
+    "dataQuality": "Kvalita dat",
+    "customCode": "Vlastní kód"
+  },
+  "chat": {
+    "title": "Asistent umělé inteligence Duckie",
+    "localTag": "místní",
+    "checking": "Kontrola motoru AI...",
+    "installTitle": "Nainstalujte asistenta umělé inteligence Duckie",
+    "installBody": "Duckle stáhne malý místní model (~ 1,1 GB), takže asistent běží výhradně na vašem počítači - žádné klíče API, žádná cloudová volání.",
+    "installCta": "Instalovat (~ 1,1 GB)",
+    "installFailedTitle": "Instalace se nezdařila",
+    "retry": "Zkusit znovu",
+    "emptyTitle": "Popsat pipeline",
+    "emptyHint": "Asistent vypisuje Duckle pipeline, kterou můžete kliknutím vložit do plátna.",
+    "insertIntoCanvas": "Vložit do plátna",
+    "thinking": "myšlení",
+    "placeholder": "Popiš, co potřebuješ...",
+    "sendAria": "Odeslat",
+    "sendTooltip": "Odeslat (Enter)"
+  },
+  "common": {
+    "save": "Uložit",
+    "cancel": "Zrušit",
+    "close": "Zavřít",
+    "delete": "Odstranit",
+    "confirm": "Potvrdit",
+    "create": "Vytvořit",
+    "ok": "OK",
+    "loading": "Načítání…",
+    "error": "Chyba",
+    "success": "Úspěšně provedeno"
+  }
+}

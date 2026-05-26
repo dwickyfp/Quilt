@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "작업 공간: {{path}}\n전환하려면 클릭하세요.",
+    "activeContextHint": "활성 컨텍스트 - 필드는 해당 변수에 바인딩할 수 있습니다",
+    "noContext": "맥락 없음",
+    "git": "Git (작업 공간)",
+    "gitAriaToggle": "Git 패널 토글",
+    "duckieAssistant": "Duckie AI Assistant",
+    "duckieAssistantAriaToggle": "Duckie AI Assistant 토글",
+    "switchLight": "라이트 모드로 전환",
+    "switchDark": "다크 모드로 전환",
+    "themeAriaToggle": "테마 토글",
+    "runtime": "런타임: {{name}}",
+    "languageAriaLabel": "언어 선택"
+  },
+  "palette": {
+    "sources": "출처",
+    "transforms": "변형",
+    "sinks": "싱크대",
+    "controlFlow": "제어 흐름",
+    "dataQuality": "데이터 품질",
+    "customCode": "사용자 코드"
+  },
+  "chat": {
+    "title": "Duckie AI Assistant",
+    "localTag": "지역",
+    "checking": "AI 엔진 확인 중...",
+    "installTitle": "Duckie AI Assistant 설치",
+    "installBody": "Duckle은 작은 로컬 모델 (~1.1 GB) 을 다운로드하여 어시스턴트가 컴퓨터에서 완전히 실행되도록 합니다. API 키도 없고 클라우드 호출도 없습니다.",
+    "installCta": "설치 (~1.1 GB)",
+    "installFailedTitle": "설치 실패",
+    "retry": "다시 시도",
+    "emptyTitle": "파이프라인 설명",
+    "emptyHint": "어시스턴트는 클릭하면 캔버스에 삽입할 수 있는 Duckle 파이프라인을 출력합니다.",
+    "insertIntoCanvas": "캔버스에 삽입",
+    "thinking": "생각 중...",
+    "placeholder": "필요한 사항을 설명해 주세요.",
+    "sendAria": "보내기",
+    "sendTooltip": "보내기 (입력)"
+  },
+  "common": {
+    "save": "저장",
+    "cancel": "취소",
+    "close": "닫기",
+    "delete": "삭제",
+    "confirm": "확인",
+    "create": "생성",
+    "ok": "확인",
+    "loading": "로드 중...",
+    "error": "오류",
+    "success": "성공"
+  }
+}

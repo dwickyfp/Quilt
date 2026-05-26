@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "סביבת עבודה: {{path}}\nלחץ כדי להחליף",
+    "activeContextHint": "הקשר פעיל - שדות יכולים להיקשר למשתנים שלו",
+    "noContext": "ללא הקשר",
+    "git": "GIT (פינת עבודה)",
+    "gitAriaToggle": "החלף פאנל Git",
+    "duckieAssistant": "עוזרת בינה מלאכותית של Duckie",
+    "duckieAssistantAriaToggle": "החלף מצב Duckie AI עוזר",
+    "switchLight": "עבור למצב בהיר",
+    "switchDark": "עבור למצב כהה",
+    "themeAriaToggle": "שנה נושא",
+    "runtime": "זמן ריצה: {{name}}",
+    "languageAriaLabel": "בחר שפה"
+  },
+  "palette": {
+    "sources": "מקורות",
+    "transforms": "המרות",
+    "sinks": "כיורים",
+    "controlFlow": "בקרת זרימה",
+    "dataQuality": "איכות נתונים",
+    "customCode": "קוד מותאם אישית"
+  },
+  "chat": {
+    "title": "עוזרת בינה מלאכותית של Duckie",
+    "localTag": "מקומי",
+    "checking": "בודק את מנוע הבינה המלאכותית...",
+    "installTitle": "התקן את עוזר ה - Duckie AI",
+    "installBody": "Duckle מוריד דגם מקומי קטן (~1.1 GB) כך שהעוזר פועל כולו במחשב שלך - אין מפתחות API, אין שיחות ענן.",
+    "installCta": "התקן (~1.1 GB)",
+    "installFailedTitle": "ההתקנה נכשלה",
+    "retry": "נסה שוב",
+    "emptyTitle": "תארו צנרת",
+    "emptyHint": "העוזר פולט צינור של דאקל שאפשר ללחוץ עליו כדי להכניס אותו לתוך הבד.",
+    "insertIntoCanvas": "הוסף לקנבס",
+    "thinking": "חושב",
+    "placeholder": "תארו מה אתם צריכים...",
+    "sendAria": "שליחה",
+    "sendTooltip": "שליחה (Enter)"
+  },
+  "common": {
+    "save": "שמירה",
+    "cancel": "בטל",
+    "close": "סגירה",
+    "delete": "מחיקה",
+    "confirm": "אישור",
+    "create": "ליצור",
+    "ok": "בסדר",
+    "loading": "טוען…",
+    "error": "שגיאה",
+    "success": "הצלחה"
+  }
+}

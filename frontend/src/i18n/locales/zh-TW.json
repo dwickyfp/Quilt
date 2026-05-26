@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "工作空間： {{path}}\n按一下以切換",
+    "activeContextHint": "活動上下文-字段可以綁定到其變量",
+    "noContext": "無上下文",
+    "git": "Git （工作區）",
+    "gitAriaToggle": "切換Git面板",
+    "duckieAssistant": "Duckie AI助手",
+    "duckieAssistantAriaToggle": "切換Duckie AI助手",
+    "switchLight": "切換至淺色模式",
+    "switchDark": "切換到黑暗模式",
+    "themeAriaToggle": "切換主題",
+    "runtime": "執行階段： {{name}}",
+    "languageAriaLabel": "選擇語言"
+  },
+  "palette": {
+    "sources": "來源",
+    "transforms": "轉換",
+    "sinks": "水槽",
+    "controlFlow": "控制流程",
+    "dataQuality": "良好的數據品質",
+    "customCode": "自定義代碼"
+  },
+  "chat": {
+    "title": "Duckie AI助手",
+    "localTag": "本地",
+    "checking": "正在檢查AI引擎...",
+    "installTitle": "安裝Duckie AI Assistant",
+    "installBody": "Duckle下載一個小型本地模型（約1.1 GB ） ，因此助手完全在您的機器上運行-沒有API密鑰，沒有雲端調用。",
+    "installCta": "安裝(~1.1 GB)",
+    "installFailedTitle": "安裝失敗",
+    "retry": "重試(&R)",
+    "emptyTitle": "描述管道",
+    "emptyHint": "助手輸出Duckle管線，您可以點擊以插入到畫布中。",
+    "insertIntoCanvas": "插入畫布",
+    "thinking": "思考中......",
+    "placeholder": "描述您的需求……",
+    "sendAria": "發送 ",
+    "sendTooltip": "發送（輸入）"
+  },
+  "common": {
+    "save": "Submit",
+    "cancel": "取消",
+    "close": "關閉",
+    "delete": "刪除",
+    "confirm": "確認",
+    "create": "建立",
+    "ok": "OK",
+    "loading": "Loading…",
+    "error": "錯誤",
+    "success": "成功"
+  }
+}

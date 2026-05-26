@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Lugar ng trabaho: {{path}}\nI - click upang lumipat",
+    "activeContextHint": "Aktibong konteksto - maaaring magbigkis ang mga patlang sa mga variable nito",
+    "noContext": "Walang konteksto",
+    "git": "Git",
+    "gitAriaToggle": "I - toggle ang Git panel",
+    "duckieAssistant": "Duckie AI Assistant",
+    "duckieAssistantAriaToggle": "I - toggle ang Duckie AI Assistant",
+    "switchLight": "Lumipat sa light mode",
+    "switchDark": "Lumipat sa dark mode",
+    "themeAriaToggle": "I - toggle ang tema",
+    "runtime": "username: {{username}}",
+    "languageAriaLabel": "Pumili ng wika"
+  },
+  "palette": {
+    "sources": "Sources",
+    "transforms": "Mga Pagbabago",
+    "sinks": "Mga lababo",
+    "controlFlow": "Kontrolin ang Daloy",
+    "dataQuality": "Kalidad ng Data",
+    "customCode": "Iniangkop na Code"
+  },
+  "chat": {
+    "title": "Duckie AI Assistant",
+    "localTag": "Lokal",
+    "checking": "Sinusuri ang AI engine...",
+    "installTitle": "I - install ang Duckie AI Assistant",
+    "installBody": "Ang pato ay nagda - download ng isang maliit na lokal na modelo (~ 1.1 GB) kaya ang katulong ay ganap na tumatakbo sa iyong makina - walang mga key ng API, walang mga tawag sa ulap.",
+    "installCta": "I - install (~ 1.1 GB)",
+    "installFailedTitle": "Nabigo ang pag - install",
+    "retry": "Subukang muli",
+    "emptyTitle": "Ilarawan ang pipeline",
+    "emptyHint": "Ang assistant outputs isang Duckle pipeline maaari mong i - click upang ipasok sa canvas.",
+    "insertIntoCanvas": "Ipasok sa canvas",
+    "thinking": "Pag-iisip",
+    "placeholder": "Ilarawan kung ano ang kailangan mo...",
+    "sendAria": "Ipadala",
+    "sendTooltip": "Ipadala (Ipasok)"
+  },
+  "common": {
+    "save": "I-save",
+    "cancel": "Kanselahin",
+    "close": "Isara",
+    "delete": "Tanggalin",
+    "confirm": "Kumpirmahin",
+    "create": "Gumawa",
+    "ok": "OK",
+    "loading": "Naglo-load...",
+    "error": "Error",
+    "success": "Tagumpay"
+  }
+}

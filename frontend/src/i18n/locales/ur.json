@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "کام کی جگہ: {{path}}\nسوئچ کرنے کے لیے کلک کریں",
+    "activeContextHint": "فعال سیاق و سباق - فیلڈز اس کے متغیرات سے منسلک ہو سکتے ہیں",
+    "noContext": "کوئی سیاق و سباق نہیں",
+    "git": "Git (کام کرنے کی جگہ)",
+    "gitAriaToggle": "Git پینل ٹوگل کریں",
+    "duckieAssistant": "Duckie AI اسسٹنٹ",
+    "duckieAssistantAriaToggle": "Duckie AI اسسٹنٹ کو ٹوگل کریں",
+    "switchLight": "لائٹ موڈ پر سوئچ کریں",
+    "switchDark": "ڈارک موڈ پر سوئچ کریں",
+    "themeAriaToggle": "تھیم ٹوگل کریں",
+    "runtime": "رن ٹائم: {{name}}",
+    "languageAriaLabel": "زبان منتخب کریں"
+  },
+  "palette": {
+    "sources": "ماخذ: ",
+    "transforms": "تبدیل ہوجاتا ہے",
+    "sinks": "ڈوبنا",
+    "controlFlow": "کنٹرول فلو",
+    "dataQuality": "ڈیٹا کا معیار",
+    "customCode": "حسب ضرورت کوڈ"
+  },
+  "chat": {
+    "title": "Duckie AI اسسٹنٹ",
+    "localTag": "مقامی ",
+    "checking": "AI انجن چیک کیا جا رہا ہے...",
+    "installTitle": "Duckie AI اسسٹنٹ انسٹال کریں",
+    "installBody": "بتھ ایک چھوٹا مقامی ماڈل (~ 1.1 GB) ڈاؤن لوڈ کرتا ہے لہذا اسسٹنٹ مکمل طور پر آپ کی مشین پر چلتا ہے - کوئی API کیز نہیں، کوئی کلاؤڈ کال نہیں ۔",
+    "installCta": "انسٹال کریں (~ 1.1 GB)",
+    "installFailedTitle": "تنصیب ناکام ہو گئی",
+    "retry": "دوبارہ کوشش کریں",
+    "emptyTitle": "پائپ لائن کی وضاحت کریں",
+    "emptyHint": "اسسٹنٹ ایک بطخ پائپ لائن آؤٹ پٹ کرتا ہے جسے آپ کینوس میں داخل کرنے کے لیے کلک کر سکتے ہیں ۔",
+    "insertIntoCanvas": "کینوس میں داخل کریں",
+    "thinking": "خیال",
+    "placeholder": "وضاحت کریں کہ آپ کو کیا ضرورت ہے...",
+    "sendAria": "بھیجیں",
+    "sendTooltip": "بھیجیں (درج کریں)"
+  },
+  "common": {
+    "save": "محفوظ کریں",
+    "cancel": "منسوخ کریں",
+    "close": "بند",
+    "delete": "حذف",
+    "confirm": "تصدیق کریں",
+    "create": "بنائیں",
+    "ok": "ٹھیک ہے",
+    "loading": "لوڈ ہورہا ہے ...",
+    "error": "خرابی",
+    "success": "کامیابی ہو گئی"
+  }
+}

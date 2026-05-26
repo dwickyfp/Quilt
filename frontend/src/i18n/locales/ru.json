@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Рабочее пространство: {{path}}\nНажмите, чтобы переключиться",
+    "activeContextHint": "Активный контекст - поля могут связываться с его переменными",
+    "noContext": "Нет контекста",
+    "git": "Git (рабочая область)",
+    "gitAriaToggle": "Переключить панель Git",
+    "duckieAssistant": "Помощник ИИ Duckie",
+    "duckieAssistantAriaToggle": "Переключить Duckie AI Assistant",
+    "switchLight": "Светлая Тема",
+    "switchDark": "Темная тема",
+    "themeAriaToggle": "Переключить тему",
+    "runtime": "время выполнения: {{name}}",
+    "languageAriaLabel": "Выберите язык&#10;"
+  },
+  "palette": {
+    "sources": "Источники",
+    "transforms": "Преобразования",
+    "sinks": "Раковина",
+    "controlFlow": "Порядок выполнения",
+    "dataQuality": "Качество данных",
+    "customCode": "Таможенный код"
+  },
+  "chat": {
+    "title": "Помощник ИИ Duckie",
+    "localTag": "локально",
+    "checking": "Проверка движка ИИ...",
+    "installTitle": "Установка помощника ИИ Duckie",
+    "installBody": "Duckle загружает небольшую локальную модель (~ 1,1 ГБ), поэтому помощник работает полностью на вашей машине - без ключей API, без облачных вызовов.",
+    "installCta": "Установить (~ 1,1 ГБ)",
+    "installFailedTitle": "Сбой установки",
+    "retry": "Повторить попытку",
+    "emptyTitle": "Опишите конвейер",
+    "emptyHint": "Помощник выводит конвейер Duckle, который вы можете нажать, чтобы вставить в холст.",
+    "insertIntoCanvas": "Вставить в холст",
+    "thinking": "Размышляю над этим...",
+    "placeholder": "Опишите, что вам нужно...",
+    "sendAria": "Отправить",
+    "sendTooltip": "Отправить (Enter)"
+  },
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "close": "Закрыть",
+    "delete": "Удалить",
+    "confirm": "Подтвердить",
+    "create": "Создать",
+    "ok": "OK",
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "success": "Успешно"
+  }
+}

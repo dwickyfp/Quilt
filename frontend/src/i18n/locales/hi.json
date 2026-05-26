@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "कार्यक्षेत्र: {{path}}\nस्विच करने के लिए क्लिक करें",
+    "activeContextHint": "सक्रिय संदर्भ - फ़ील्ड इसके वेरिएबल से जुड़ सकते हैं",
+    "noContext": "कोई संदर्भ नहीं",
+    "git": "Git (वर्कस्पेस)",
+    "gitAriaToggle": "गिट पैनल टॉगल करें",
+    "duckieAssistant": "डकी एआई असिस्टेंट",
+    "duckieAssistantAriaToggle": "डकी AI असिस्टेंट टॉगल करें",
+    "switchLight": "लाइट मोड पर स्विच करें",
+    "switchDark": "डार्क मोड पर स्विच करें",
+    "themeAriaToggle": "थीम टॉगल करें",
+    "runtime": "रनटाइम: {{name}}",
+    "languageAriaLabel": "भाषा चुनें"
+  },
+  "palette": {
+    "sources": "स्रोत",
+    "transforms": "रूपांतरण",
+    "sinks": "सिंक",
+    "controlFlow": "नियंत्रण प्रवाह",
+    "dataQuality": "डेटा की क्वालिटी",
+    "customCode": "कस्टम कोड"
+  },
+  "chat": {
+    "title": "डकी एआई असिस्टेंट",
+    "localTag": "स्थानीय",
+    "checking": "AI इंजन की जाँच की जा रही है...",
+    "installTitle": "डकी AI असिस्टेंट इंस्टॉल करें",
+    "installBody": "डकल एक छोटा स्थानीय मॉडल (~ 1.1 GB) डाउनलोड करता है, इसलिए असिस्टेंट पूरी तरह से आपकी मशीन पर चलता है - कोई API कीज़ नहीं, कोई क्लाउड कॉल नहीं।",
+    "installCta": "इंस्टॉल करें (~ 1.1 GB)",
+    "installFailedTitle": "इंस्टॉल नहीं हो सका",
+    "retry": "वरी कोशिश कयो",
+    "emptyTitle": "पाइपलाइन का वर्णन करें",
+    "emptyHint": "सहायक एक डकल पाइपलाइन आउटपुट करता है जिसे आप कैनवास में डालने के लिए क्लिक कर सकते हैं।",
+    "insertIntoCanvas": "कैनवास में डालें",
+    "thinking": "सोच में...",
+    "placeholder": "बताएँ कि आपको क्या चाहिए...",
+    "sendAria": "भेजें",
+    "sendTooltip": "भेजें (दर्ज करें)"
+  },
+  "common": {
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "close": "बंद करें",
+    "delete": "हटाएँ",
+    "confirm": "पक्का करें",
+    "create": "बनाएँ",
+    "ok": "ठीक",
+    "loading": "लोड कर रहा है...",
+    "error": "इस वीडियो को कैसे बनाया जाए?",
+    "success": "सफल"
+  }
+}

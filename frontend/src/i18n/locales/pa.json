@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "ਵਰਕਸਪੇਸ: {{path}}\nਸਵਿੱਚ ਕਰਨ ਲਈ ਕਲਿੱਕ ਕਰੋ",
+    "activeContextHint": "ਕਿਰਿਆਸ਼ੀਲ ਪ੍ਰਸੰਗ - ਖੇਤਰ ਇਸਦੇ ਵੇਰੀਏਬਲਾਂ ਨਾਲ ਬੰਨ੍ਹ ਸਕਦੇ ਹਨ",
+    "noContext": "ਕੋਈ ਪਰਸੰਗ ਨਹੀਂ",
+    "git": "Git (ਵਰਕਸਪੇਸ)",
+    "gitAriaToggle": "Git ਪੈਨਲ ਬਦਲੋ",
+    "duckieAssistant": "ਡਕੀ ਏਆਈ ਸਹਾਇਕ",
+    "duckieAssistantAriaToggle": "ਡੱਕੀ AI ਸਹਾਇਕ ਬਦਲੋ",
+    "switchLight": "ਲਾਈਟ ਮੋਡ ਵਿੱਚ ਬਦਲੋ",
+    "switchDark": "ਡਾਰਕ ਮੋਡ ਵਿੱਚ ਜਾਓ",
+    "themeAriaToggle": "ਥੀਮ ਬਦਲੋ",
+    "runtime": "ਰਨਟਾਈਮ: {{name}}",
+    "languageAriaLabel": "ਆਪਣੀ ਭਾਸ਼ਾ ਚੁਣੋ"
+  },
+  "palette": {
+    "sources": "ਸਰੋਤ",
+    "transforms": "ਪਰਿਵਰਤਨ",
+    "sinks": "ਸਿੰਕ",
+    "controlFlow": "ਕੰਟਰੋਲ ਫਲੋ",
+    "dataQuality": "ਡਾਟਾ ਕੁਆਲਟੀ",
+    "customCode": "ਪਸੰਦੀਦਾ ਕੋਡ"
+  },
+  "chat": {
+    "title": "ਡਕੀ ਏਆਈ ਸਹਾਇਕ",
+    "localTag": "localTag Type",
+    "checking": "AI ਇੰਜਣ ਦੀ ਜਾਂਚ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ...",
+    "installTitle": "ਡਕੀ ਏਆਈ ਸਹਾਇਕ ਸਥਾਪਤ ਕਰੋ",
+    "installBody": "ਡੱਕਲ ਇੱਕ ਛੋਟਾ ਜਿਹਾ ਸਥਾਨਕ ਮਾਡਲ (~ 1.1 GB) ਡਾਉਨਲੋਡ ਕਰਦਾ ਹੈ ਤਾਂ ਜੋ ਸਹਾਇਕ ਪੂਰੀ ਤਰ੍ਹਾਂ ਤੁਹਾਡੀ ਮਸ਼ੀਨ ਤੇ ਚਲਦਾ ਹੈ - ਕੋਈ ਏਪੀਆਈ ਕੁੰਜੀ ਨਹੀਂ, ਕੋਈ ਕਲਾਉਡ ਕਾਲ ਨਹੀਂ.",
+    "installCta": "ਇੰਸਟਾਲ (~ 1. 1 GB)",
+    "installFailedTitle": "ਇੰਸਟਾਲ ਫੇਲ੍ਹ ਹੈ",
+    "retry": "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+    "emptyTitle": "ਪਾਈਪਲਾਈਨ ਦਾ ਵਰਣਨ ਕਰੋ",
+    "emptyHint": "ਸਹਾਇਕ ਇੱਕ ਡਕਲ ਪਾਈਪਲਾਈਨ ਆਉਟਪੁੱਟ ਕਰਦਾ ਹੈ ਜਿਸ ਨੂੰ ਤੁਸੀਂ ਕੈਨਵਸ ਵਿੱਚ ਪਾਉਣ ਲਈ ਕਲਿੱਕ ਕਰ ਸਕਦੇ ਹੋ.",
+    "insertIntoCanvas": "ਕੈਨਵਸ ਵਿੱਚ ਸੰਮਿਲਿਤ ਕਰੋ",
+    "thinking": "ਸੋਚਣ ਦੀ ਸ਼ਕਤੀ",
+    "placeholder": "ਤੁਹਾਨੂੰ ਕੀ ਚਾਹੀਦਾ ਹੈ ਦਾ ਵਰਣਨ ਕਰੋ...",
+    "sendAria": "ਭੇਜੋ",
+    "sendTooltip": "ਭੇਜੋ (ਦਿਓ)"
+  },
+  "common": {
+    "save": "ਸੇਵ ਕਰੋ",
+    "cancel": "ਰੱਦ ਕਰੋ",
+    "close": "ਬੰਦ",
+    "delete": "ਡਿਲੀਟ ਕਰੋ",
+    "confirm": "ਪੁਸ਼ਟੀQSql",
+    "create": "ਬਣਾਓ",
+    "ok": "ਠੀਕ ਹੈ",
+    "loading": "...ਲੋਡ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
+    "error": "ਗਲਤੀ",
+    "success": "ਸਫ਼ਲ"
+  }
+}

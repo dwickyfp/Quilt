@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Arbetsyta: {{path}}\nKlicka för att byta",
+    "activeContextHint": "Aktivt sammanhang - fält kan bindas till sina variabler",
+    "noContext": "Inget sammanhang",
+    "git": "Git (arbetsyta)",
+    "gitAriaToggle": "Växla Git-panel",
+    "duckieAssistant": "Duckie AI-assistent",
+    "duckieAssistantAriaToggle": "Växla Duckie AI-assistent",
+    "switchLight": "Växla till ljusläge",
+    "switchDark": "Byt till läge:",
+    "themeAriaToggle": "Byt tema",
+    "runtime": "runtime: {{name}}",
+    "languageAriaLabel": "Välj språk"
+  },
+  "palette": {
+    "sources": "Källor",
+    "transforms": "FÖRVANDLAS",
+    "sinks": "Tvättställ",
+    "controlFlow": "kontrollflöde",
+    "dataQuality": "Datakvalitet",
+    "customCode": "Anpassad kod"
+  },
+  "chat": {
+    "title": "Duckie AI-assistent",
+    "localTag": "lokal",
+    "checking": "Kontrollerar AI-motor...",
+    "installTitle": "Installera Duckie AI-assistenten",
+    "installBody": "Duckle laddar ner en liten lokal modell (~ 1,1 GB) så att assistenten körs helt på din dator - inga API-nycklar, inga molnanrop.",
+    "installCta": "Installera (~ 1,1 GB)",
+    "installFailedTitle": "Installation av %s misslyckades",
+    "retry": "Försök igen",
+    "emptyTitle": "Beskriv en pipeline",
+    "emptyHint": "Assistenten matar ut en Duckle-rörledning som du kan klicka på för att infoga i duken.",
+    "insertIntoCanvas": "Infoga i arbetsytan",
+    "thinking": "Tänkande",
+    "placeholder": "Beskriv vad du behöver...",
+    "sendAria": "Skicka",
+    "sendTooltip": "Skicka (Enter)"
+  },
+  "common": {
+    "save": "Spara",
+    "cancel": "Avbryt",
+    "close": "Stäng",
+    "delete": "Ta bort",
+    "confirm": "Godkänn",
+    "create": "Skapa",
+    "ok": "OK",
+    "loading": "Laddar&#xA0;…",
+    "error": "Fel",
+    "success": "Lyckades"
+  }
+}

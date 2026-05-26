@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Spazio di lavoro: {{path}}\nClicca per cambiare",
+    "activeContextHint": "Contesto attivo - i campi possono associarsi alle sue variabili",
+    "noContext": "Nessun contesto",
+    "git": "Git (spazio di lavoro)",
+    "gitAriaToggle": "Attiva/disattiva pannello Git",
+    "duckieAssistant": "Duckie AI Assistant",
+    "duckieAssistantAriaToggle": "Attiva/disattiva Duckie AI Assistant",
+    "switchLight": "Passa alla modalità light",
+    "switchDark": "Passa alla modalità dark",
+    "themeAriaToggle": "Attiva tema scuro",
+    "runtime": "runtime: {{name}}",
+    "languageAriaLabel": "Scegli lingua"
+  },
+  "palette": {
+    "sources": "Fonti",
+    "transforms": "Trasformazioni",
+    "sinks": "Lavandini",
+    "controlFlow": "Struttura di controllo",
+    "dataQuality": "Qualità dei dati",
+    "customCode": "Codice personalizzato"
+  },
+  "chat": {
+    "title": "Duckie AI Assistant",
+    "localTag": "locali",
+    "checking": "Controllo del motore AI in corso...",
+    "installTitle": "Installa Duckie AI Assistant",
+    "installBody": "Duckle scarica un piccolo modello locale (~ 1,1 GB) in modo che l'assistente funzioni interamente sulla tua macchina: nessuna chiave API, nessuna chiamata cloud.",
+    "installCta": "Installa (~1,1 GB)",
+    "installFailedTitle": "Installazione non riuscita",
+    "retry": "Riprova",
+    "emptyTitle": "Descrivere una pipeline",
+    "emptyHint": "L'assistente emette una pipeline Duckle che puoi cliccare per inserire nella tela.",
+    "insertIntoCanvas": "Inserisci nella tela",
+    "thinking": "Sto pensando...",
+    "placeholder": "Descrivi di cosa hai bisogno...",
+    "sendAria": "<g id=\"9770\">Spedisci</g>:",
+    "sendTooltip": "Invia (Invio)"
+  },
+  "common": {
+    "save": "Salva",
+    "cancel": "Annulla",
+    "close": "Chiudi",
+    "delete": "Elimina",
+    "confirm": "Conferma",
+    "create": "Crea",
+    "ok": "OK",
+    "loading": "Caricamento in corso...",
+    "error": "Errore",
+    "success": "Operazione riuscita"
+  }
+}

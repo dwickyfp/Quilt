@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Không gian làm việc: {{path}}\nNhấp để chuyển đổi",
+    "activeContextHint": "Bối cảnh hoạt động - các trường có thể liên kết với các biến của nó",
+    "noContext": "Không có ngữ cảnh",
+    "git": "Git (không gian làm việc)",
+    "gitAriaToggle": "Bật/tắt bảng điều khiển Git",
+    "duckieAssistant": "Trợ lý AI Duckie",
+    "duckieAssistantAriaToggle": "Bật/tắt Trợ lý AI Duckie",
+    "switchLight": "Chuyển sang chế độ ánh sáng",
+    "switchDark": "Chuyển sang chế độ tối",
+    "themeAriaToggle": "Chuyển đổi chủ đề",
+    "runtime": "thời gian chạy: {{name}}",
+    "languageAriaLabel": "Chọn ngôn ngữ"
+  },
+  "palette": {
+    "sources": "Nguồn ",
+    "transforms": "Biến dạng",
+    "sinks": "Bồn rửa",
+    "controlFlow": "Kiểm soát luồng",
+    "dataQuality": "Chất lượng Dữ liệu",
+    "customCode": "Mã tùy chỉnh"
+  },
+  "chat": {
+    "title": "Trợ lý AI Duckie",
+    "localTag": "khu vực",
+    "checking": "Đang kiểm tra công cụ AI...",
+    "installTitle": "Cài đặt Duckie AI Assistant",
+    "installBody": "Duckle tải xuống một mô hình cục bộ nhỏ (~1.1 GB) để trợ lý chạy hoàn toàn trên máy của bạn - không có khóa API, không có cuộc gọi đám mây.",
+    "installCta": "Cài đặt (~1.1 GB)",
+    "installFailedTitle": "Cài đặt thất bại",
+    "retry": "Thử lại",
+    "emptyTitle": "Mô tả một đường ống",
+    "emptyHint": "Trợ lý xuất ra một Duckle pipeline mà bạn có thể nhấp để chèn vào canvas.",
+    "insertIntoCanvas": "Chèn vào canvas",
+    "thinking": "Tư duy...",
+    "placeholder": "Mô tả những gì bạn cần...",
+    "sendAria": "Gửi",
+    "sendTooltip": "Gửi (Enter)"
+  },
+  "common": {
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "close": "Đóng",
+    "delete": "Delete (Xóa)",
+    "confirm": "Xác nhận",
+    "create": "Tạo",
+    "ok": "OK",
+    "loading": "Đang tải...",
+    "error": "Error",
+    "success": "Thành công"
+  }
+}

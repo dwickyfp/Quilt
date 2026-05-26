@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Espacio de trabajo: {{path}}\nHaz clic para cambiar",
+    "activeContextHint": "Contexto activo: los campos pueden vincularse a sus variables",
+    "noContext": "Sin contexto",
+    "git": "Git (espacio de trabajo)",
+    "gitAriaToggle": "Alternar panel de Git",
+    "duckieAssistant": "Duckie AI Assistant",
+    "duckieAssistantAriaToggle": "Alternar asistente de IA de Duckie",
+    "switchLight": "Cambiar a Modo Luz",
+    "switchDark": "Cambiar a Modo Oscuro",
+    "themeAriaToggle": "Alternar tema",
+    "runtime": "runtime: {{name}}",
+    "languageAriaLabel": "Escoge un idioma"
+  },
+  "palette": {
+    "sources": "Bibliografía",
+    "transforms": "Transformaciones",
+    "sinks": "Lavabos",
+    "controlFlow": "flujo de datos de supervisión",
+    "dataQuality": "Calidad de datos",
+    "customCode": "Código personalizado"
+  },
+  "chat": {
+    "title": "Duckie AI Assistant",
+    "localTag": "local",
+    "checking": "Comprobando el motor de IA...",
+    "installTitle": "Instala el asistente de IA de Duckie",
+    "installBody": "Duckle descarga un pequeño modelo local (~1.1 GB) para que el asistente se ejecute completamente en su máquina, sin claves API ni llamadas a la nube.",
+    "installCta": "Instalar (~ 1,1 GB)",
+    "installFailedTitle": "Ha fallado la instalación",
+    "retry": "Reintentar",
+    "emptyTitle": "Describe un proceso",
+    "emptyHint": "El asistente genera una canalización Duckle en la que puede hacer clic para insertarla en el lienzo.",
+    "insertIntoCanvas": "Insertar en el lienzo",
+    "thinking": "Pensando...",
+    "placeholder": "\"Describa lo que necesita\"",
+    "sendAria": "Enviar",
+    "sendTooltip": "Enviar (Introducir)"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "delete": "Eliminar",
+    "confirm": "Confirmar",
+    "create": "Crear",
+    "ok": "OK",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Realizado con éxito"
+  }
+}

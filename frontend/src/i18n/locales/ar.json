@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "مساحة العمل: {{path}}\nانقر للتبديل",
+    "activeContextHint": "السياق النشط - يمكن ربط الحقول بمتغيراتها",
+    "noContext": "لا يوجد سياق",
+    "git": "بوابة (مساحة عمل)",
+    "gitAriaToggle": "تبديل لوحة Git",
+    "duckieAssistant": "مساعد Duckie AI",
+    "duckieAssistantAriaToggle": "تبديل مساعد الذكاء الاصطناعي Duckie",
+    "switchLight": "التبديل إلى وضع الإضاءة",
+    "switchDark": "التبديل إلى الوضع المظلم",
+    "themeAriaToggle": "تبديل القالب",
+    "runtime": "وقت التشغيل: {{name}}",
+    "languageAriaLabel": "اختر اللغة"
+  },
+  "palette": {
+    "sources": "المصادر:",
+    "transforms": "- التحولات.",
+    "sinks": "أحواض",
+    "controlFlow": "تدفق عناصر التحكم",
+    "dataQuality": "جودة البيانات",
+    "customCode": "كود مخصص"
+  },
+  "chat": {
+    "title": "مساعد Duckie AI",
+    "localTag": "محلي",
+    "checking": "جارٍ التحقق من محرك الذكاء الاصطناعي...",
+    "installTitle": "تثبيت مساعد الذكاء الاصطناعي Duckie",
+    "installBody": "يقوم Duckle بتنزيل نموذج محلي صغير (~ 1.1 جيجابايت) بحيث يعمل المساعد بالكامل على جهازك - لا توجد مفاتيح API، ولا مكالمات سحابية.",
+    "installCta": "التثبيت (حوالي 1.1 جيجابايت)",
+    "installFailedTitle": "فشل التثبيت!",
+    "retry": "إعادة المحاولة",
+    "emptyTitle": "وصف خط أنابيب",
+    "emptyHint": "يقوم المساعد بإخراج خط أنابيب Duckle يمكنك النقر فوقه لإدراجه في اللوحة القماشية.",
+    "insertIntoCanvas": "إدراج في لوحة الرسم القماشية",
+    "thinking": "التفكير",
+    "placeholder": "صف ما تحتاجه...",
+    "sendAria": "Send",
+    "sendTooltip": "إرسال (إدخال)"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "إلغاء",
+    "close": "خاتمة",
+    "delete": "حذف",
+    "confirm": "أكّد العملية",
+    "create": "صياغة",
+    "ok": "مؤكد",
+    "loading": "جاري التحميل...",
+    "error": "خطأ",
+    "success": "ناجحة"
+  }
+}

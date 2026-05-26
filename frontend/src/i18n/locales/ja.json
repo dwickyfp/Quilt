@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "ワークスペース: {{path}}\nクリックして切り替え",
+    "activeContextHint": "アクティブなコンテキスト-フィールドはその変数にバインドできます",
+    "noContext": "コンテキストがありません",
+    "git": "Git （ワークスペース）",
+    "gitAriaToggle": "Gitパネルを切り替える",
+    "duckieAssistant": "ダッキーAIアシスタント",
+    "duckieAssistantAriaToggle": "Duckie AIアシスタントの切り替え",
+    "switchLight": "ライトモードに切り替える",
+    "switchDark": "ダークモードに切り替える",
+    "themeAriaToggle": "テーマを切り替える",
+    "runtime": "ランタイム：{{ name}}",
+    "languageAriaLabel": "言語を選びます"
+  },
+  "palette": {
+    "sources": "出典",
+    "transforms": "トランスフォーム",
+    "sinks": "シンク等",
+    "controlFlow": "制御フロー",
+    "dataQuality": "データ品質",
+    "customCode": "カスタムコード"
+  },
+  "chat": {
+    "title": "ダッキーAIアシスタント",
+    "localTag": "ローカル",
+    "checking": "AIエンジンを確認しています...",
+    "installTitle": "Duckie AIアシスタントをインストールする",
+    "installBody": "Duckleは小さなローカルモデル（〜1.1 GB ）をダウンロードするので、アシスタントは完全にマシン上で実行されます。APIキーもクラウド呼び出しもありません。",
+    "installCta": "インストール(~1.1 GB)",
+    "installFailedTitle": "インストールに失敗しました",
+    "retry": "再試行",
+    "emptyTitle": "パイプラインの説明",
+    "emptyHint": "アシスタントは、キャンバスに挿入するためにクリックできるDuckleパイプラインを出力します。",
+    "insertIntoCanvas": "キャンバスに挿入",
+    "thinking": "考えてみると・・・",
+    "placeholder": "プロジェクトの詳細を記入してください",
+    "sendAria": "送信",
+    "sendTooltip": "送信(Enter)"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取り消す",
+    "close": "閉じる",
+    "delete": "削除",
+    "confirm": "確認",
+    "create": "作成",
+    "ok": "OK",
+    "loading": "読み込み中・・・",
+    "error": "エラー",
+    "success": "成功"
+  }
+}

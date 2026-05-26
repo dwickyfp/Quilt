@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Çalışma alanı: {{path}}\nGeçiş yapmak için tıklayın",
+    "activeContextHint": "Aktif bağlam - alanlar değişkenlerine bağlanabilir",
+    "noContext": "Bağlam yok",
+    "git": "Git (çalışma alanı)",
+    "gitAriaToggle": "Git panelini aç/kapat",
+    "duckieAssistant": "Duckie Yapay Zeka Asistanı",
+    "duckieAssistantAriaToggle": "Duckie Yapay Zeka Asistanını Aç/Kapat",
+    "switchLight": "Açık Tema",
+    "switchDark": "Koyu Tema",
+    "themeAriaToggle": "Temayı aç/kapat",
+    "runtime": "çalışma zamanı: {{name}}",
+    "languageAriaLabel": "Dil seçin"
+  },
+  "palette": {
+    "sources": "Kaynaklar",
+    "transforms": "Dönüşümler",
+    "sinks": "Lavabolar",
+    "controlFlow": "   Kontrol Akışı",
+    "dataQuality": "Veri Kalitesi",
+    "customCode": "Özel Kod"
+  },
+  "chat": {
+    "title": "Duckie Yapay Zeka Asistanı",
+    "localTag": "yöresel",
+    "checking": "Yapay zeka motoru kontrol ediliyor...",
+    "installTitle": "Duckie AI Asistanını yükleyin",
+    "installBody": "Duckle, küçük bir yerel model (~ 1,1 GB) indirir, böylece asistan tamamen makinenizde çalışır - API anahtarı yok, bulut çağrısı yok.",
+    "installCta": "Kurulum (~1.1 GB)",
+    "installFailedTitle": "Kurulum başarısız oldu.",
+    "retry": "Tekrar dene",
+    "emptyTitle": "Bir iş hattını tanımlayın",
+    "emptyHint": "Asistan, tuvale eklemek için tıklayabileceğiniz bir Ördek boru hattı çıkarır.",
+    "insertIntoCanvas": "Tuvale yerleştir",
+    "thinking": "Düşünme",
+    "placeholder": "Ne İstediğinizi Anlatın",
+    "sendAria": "Gönder",
+    "sendTooltip": "Gönder (Gir)"
+  },
+  "common": {
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "close": "Kapat",
+    "delete": "Sil",
+    "confirm": "Onayla",
+    "create": "Oluştur",
+    "ok": "Tamam",
+    "loading": "Yükleniyor... Lütfen bekleyin...",
+    "error": "Hata",
+    "success": "Başarılı"
+  }
+}

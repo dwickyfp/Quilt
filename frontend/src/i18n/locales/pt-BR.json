@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Espaço de trabalho: {{path}}\nClique para mudar",
+    "activeContextHint": "Contexto ativo - os campos podem ser vinculados às suas variáveis",
+    "noContext": "Nenhum contexto",
+    "git": "Git (espaço de trabalho)",
+    "gitAriaToggle": "Alternar painel Git",
+    "duckieAssistant": "Assistente de IA Duckie",
+    "duckieAssistantAriaToggle": "Assistente AI Toggle Duckie",
+    "switchLight": "Mudar para o modo diurno",
+    "switchDark": "Mudar para o modo noturno",
+    "themeAriaToggle": "Alternar tema",
+    "runtime": "runtime: {{name}}",
+    "languageAriaLabel": "Escolher idioma"
+  },
+  "palette": {
+    "sources": "Fontes",
+    "transforms": "Transformações",
+    "sinks": "Pias",
+    "controlFlow": "Controle de fluxo",
+    "dataQuality": "Qualidade dos Dados",
+    "customCode": "Personalizar Código"
+  },
+  "chat": {
+    "title": "Assistente de IA Duckie",
+    "localTag": "local",
+    "checking": "Verificando o mecanismo de IA...",
+    "installTitle": "Instale o Duckie AI Assistant",
+    "installBody": "O Duckle baixa um pequeno modelo local (~ 1,1 GB) para que o assistente seja executado inteiramente em sua máquina - sem chaves de API, sem chamadas na nuvem.",
+    "installCta": "Instalação (~ 1,1 GB)",
+    "installFailedTitle": "Falha na instalação. ",
+    "retry": "Tentar novamente",
+    "emptyTitle": "Descrever um pipeline",
+    "emptyHint": "O assistente gera um pipeline Duckle que você pode clicar para inserir na tela.",
+    "insertIntoCanvas": "Inserir na tela",
+    "thinking": "Pensar",
+    "placeholder": "Descreva o que precisa ser feito",
+    "sendAria": "Enviar",
+    "sendTooltip": "Enviar (Enter)"
+  },
+  "common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "delete": "Excluir",
+    "confirm": "Confirmar",
+    "create": "Criar",
+    "ok": "OK",
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "sucesso"
+  }
+}

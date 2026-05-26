@@ -1,4 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     ArrowDownToLine,
     ArrowUpFromLine,
@@ -43,7 +44,20 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 const DEFAULT_EXPANDED = new Set<string>();
 const ALL_CATEGORY_IDS = PALETTE.map(c => c.id);
 
+// Map palette top-level category IDs to i18n keys under "palette.*".
+// Only top-level group labels are translated for now; subgroup labels
+// ("Files", "Databases", "APIs", etc.) and component names stay English.
+const CAT_LABEL_KEY: Record<string, string> = {
+    sources: 'palette.sources',
+    transforms: 'palette.transforms',
+    sinks: 'palette.sinks',
+    control: 'palette.controlFlow',
+    quality: 'palette.dataQuality',
+    code: 'palette.customCode',
+};
+
 export default function Palette() {
+    const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const [expanded, setExpanded] = useState<Set<string>>(DEFAULT_EXPANDED);
 
@@ -160,7 +174,7 @@ export default function Palette() {
                                     <span className="palette-cat-icon" aria-hidden="true">
                                         {CATEGORY_ICONS[cat.id]}
                                     </span>
-                                    <span className="palette-cat-label">{cat.label}</span>
+                                    <span className="palette-cat-label">{CAT_LABEL_KEY[cat.id] ? t(CAT_LABEL_KEY[cat.id]) : cat.label}</span>
                                     <span className="palette-cat-count">{count}</span>
                                 </button>
                                 {isExpanded ? (

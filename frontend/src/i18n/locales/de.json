@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Arbeitsbereich: {{path}}\nZum Wechseln klicken",
+    "activeContextHint": "Aktiver Kontext - Felder können an ihre Variablen gebunden werden",
+    "noContext": "Nein {{context}}",
+    "git": "Git (Arbeitsbereich)",
+    "gitAriaToggle": "Git-Panel umschalten",
+    "duckieAssistant": "Duckie KI-Assistent",
+    "duckieAssistantAriaToggle": "Duckie KI-Assistent umschalten",
+    "switchLight": "Wechseln zu Light",
+    "switchDark": "Wechseln zu Dark",
+    "themeAriaToggle": "Farbschema umschalten",
+    "runtime": "Laufzeitname",
+    "languageAriaLabel": "Sprache auswählen"
+  },
+  "palette": {
+    "sources": "Quellen",
+    "transforms": "Transformieren",
+    "sinks": "Sinks",
+    "controlFlow": "Kontrollfluß",
+    "dataQuality": "Datenqualität",
+    "customCode": "Custom Code"
+  },
+  "chat": {
+    "title": "Duckie KI-Assistent",
+    "localTag": "lokal",
+    "checking": "KI-Engine wird überprüft...",
+    "installTitle": "Installieren Sie den Duckie AI Assistant",
+    "installBody": "Duckle lädt ein kleines lokales Modell (~ 1,1 GB) herunter, sodass der Assistent vollständig auf Ihrem Computer ausgeführt wird - keine API-Schlüssel, keine Cloud-Anrufe.",
+    "installCta": "Installieren (~1,1 GB)",
+    "installFailedTitle": "Installation fehlgeschlagen",
+    "retry": "Erneut versuchen",
+    "emptyTitle": "Eine Pipeline beschreiben",
+    "emptyHint": "Der Assistent gibt eine Duckle-Pipeline aus, die Sie anklicken können, um sie in die Leinwand einzufügen.",
+    "insertIntoCanvas": "In Leinwand einfügen",
+    "thinking": "Denke nach …",
+    "placeholder": "Beschreiben Sie, was Sie brauchen.",
+    "sendAria": "Senden",
+    "sendTooltip": "Senden (Enter)"
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "delete": "Löschen",
+    "confirm": "Bestätigen",
+    "create": "Erstellen",
+    "ok": "OK",
+    "loading": "Wird geladen …",
+    "error": "Error",
+    "success": "Erfolg"
+  }
+}

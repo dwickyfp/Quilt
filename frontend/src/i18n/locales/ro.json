@@ -1,0 +1,53 @@
+{
+  "topbar": {
+    "workspaceTooltip": "Spațiu de lucru: {{path}}\nFaceți clic pentru a comuta",
+    "activeContextHint": "Context activ - câmpurile se pot lega de variabilele sale",
+    "noContext": "Fără context",
+    "git": "Git (spațiu de lucru)",
+    "gitAriaToggle": "Comutați panoul Git",
+    "duckieAssistant": "Duckie AI Assistant",
+    "duckieAssistantAriaToggle": "Toggle Duckie AI Assistant",
+    "switchLight": "Comută la modul iluminat",
+    "switchDark": "Comută la modul întunecat",
+    "themeAriaToggle": "Comută tema",
+    "runtime": "timp de funcționare: {{name}}",
+    "languageAriaLabel": "Alegeți limba"
+  },
+  "palette": {
+    "sources": "Surse",
+    "transforms": "Transformă",
+    "sinks": "Chiuvete",
+    "controlFlow": "Flux de control",
+    "dataQuality": "Calitatea datelor",
+    "customCode": "Cod Personalizat"
+  },
+  "chat": {
+    "title": "Duckie AI Assistant",
+    "localTag": "local",
+    "checking": "Se verifică motorul AI...",
+    "installTitle": "Instalați Duckie AI Assistant",
+    "installBody": "Duckle descarcă un model local mic (~ 1,1 GB), astfel încât asistentul rulează în întregime pe mașina dvs. - fără chei API, fără apeluri în cloud.",
+    "installCta": "Instalare (~ 1,1 GB)",
+    "installFailedTitle": "Instalare eșuată",
+    "retry": "Reîncercați",
+    "emptyTitle": "Descrieți o conductă",
+    "emptyHint": "Asistentul emite o conductă Duckle pe care puteți face clic pentru a o insera în pânză.",
+    "insertIntoCanvas": "Inserare în pânză",
+    "thinking": "Gândire",
+    "placeholder": "Descrieți de ce aveți nevoie...",
+    "sendAria": "Trimitere",
+    "sendTooltip": "Trimitere (Enter)"
+  },
+  "common": {
+    "save": "Salvare",
+    "cancel": "Cancel",
+    "close": "Închide",
+    "delete": "Delete",
+    "confirm": "Confirmă",
+    "create": "Creează",
+    "ok": "OK",
+    "loading": "Se încarcă...",
+    "error": "Eroare",
+    "success": "Succes"
+  }
+}
