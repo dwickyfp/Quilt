@@ -3731,7 +3731,7 @@ fn build_view_sql(
         }
         "src.postgres" | "src.cockroach" | "src.mysql" | "src.mariadb"
         | "src.motherduck" | "src.ducklake" | "src.pgvector"
-        | "src.redshift" | "src.bigquery" => build_relational_source(component_id, props),
+        | "src.redshift" | "src.bigquery" | "src.quack" => build_relational_source(component_id, props),
         "src.avro" => Ok(build_avro_source(props)),
         "src.excel" => Ok(build_excel_source(props)),
         "src.iceberg" => Ok(build_iceberg_source(props)),
@@ -5793,6 +5793,8 @@ fn attach_prelude(component_id: &str, props: &JsonValue) -> String {
         "snk.mysql" | "snk.mariadb" => return db_attach(props, "mysql", 3306, false),
         "src.motherduck" => return md_attach(props, true),
         "snk.motherduck" => return md_attach(props, false),
+        "src.quack" => return quack_attach(props, true),
+        "snk.quack" => return quack_attach(props, false),
         "src.ducklake" => return ducklake_attach(props, true),
         "snk.ducklake" => return ducklake_attach(props, false),
         // BigQuery via the duckdb-bigquery community extension. The
@@ -6066,6 +6068,52 @@ fn md_attach(props: &JsonValue, read_only: bool) -> String {
         ("duckle_dst", "")
     };
     format!("ATTACH '{}' AS {}{}; ", sql_escape(&url), alias, mode)
+}
+
+/// Quack remote protocol (DuckDB 2.0+, May 2026). The remote DuckDB
+/// instance runs `quack_serve(...)` on port 9494 by default and exposes
+/// its database to multiple concurrent clients over HTTP using a
+/// custom `application/duckdb` MIME type. Client side: a SECRET
+/// carries the auth token, then ATTACH names the URL.
+///
+/// Requires DuckDB built with quack support; older builds will surface
+/// a clear error at runtime ("Unknown ATTACH option 'TYPE'" or
+/// similar) without any Duckle-side breakage.
+fn quack_attach(props: &JsonValue, read_only: bool) -> String {
+    let host = match string_prop(props, "host").filter(|s| !s.is_empty()) {
+        Some(h) => h,
+        None => return String::new(),
+    };
+    let port = props
+        .get("port")
+        .and_then(|v| v.as_u64())
+        .filter(|p| *p > 0)
+        .unwrap_or(9494);
+    let token = string_prop(props, "token").filter(|s| !s.is_empty());
+
+    // If the host already carries an explicit :port, respect it; otherwise
+    // append the default 9494.
+    let url = if host.contains(':') && !host.starts_with('[') {
+        format!("quack:{}", host)
+    } else {
+        format!("quack:{}:{}", host, port)
+    };
+
+    let (alias, mode) = if read_only {
+        ("duckle_src", " (READ_ONLY)")
+    } else {
+        ("duckle_dst", "")
+    };
+
+    let secret = match token {
+        Some(t) => format!(
+            "CREATE OR REPLACE SECRET duckle_quack_secret (TYPE QUACK, TOKEN '{}'); ",
+            sql_escape(&t)
+        ),
+        None => String::new(),
+    };
+
+    format!("{}ATTACH '{}' AS {}{}; ", secret, sql_escape(&url), alias, mode)
 }
 
 /// Excel sink: COPY ... TO '<path>' (FORMAT 'xlsx'). The form's
@@ -7395,7 +7443,7 @@ fn build_sink_sql(
         "snk.sqlite" | "snk.duckdb" => Ok(build_db_sink(props, from_view)),
         "snk.postgres" | "snk.cockroach" | "snk.mysql" | "snk.mariadb"
         | "snk.motherduck" | "snk.ducklake" | "snk.pgvector"
-        | "snk.redshift" | "snk.bigquery" => build_relational_sink(component_id, props, from_view),
+        | "snk.redshift" | "snk.bigquery" | "snk.quack" => build_relational_sink(component_id, props, from_view),
         "snk.excel" => Ok(build_excel_sink(props, from_view)),
         "snk.spatial" => Ok(build_spatial_sink(props, from_view)),
         "snk.iceberg" => Ok(build_iceberg_sink(props, from_view)),
@@ -7627,6 +7675,83 @@ mod tests {
         assert!(compiled.stages[2]
             .sql
             .contains("TO '/tmp/out.parquet' (FORMAT PARQUET"));
+    }
+
+    #[test]
+    fn quack_source_emits_attach_with_secret() {
+        let p = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s1","position":{"x":0,"y":0},"data":{
+                  "label":"Quack","componentId":"src.quack",
+                  "properties":{"host":"duck.example.com","port":9494,
+                                "token":"super_secret","tableName":"orders"}}},
+                {"id":"k1","position":{"x":0,"y":0},"data":{
+                  "label":"CSV","componentId":"snk.csv",
+                  "properties":{"path":"/tmp/out.csv","hasHeader":true}}}
+              ],
+              "edges": [
+                {"id":"e1","source":"s1","target":"k1",
+                  "data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let compiled = compile(&p).unwrap();
+        let src_sql = &compiled.stages[0].sql;
+        assert!(
+            src_sql.contains("CREATE OR REPLACE SECRET duckle_quack_secret"),
+            "missing SECRET creation: {}",
+            src_sql
+        );
+        assert!(src_sql.contains("TYPE QUACK"), "wrong SECRET type: {}", src_sql);
+        assert!(src_sql.contains("'super_secret'"), "token not in SECRET: {}", src_sql);
+        assert!(
+            src_sql.contains("ATTACH 'quack:duck.example.com:9494'"),
+            "wrong ATTACH URL: {}",
+            src_sql
+        );
+        assert!(src_sql.contains("AS duckle_src"), "wrong alias: {}", src_sql);
+        assert!(src_sql.contains("READ_ONLY"), "missing READ_ONLY: {}", src_sql);
+        assert!(
+            src_sql.contains("SELECT * FROM duckle_src"),
+            "missing SELECT from alias: {}",
+            src_sql
+        );
+    }
+
+    #[test]
+    fn quack_source_omits_secret_when_no_token() {
+        // Unauthenticated test servers: leave the SECRET off entirely
+        // rather than emitting an empty TOKEN clause.
+        let p = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s1","position":{"x":0,"y":0},"data":{
+                  "label":"Quack","componentId":"src.quack",
+                  "properties":{"host":"localhost","tableName":"t"}}},
+                {"id":"k1","position":{"x":0,"y":0},"data":{
+                  "label":"CSV","componentId":"snk.csv",
+                  "properties":{"path":"/tmp/o.csv","hasHeader":true}}}
+              ],
+              "edges": [
+                {"id":"e1","source":"s1","target":"k1",
+                  "data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let compiled = compile(&p).unwrap();
+        let src_sql = &compiled.stages[0].sql;
+        assert!(
+            !src_sql.contains("CREATE OR REPLACE SECRET"),
+            "should not emit empty SECRET: {}",
+            src_sql
+        );
+        // Default port 9494 is appended when host has no explicit port.
+        assert!(
+            src_sql.contains("'quack:localhost:9494'"),
+            "missing default port: {}",
+            src_sql
+        );
     }
 
     #[test]

@@ -48,6 +48,31 @@ import hu from './locales/hu.json';
 import ro from './locales/ro.json';
 import tl from './locales/tl.json';
 import ms from './locales/ms.json';
+import no from './locales/no.json';
+import da from './locales/da.json';
+import fi from './locales/fi.json';
+import ca from './locales/ca.json';
+import bg from './locales/bg.json';
+import sk from './locales/sk.json';
+import hr from './locales/hr.json';
+import sr from './locales/sr.json';
+import sl from './locales/sl.json';
+import lt from './locales/lt.json';
+import lv from './locales/lv.json';
+import et from './locales/et.json';
+import km from './locales/km.json';
+import my from './locales/my.json';
+import si from './locales/si.json';
+import ne from './locales/ne.json';
+import sw from './locales/sw.json';
+import af from './locales/af.json';
+import cy from './locales/cy.json';
+import ga from './locales/ga.json';
+import is_ from './locales/is.json';
+import sq from './locales/sq.json';
+import az from './locales/az.json';
+import mn from './locales/mn.json';
+import kk from './locales/kk.json';
 
 // Locales may be missing newer keys (filled in by scripts/i18n-translate.py).
 // i18next's fallbackLng resolves missing keys to en, so loose typing is safe.
@@ -88,6 +113,32 @@ const RESOURCES: Record<LangCode, LocaleBundle> = {
     'ro':    { common: ro },
     'tl':    { common: tl },
     'ms':    { common: ms },
+    // Pass 3 additions (25 languages, 35 -> 60 total)
+    'no':    { common: no },
+    'da':    { common: da },
+    'fi':    { common: fi },
+    'ca':    { common: ca },
+    'bg':    { common: bg },
+    'sk':    { common: sk },
+    'hr':    { common: hr },
+    'sr':    { common: sr },
+    'sl':    { common: sl },
+    'lt':    { common: lt },
+    'lv':    { common: lv },
+    'et':    { common: et },
+    'km':    { common: km },
+    'my':    { common: my },
+    'si':    { common: si },
+    'ne':    { common: ne },
+    'sw':    { common: sw },
+    'af':    { common: af },
+    'cy':    { common: cy },
+    'ga':    { common: ga },
+    'is':    { common: is_ },
+    'sq':    { common: sq },
+    'az':    { common: az },
+    'mn':    { common: mn },
+    'kk':    { common: kk },
 };
 
 void i18n

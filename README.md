@@ -56,9 +56,9 @@
 **Reference**
 
 - [Capabilities matrix](#capabilities)
-- [Sources](#sources-73-available)
+- [Sources](#sources-74-available)
 - [Transforms](#transforms-123-available)
-- [Sinks](#sinks-57-available)
+- [Sinks](#sinks-58-available)
 - [Data quality](#data-quality-12-available)
 - [Custom code](#custom-code-7-available)
 - [Control flow](#control-flow-14-available)
@@ -138,7 +138,7 @@ The sidebar on the right is **Duckie AI Assistant** - powered by **Qwen 2.5 Code
 | **Git-friendly by design** | Pipelines, connections, contexts, and routines persist as plain files in a folder you pick. Diff them, branch them, review them. |
 | **290+ connectors that work** | Files, databases, warehouses, lakehouses, object stores, SaaS APIs, NoSQL, streaming brokers, vector DBs, FTP, IMAP, SMTP. Each is covered by tests. |
 | **Honest about scope** | Single-machine and embedded by design. Built to make local and small-team data work fast, not to replace a distributed warehouse. |
-| **35 UI languages** | Topbar, palette, chat assistant, and common dialogs ship localized. English, Spanish, Chinese (Simplified + Traditional), Hindi, Arabic, Portuguese (Brazil), Bengali, Russian, Japanese, Punjabi, German, Korean, French, Vietnamese, Telugu, Marathi, Turkish, Tamil, Urdu, Persian, Polish, Italian, Ukrainian, Indonesian, Thai, Dutch, Hebrew, Swedish, Greek, Czech, Hungarian, Romanian, Filipino, Malay. RTL (Arabic, Hebrew, Persian, Urdu) supported. Switch languages from the topbar globe. |
+| **60 UI languages** | Topbar, palette, chat assistant, properties panel, and common dialogs ship localized. English, Spanish, Chinese (Simplified + Traditional), Hindi, Arabic, Portuguese (Brazil), Bengali, Russian, Japanese, Punjabi, German, Korean, French, Vietnamese, Telugu, Marathi, Turkish, Tamil, Urdu, Persian, Polish, Italian, Ukrainian, Indonesian, Thai, Dutch, Hebrew, Swedish, Greek, Czech, Hungarian, Romanian, Filipino, Malay, Norwegian, Danish, Finnish, Catalan, Bulgarian, Slovak, Croatian, Serbian, Slovenian, Lithuanian, Latvian, Estonian, Khmer, Burmese, Sinhala, Nepali, Swahili, Afrikaans, Welsh, Irish, Icelandic, Albanian, Azerbaijani, Mongolian, Kazakh. RTL (Arabic, Hebrew, Persian, Urdu) supported. Switch languages from the topbar globe. |
 | **Open source** | Dual-licensed MIT OR Apache-2.0. Yours to use, fork, and extend. |
 
 ---
@@ -185,7 +185,7 @@ The component palette ships **313 nodes** so the roadmap is visible in the produ
 
 Duckle is not a CSV tool with extras. It reads a broad set of formats and sources, ships a deep transform library, and writes to files, databases, object storage, vector DBs, message buses, and email.
 
-### Sources (73 available)
+### Sources (74 available)
 
 | Group | Connectors | Status |
 |---|---|---|
@@ -197,7 +197,7 @@ Duckle is not a CSV tool with extras. It reads a broad set of formats and source
 | **Network relational DBs** | SQL Server (TDS), Oracle (Instant Client at runtime), ClickHouse (HTTP API) | Available |
 | **Network relational DBs** | IBM DB2, generic JDBC | Planned |
 | **Object storage** | Amazon S3, Google Cloud Storage, Azure Blob, HTTP(S), MinIO, Cloudflare R2, Backblaze B2 | Available (live CI for MinIO) |
-| **Cloud warehouses** | MotherDuck, Snowflake (SQL API + PAT/JWT), BigQuery, Redshift (postgres ATTACH), Databricks SQL (Statement Execution + chunk follow), Azure Synapse (TDS) | Available |
+| **Cloud warehouses** | MotherDuck, Snowflake (SQL API + PAT/JWT), BigQuery, Redshift (postgres ATTACH), Databricks SQL (Statement Execution + chunk follow), Azure Synapse (TDS), **DuckDB Quack** (May 2026 remote protocol - HTTP on :9494, SECRET-based token auth) | Available |
 | **Streaming** | Apache Kafka / Redpanda (pure-Rust `rskafka`), NATS JetStream, GCP Pub/Sub (REST + auto-ack), RabbitMQ (`lapin` AMQP), AWS Kinesis (HTTP + SigV4 - no AWS SDK) | Available |
 | **Streaming** | Pulsar, Event Hubs, multi-shard Kinesis | Planned |
 | **APIs and SaaS (REST)** | Salesforce, HubSpot, Pipedrive, Zendesk, Intercom, Stripe, QuickBooks, Xero, Shopify, Notion, Airtable, Asana, Trello, ClickUp, Monday.com, GitHub, GitLab, Linear, Jira, Slack, Discord, Telegram, Twilio, Mailchimp, SendGrid, Segment - thin pre-configured wrappers over `src.rest` / `src.graphql` | Available |
@@ -265,7 +265,7 @@ Validators split their input: passing rows continue on the main port, failures r
 | **JavaScript UDF** | Per-row JS transform via pure-Rust `boa` interpreter. Sandboxed. Define a `transform(row)` function. |
 | **Python / Rust UDFs** | Embedded-language stages | Planned |
 
-### Sinks (57 available)
+### Sinks (58 available)
 
 | Group | Connectors | Status |
 |---|---|---|
@@ -277,7 +277,7 @@ Validators split their input: passing rows continue on the main port, failures r
 | **Network relational DBs** | SQL Server / Azure Synapse (TDS, multi-row VALUES batched), Oracle (Instant Client; INSERT ALL), ClickHouse (HTTP JSONEachRow) | Available |
 | **Network relational DBs** | IBM DB2, generic JDBC | Planned |
 | **Object storage** | S3, GCS, Azure Blob via DuckDB `httpfs` (MinIO / R2 / B2 via endpoint) | Available |
-| **Cloud warehouses** | MotherDuck, Snowflake (PAT or JWT RS256), BigQuery, Redshift, Databricks SQL, Azure Synapse | Available |
+| **Cloud warehouses** | MotherDuck, Snowflake (PAT or JWT RS256), BigQuery, Redshift, Databricks SQL, Azure Synapse, **DuckDB Quack** (concurrent writers to remote DuckDB via the May 2026 protocol) | Available |
 | **HTTP APIs** | REST (POST/PUT/PATCH batched JSON-array), Webhook (one POST per row), GraphQL mutations | Available |
 | **Email (SMTP)** | Per-row SMTP send via pure-Rust `lettre` + rustls. Plain text v1; HTML + attachments follow. | Available |
 | **NoSQL** | MongoDB (insert_many batched), Cassandra / ScyllaDB (CQL), Elasticsearch / OpenSearch (`_bulk` NDJSON), Redis (pipelined SET) | Available |
@@ -454,10 +454,10 @@ A wider tour of the workflow.
 
 | Step | What you do | Where to look |
 |---|---|---|
-| **1. Sources** | Drag a source, point it at a file / DB / cloud URL / SaaS endpoint. Click **Autodetect schema** to read columns + a sample. | [Sources reference](#sources-73-available) |
+| **1. Sources** | Drag a source, point it at a file / DB / cloud URL / SaaS endpoint. Click **Autodetect schema** to read columns + a sample. | [Sources reference](#sources-74-available) |
 | **2. Transforms** | Wire transforms to source output ports. Configure in the Properties panel. **Preview** tab shows live rows; **Plan** tab shows generated SQL. | [Transforms reference](#transforms-123-available) |
 | **3. Data quality** | Drop in a validator (Not-Null, Range, Regex, Uniqueness). Passing rows continue on the main port; failures route to the **reject** port. | [Data quality reference](#data-quality-12-available) |
-| **4. Sinks** | Finish with a sink (file, DB, cloud, vector DB, message bus, email). Set write mode (overwrite, append, truncate, upsert). | [Sinks reference](#sinks-57-available) |
+| **4. Sinks** | Finish with a sink (file, DB, cloud, vector DB, message bus, email). Set write mode (overwrite, append, truncate, upsert). | [Sinks reference](#sinks-58-available) |
 | **5. Run** | Press **Run** to execute on DuckDB. Nodes light up stage by stage; **Output** + **Console** show row counts, timing, errors. Stop button kills mid-run. | [Run feedback](#orchestration-and-workspace) |
 | **6. Ask Duckie** | For anything you can describe in English, the AI assistant can sketch a pipeline. Iterate by editing the graph or asking follow-ups. | [Meet Duckie](#meet-duckie---the-local-ai-pipeline-assistant) |
 | **7. Reuse** | Save Connections, Context variables, and SQL Routines in the workspace; reference `${context.var}` in any field. Everything persists as plain files. | [Workspace and Git flow](#workspace-and-git-flow) |

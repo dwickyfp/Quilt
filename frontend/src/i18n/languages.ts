@@ -8,7 +8,10 @@ export type LangCode =
   | 'ru' | 'ja' | 'pa' | 'de' | 'ko' | 'fr' | 'vi' | 'te'
   | 'mr' | 'tr' | 'ta' | 'ur' | 'fa' | 'pl' | 'it' | 'uk'
   | 'id' | 'th' | 'nl' | 'he' | 'sv' | 'el' | 'cs' | 'hu'
-  | 'ro' | 'tl' | 'ms';
+  | 'ro' | 'tl' | 'ms'
+  | 'no' | 'da' | 'fi' | 'ca' | 'bg' | 'sk' | 'hr' | 'sr'
+  | 'sl' | 'lt' | 'lv' | 'et' | 'km' | 'my' | 'si' | 'ne'
+  | 'sw' | 'af' | 'cy' | 'ga' | 'is' | 'sq' | 'az' | 'mn' | 'kk';
 
 export interface LangMeta {
     code: LangCode;
@@ -53,6 +56,31 @@ export const LANGUAGES: LangMeta[] = [
     { code: 'ro',    name: 'Romanian',             nativeName: 'Romana',            dir: 'ltr' },
     { code: 'tl',    name: 'Filipino',             nativeName: 'Filipino',          dir: 'ltr' },
     { code: 'ms',    name: 'Malay',                nativeName: 'Bahasa Melayu',     dir: 'ltr' },
+    { code: 'no',    name: 'Norwegian',            nativeName: 'Norsk',             dir: 'ltr' },
+    { code: 'da',    name: 'Danish',               nativeName: 'Dansk',             dir: 'ltr' },
+    { code: 'fi',    name: 'Finnish',              nativeName: 'Suomi',             dir: 'ltr' },
+    { code: 'ca',    name: 'Catalan',              nativeName: 'Catala',            dir: 'ltr' },
+    { code: 'bg',    name: 'Bulgarian',            nativeName: 'Български', dir: 'ltr' },
+    { code: 'sk',    name: 'Slovak',               nativeName: 'Slovencina',        dir: 'ltr' },
+    { code: 'hr',    name: 'Croatian',             nativeName: 'Hrvatski',          dir: 'ltr' },
+    { code: 'sr',    name: 'Serbian',              nativeName: 'Српски',  dir: 'ltr' },
+    { code: 'sl',    name: 'Slovenian',            nativeName: 'Slovenscina',       dir: 'ltr' },
+    { code: 'lt',    name: 'Lithuanian',           nativeName: 'Lietuviu',          dir: 'ltr' },
+    { code: 'lv',    name: 'Latvian',              nativeName: 'Latviesu',          dir: 'ltr' },
+    { code: 'et',    name: 'Estonian',             nativeName: 'Eesti',             dir: 'ltr' },
+    { code: 'km',    name: 'Khmer',                nativeName: 'ខ្មែរ',  dir: 'ltr' },
+    { code: 'my',    name: 'Burmese',              nativeName: 'မြန်မာ',  dir: 'ltr' },
+    { code: 'si',    name: 'Sinhala',              nativeName: 'සිංහල',  dir: 'ltr' },
+    { code: 'ne',    name: 'Nepali',               nativeName: 'नेपाली',  dir: 'ltr' },
+    { code: 'sw',    name: 'Swahili',              nativeName: 'Kiswahili',         dir: 'ltr' },
+    { code: 'af',    name: 'Afrikaans',            nativeName: 'Afrikaans',         dir: 'ltr' },
+    { code: 'cy',    name: 'Welsh',                nativeName: 'Cymraeg',           dir: 'ltr' },
+    { code: 'ga',    name: 'Irish',                nativeName: 'Gaeilge',           dir: 'ltr' },
+    { code: 'is',    name: 'Icelandic',            nativeName: 'Islenska',          dir: 'ltr' },
+    { code: 'sq',    name: 'Albanian',             nativeName: 'Shqip',             dir: 'ltr' },
+    { code: 'az',    name: 'Azerbaijani',          nativeName: 'Azerbaycanca',      dir: 'ltr' },
+    { code: 'mn',    name: 'Mongolian',            nativeName: 'Монгол',  dir: 'ltr' },
+    { code: 'kk',    name: 'Kazakh',               nativeName: 'Қазақша', dir: 'ltr' },
 ];
 
 export const RTL_LANGS = new Set<string>(

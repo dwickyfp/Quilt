@@ -1031,6 +1031,29 @@ function synthWarehouseSource(comp: ComponentDef): ComponentManifest {
             },
         ]);
     }
+    if (comp.id === 'src.quack') {
+        // Quack (DuckDB May 2026 remote protocol). The server runs
+        // quack_serve(...) on port 9494 by default; the client ATTACHes
+        // the quack: URL with a SECRET carrying the token. Requires a
+        // Quack-enabled DuckDB build on both sides.
+        return base(comp, [
+            {
+                label: 'Connection',
+                fields: [
+                    { key: 'host', label: 'Host', kind: 'text', required: true, placeholder: 'duck.example.com' },
+                    { key: 'port', label: 'Port', kind: 'integer', defaultValue: 9494, description: 'Default Quack port is 9494.' },
+                    { key: 'token', label: 'Token', kind: 'text', placeholder: 'super_secret', description: 'Auth token; matches the value passed to quack_serve(token=...). Leave empty for unauthenticated test servers.' },
+                ],
+            },
+            {
+                label: 'Query',
+                fields: [
+                    { key: 'schemaName', label: 'Schema', kind: 'text', defaultValue: 'main' },
+                    { key: 'tableName', label: 'Table', kind: 'text', required: true, placeholder: 'orders' },
+                ],
+            },
+        ]);
+    }
     return base(comp, [
         {
             label: 'Account',
@@ -1202,6 +1225,39 @@ function synthWarehouseSink(comp: ComponentDef): ComponentManifest {
                         kind: 'text',
                         description: 'Optional. If empty, MOTHERDUCK_TOKEN from the environment is used.',
                     },
+                    { key: 'schemaName', label: 'Schema', kind: 'text', defaultValue: 'main' },
+                    { key: 'tableName', label: 'Table', kind: 'text', required: true, placeholder: 'orders' },
+                    {
+                        key: 'mode',
+                        label: 'Write mode',
+                        kind: 'select',
+                        defaultValue: 'overwrite',
+                        options: [
+                            { label: 'Create or replace', value: 'overwrite' },
+                            { label: 'Append (insert)', value: 'append' },
+                            { label: 'Truncate + insert', value: 'truncate' },
+                        ],
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
+    if (comp.id === 'snk.quack') {
+        // Mirror src.quack with an added write-mode picker. Reuses the
+        // standard relational sink path so append / overwrite / truncate
+        // all behave the same as snk.postgres / snk.motherduck.
+        return base(comp, [
+            {
+                label: 'Connection',
+                fields: [
+                    { key: 'host', label: 'Host', kind: 'text', required: true, placeholder: 'duck.example.com' },
+                    { key: 'port', label: 'Port', kind: 'integer', defaultValue: 9494, description: 'Default Quack port is 9494.' },
+                    { key: 'token', label: 'Token', kind: 'text', placeholder: 'super_secret', description: 'Auth token; matches the value passed to quack_serve(token=...).' },
+                ],
+            },
+            {
+                label: 'Destination',
+                fields: [
                     { key: 'schemaName', label: 'Schema', kind: 'text', defaultValue: 'main' },
                     { key: 'tableName', label: 'Table', kind: 'text', required: true, placeholder: 'orders' },
                     {

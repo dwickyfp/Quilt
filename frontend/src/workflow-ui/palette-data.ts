@@ -134,6 +134,7 @@ export const PALETTE: Category[] = [
                     src('databricks', 'Databricks SQL', 'available', 'Read Databricks via the SQL Statement Execution API with PAT Bearer auth. Engine materializes inline result sets as a DuckDB table for downstream stages.'),
                     src('synapse', 'Azure Synapse', 'available', 'Azure Synapse rides the SQL Server TDS wire - same connection form as src.sqlserver.'),
                     src('motherduck', 'MotherDuck', 'available', 'Read from MotherDuck via ATTACH md:'),
+                    src('quack', 'DuckDB Quack', 'available', 'Read tables from a remote DuckDB instance over the Quack protocol (HTTP on port 9494). Server runs quack_serve(...); client ATTACHes the quack: URL with a token-based SECRET.'),
                 ],
             },
             {
@@ -494,6 +495,7 @@ export const PALETTE: Category[] = [
                 label: 'Cloud Warehouses',
                 components: [
                     snk('motherduck', 'MotherDuck', 'available', 'Write a table into MotherDuck via ATTACH md:'),
+                    snk('quack', 'DuckDB Quack', 'available', 'Write a table to a remote DuckDB instance over the Quack protocol (HTTP on port 9494). Supports append / overwrite / truncate / upsert modes via the standard relational sink path.'),
                     snk('snowflake', 'Snowflake', 'available', 'INSERT to a Snowflake table via the SQL API (/api/v2/statements) with PAT (Personal Access Token) bearer auth. Multi-row INSERTs batched at 1000 rows by default.'),
                     snk('bigquery', 'BigQuery', 'available', 'Write tables to BigQuery via the duckdb-bigquery community extension'),
                     snk('redshift', 'Redshift', 'available', 'Write Redshift via the postgres ATTACH path (Postgres wire on port 5439); overwrite / append / truncate / upsert all supported via the existing PG sink modes'),

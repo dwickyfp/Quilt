@@ -109,6 +109,10 @@ def main():
         'de', 'ko', 'fr', 'vi', 'te', 'mr', 'tr', 'ta', 'ur', 'fa', 'pl',
         'it', 'uk', 'id', 'th', 'nl', 'he', 'sv', 'el', 'cs', 'hu', 'ro',
         'tl', 'ms',
+        # Pass 3 additions (25 languages, 35 -> 60 total)
+        'no', 'da', 'fi', 'ca', 'bg', 'sk', 'hr', 'sr', 'sl', 'lt',
+        'lv', 'et', 'km', 'my', 'si', 'ne', 'sw', 'af', 'cy', 'ga',
+        'is', 'sq', 'az', 'mn', 'kk',
     ]
     langs = args.only if args.only else all_langs
 
