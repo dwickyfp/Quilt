@@ -1163,14 +1163,19 @@ impl DuckdbEngine {
     ) -> Result<String, EngineError> {
         let conn = oracle::Connection::connect(&spec.user, &spec.password, &spec.connect)
             .map_err(|e| EngineError::Query(format!("oracle connect: {}", e)))?;
-        let stmt = conn
+        // Issue #4: the default Oracle prefetch is tiny (often 1 row
+        // per round trip). On a 10 000-row x 37-column table that's
+        // 10 000 network round trips, which presented to users as
+        // "the query never finishes". 1 000 rows per fetch keeps the
+        // socket busy and matches typical sqlplus / ODBC defaults.
+        let mut stmt = conn
             .statement(&spec.query)
+            .prefetch_rows(1000)
             .build()
             .map_err(|e| EngineError::Query(format!("oracle prepare: {}", e)))?;
-        let rs = conn
-            .query(&spec.query, &[])
+        let rs = stmt
+            .query(&[])
             .map_err(|e| EngineError::Query(format!("oracle query: {}", e)))?;
-        let _ = stmt; // suppress unused warning; rs owns the statement.
         let cols: Vec<String> = rs
             .column_info()
             .iter()
@@ -1181,18 +1186,7 @@ impl DuckdbEngine {
             let row = row_res.map_err(|e| EngineError::Query(format!("oracle row: {}", e)))?;
             let mut obj = serde_json::Map::new();
             for (i, name) in cols.iter().enumerate() {
-                let v: JsonValue = if let Ok(Some(s)) = row.get::<usize, Option<String>>(i) {
-                    JsonValue::String(s)
-                } else if let Ok(Some(n)) = row.get::<usize, Option<i64>>(i) {
-                    JsonValue::from(n)
-                } else if let Ok(Some(f)) = row.get::<usize, Option<f64>>(i) {
-                    serde_json::Number::from_f64(f)
-                        .map(JsonValue::Number)
-                        .unwrap_or(JsonValue::Null)
-                } else {
-                    JsonValue::Null
-                };
-                obj.insert(name.clone(), v);
+                obj.insert(name.clone(), Self::oracle_cell_to_json(&row, i));
             }
             rows.push(JsonValue::Object(obj));
         }
@@ -1202,6 +1196,79 @@ impl DuckdbEngine {
             "oracle: materialized {} rows into {}",
             count, spec.node_id
         ))
+    }
+
+    /// Convert one cell of an Oracle row to JSON without silently
+    /// losing data. The old approach was a try-String-then-i64-then-
+    /// f64 cascade, which fell through to NULL for DATE / TIMESTAMP /
+    /// BLOB / RAW / NUMBER-that-overflows-i64 columns - whole
+    /// columns vanished in downstream Parquet (issue #4).
+    ///
+    /// Strategy: dispatch by Oracle column type. NUMBER with a
+    /// non-zero scale is parsed as f64 if it fits, otherwise kept as
+    /// a string to avoid the precision trap with high-precision
+    /// decimals. DATE / TIMESTAMP becomes an ISO-shaped string.
+    /// BLOB / RAW gets base64-encoded. Unknown types fall through to
+    /// the String accessor so the cell is at worst visible as text
+    /// rather than NULL.
+    #[cfg(feature = "oracle")]
+    fn oracle_cell_to_json(row: &oracle::Row, i: usize) -> JsonValue {
+        use oracle::sql_type::OracleType;
+        let infos = row.column_info();
+        let oty = infos
+            .get(i)
+            .map(|c| c.oracle_type().clone())
+            .unwrap_or(OracleType::Varchar2(0));
+
+        match oty {
+            OracleType::Number(_, scale) if scale == 0 => {
+                if let Ok(Some(n)) = row.get::<usize, Option<i64>>(i) {
+                    return JsonValue::from(n);
+                }
+                if let Ok(Some(s)) = row.get::<usize, Option<String>>(i) {
+                    return JsonValue::String(s);
+                }
+                JsonValue::Null
+            }
+            OracleType::Number(_, _)
+            | OracleType::Float(_)
+            | OracleType::BinaryDouble
+            | OracleType::BinaryFloat => {
+                if let Ok(Some(s)) = row.get::<usize, Option<String>>(i) {
+                    if let Ok(n) = s.parse::<f64>() {
+                        if let Some(num) = serde_json::Number::from_f64(n) {
+                            return JsonValue::Number(num);
+                        }
+                    }
+                    return JsonValue::String(s);
+                }
+                JsonValue::Null
+            }
+            OracleType::Date
+            | OracleType::Timestamp(_)
+            | OracleType::TimestampTZ(_)
+            | OracleType::TimestampLTZ(_) => row
+                .get::<usize, Option<String>>(i)
+                .ok()
+                .flatten()
+                .map(JsonValue::String)
+                .unwrap_or(JsonValue::Null),
+            OracleType::BLOB | OracleType::Raw(_) | OracleType::LongRaw => {
+                use base64::engine::general_purpose::STANDARD as B64;
+                use base64::Engine as _;
+                row.get::<usize, Option<Vec<u8>>>(i)
+                    .ok()
+                    .flatten()
+                    .map(|b| JsonValue::String(B64.encode(&b)))
+                    .unwrap_or(JsonValue::Null)
+            }
+            _ => row
+                .get::<usize, Option<String>>(i)
+                .ok()
+                .flatten()
+                .map(JsonValue::String)
+                .unwrap_or(JsonValue::Null),
+        }
     }
 
     #[cfg(not(feature = "oracle"))]
