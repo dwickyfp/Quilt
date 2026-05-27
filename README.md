@@ -57,7 +57,7 @@
 
 - [Capabilities matrix](#capabilities)
 - [Sources](#sources-74-available)
-- [Transforms](#transforms-124-available)
+- [Transforms](#transforms-126-available)
 - [Sinks](#sinks-58-available)
 - [Data quality](#data-quality-12-available)
 - [Custom code](#custom-code-7-available)
@@ -211,7 +211,7 @@ Duckle is not a CSV tool with extras. It reads a broad set of formats and source
 | **Desktop** | System clipboard (pure-Rust `arboard`, auto-detects JSON-array shape) | Available |
 | **Repos** | Git (commit log or file tree from a local working copy; shells out to system `git` CLI) | Available |
 
-### Transforms (124 available)
+### Transforms (126 available)
 
 | Group | Operations |
 |---|---|
@@ -227,7 +227,7 @@ Duckle is not a CSV tool with extras. It reads a broad set of formats and source
 | **JSON / nested** | Parse, Stringify, Flatten, JSONPath Extract, Merge Objects, Array Aggregate |
 | **Array** | Explode / Unnest, Collect List, Element At, Contains, Distinct, Length |
 | **Pivot / shape** | Pivot, Unpivot, Denormalize, Normalize, Transpose |
-| **CDC / SCD** | Diff Detect, SCD Type 1, SCD Type 2 (valid_from / valid_to / is_current), Merge / Upsert |
+| **CDC / SCD** | Diff Detect, SCD Type 1, SCD Type 2 (valid_from / valid_to / is_current), Merge / Upsert, Row Hash (md5 / sha1 / sha256 fingerprint), Audit Stamp (`_loaded_at` / `_loaded_date` / `_source` / `_batch_id`) |
 | **AI / Search** | **Vector Similarity Search** (cosine / L2 / inner product over FLOAT[N] via `vss`), **Full-Text Search** (BM25 via `fts`), **Embeddings** (OpenAI-compatible `/v1/embeddings`), **LLM Transform** (per-row chat completion with `{column}` templates), **Classify** (LLM-backed, normalizes to UNKNOWN), **Text Chunker** (RAG-ready, pure local), **PII Redact** (regex - emails / phones / SSNs / cards), **Semantic Dedupe** (cosine over precomputed embeddings) |
 | **Geospatial** | Spatial Distance (ST_Distance), Spatial Buffer (ST_Buffer), Spatial Intersects (ST_Intersects) |
 | **Debug** | Log Rows, Assert (hard-fail on SQL predicate violation) |
@@ -455,7 +455,7 @@ A wider tour of the workflow.
 | Step | What you do | Where to look |
 |---|---|---|
 | **1. Sources** | Drag a source, point it at a file / DB / cloud URL / SaaS endpoint. Click **Autodetect schema** to read columns + a sample. | [Sources reference](#sources-74-available) |
-| **2. Transforms** | Wire transforms to source output ports. Configure in the Properties panel. **Preview** tab shows live rows; **Plan** tab shows generated SQL. | [Transforms reference](#transforms-124-available) |
+| **2. Transforms** | Wire transforms to source output ports. Configure in the Properties panel. **Preview** tab shows live rows; **Plan** tab shows generated SQL. | [Transforms reference](#transforms-126-available) |
 | **3. Data quality** | Drop in a validator (Not-Null, Range, Regex, Uniqueness). Passing rows continue on the main port; failures route to the **reject** port. | [Data quality reference](#data-quality-12-available) |
 | **4. Sinks** | Finish with a sink (file, DB, cloud, vector DB, message bus, email). Set write mode (overwrite, append, truncate, upsert). | [Sinks reference](#sinks-58-available) |
 | **5. Run** | Press **Run** to execute on DuckDB. Nodes light up stage by stage; **Output** + **Console** show row counts, timing, errors. Stop button kills mid-run. | [Run feedback](#orchestration-and-workspace) |

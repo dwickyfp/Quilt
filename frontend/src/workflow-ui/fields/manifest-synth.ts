@@ -3021,6 +3021,63 @@ function synthArrayTransform(comp: ComponentDef): ComponentManifest {
 
 function synthCdcTransform(comp: ComponentDef): ComponentManifest {
     const id = comp.id;
+    if (id === 'xf.row_hash') {
+        return base(comp, [
+            {
+                label: 'Row hash',
+                fields: [
+                    {
+                        key: 'columns',
+                        label: 'Columns to hash',
+                        kind: 'columns',
+                        required: true,
+                        description: 'Listed in this order. concat_ws("||", col1, col2, ...) then hashed.',
+                    },
+                    {
+                        key: 'algorithm',
+                        label: 'Algorithm',
+                        kind: 'select',
+                        defaultValue: 'md5',
+                        options: [
+                            { label: 'md5  (16-byte hex, fastest)', value: 'md5' },
+                            { label: 'sha1  (20-byte hex)', value: 'sha1' },
+                            { label: 'sha256  (32-byte hex, collision-safe)', value: 'sha256' },
+                        ],
+                    },
+                    {
+                        key: 'outputColumn',
+                        label: 'Output column',
+                        kind: 'text',
+                        defaultValue: '_row_hash',
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
+    if (id === 'xf.audit') {
+        return base(comp, [
+            {
+                label: 'Audit columns',
+                fields: [
+                    { key: 'loadedAt', label: 'Add _loaded_at (current_timestamp)', kind: 'bool', defaultValue: true },
+                    { key: 'loadedDate', label: 'Add _loaded_date (current_date)', kind: 'bool', defaultValue: false },
+                    {
+                        key: 'source',
+                        label: 'Source label (_source)',
+                        kind: 'text',
+                        placeholder: 'orders_etl',
+                        description: 'String literal stamped on every row. Use {{ context.var }} to pull a per-run value.',
+                    },
+                    {
+                        key: 'batchId',
+                        label: 'Batch ID (_batch_id)',
+                        kind: 'text',
+                        placeholder: '{{ context.run_id }}',
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
     return base(comp, [
         {
             label: 'Keys',

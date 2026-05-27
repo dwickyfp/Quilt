@@ -3813,6 +3813,8 @@ fn build_view_sql(
         "xf.fill_forward" => build_fill_forward(inputs, props),
         "xf.fill_backward" => build_fill_backward(inputs, props),
         "xf.fill_constant" => build_fill_constant(inputs, props),
+        "xf.row_hash" => build_row_hash(inputs, props),
+        "xf.audit" => build_audit(inputs, props),
         "xf.cumulative" => build_cumulative(inputs, props),
         "xf.dt.bin" => build_dt_bin(inputs, props),
         "xf.arr.length" => build_arr_length(inputs, props),
@@ -6918,6 +6920,87 @@ fn build_fill_forward(inputs: &NodeInputs, props: &JsonValue) -> Result<String, 
     ))
 }
 
+/// Row hash: append a stable fingerprint column computed over N
+/// other columns. The classic CDC primitive - hash a tuple's
+/// content so downstream you can answer "did this row's value
+/// change?" without comparing every column.
+///
+/// SQL: SELECT *, {algo}(concat_ws('||', col1::VARCHAR, col2::VARCHAR, ...)) AS _row_hash
+///
+/// Concat separator is '||' (a pipe sequence that won't appear in
+/// typical data and that keeps multi-column distinguishable - "a"
+/// + "bc" != "ab" + "c" when the boundary marker is present).
+/// NULLs are coerced to the empty string via concat_ws's default
+/// NULL-skipping, which means rows with the same non-null values
+/// hash equal regardless of which optional fields were missing -
+/// usually what you want for change detection.
+fn build_row_hash(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.row_hash"))?;
+    let cols: Vec<String> = columns_from_props(props, "columns").unwrap_or_default();
+    if cols.is_empty() {
+        return Err("Row Hash needs at least one column".to_string());
+    }
+    let algo = string_prop(props, "algorithm")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "md5".into());
+    let algo_fn = match algo.as_str() {
+        "md5" => "md5",
+        "sha1" => "sha1",
+        "sha256" => "sha256",
+        other => return Err(format!("Row Hash: unknown algorithm '{}'", other)),
+    };
+    let out = string_prop(props, "outputColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "_row_hash".into());
+    let parts = cols
+        .iter()
+        .map(|c| format!("CAST({} AS VARCHAR)", quote_ident(c)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    Ok(format!(
+        "SELECT *, {algo}(concat_ws('||', {parts})) AS {out} FROM {up}",
+        algo = algo_fn,
+        parts = parts,
+        out = quote_ident(&out),
+        up = quote_ident(upstream)
+    ))
+}
+
+/// Audit columns: stamp every row with provenance + load metadata.
+/// The classic warehouse pattern - downstream you can answer "when
+/// did this row land?", "from which pipeline?", "which batch?"
+/// without joining back to a runs table.
+///
+/// All four columns are independently toggleable. Strings (`source`,
+/// `batchId`) are emitted as literals so context variables resolve
+/// at compile time. Use Duckle's `{{ context.foo }}` interpolation
+/// in the form to wire a per-run batch ID.
+fn build_audit(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.audit"))?;
+    let mut adds: Vec<String> = Vec::new();
+    let loaded_at = props.get("loadedAt").and_then(JsonValue::as_bool).unwrap_or(true);
+    if loaded_at {
+        adds.push("current_timestamp AS _loaded_at".to_string());
+    }
+    if props.get("loadedDate").and_then(JsonValue::as_bool).unwrap_or(false) {
+        adds.push("current_date AS _loaded_date".to_string());
+    }
+    if let Some(s) = string_prop(props, "source").filter(|s| !s.is_empty()) {
+        adds.push(format!("'{}' AS _source", sql_escape(&s)));
+    }
+    if let Some(b) = string_prop(props, "batchId").filter(|s| !s.is_empty()) {
+        adds.push(format!("'{}' AS _batch_id", sql_escape(&b)));
+    }
+    if adds.is_empty() {
+        return Err("Audit: enable at least one audit column".to_string());
+    }
+    Ok(format!(
+        "SELECT *, {extra} FROM {up}",
+        extra = adds.join(", "),
+        up = quote_ident(upstream)
+    ))
+}
+
 /// Constant-fill: replace NULLs in a column with a user-supplied
 /// literal. Rounds out the fill family (forward / backward / constant).
 /// String literals are auto-quoted so the user types `unknown`, not
@@ -7847,6 +7930,98 @@ mod tests {
         let sql = &compiled.stages[0].sql;
         assert!(sql.contains("dateformat='%d/%m/%Y'"), "missing dateformat: {}", sql);
         assert!(sql.contains("timestampformat='%d/%m/%Y %H:%M:%S'"), "missing timestampformat: {}", sql);
+    }
+
+    #[test]
+    fn row_hash_emits_concat_ws_with_casts() {
+        let p = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{
+                  "label":"CSV","componentId":"src.csv",
+                  "properties":{"path":"/tmp/x.csv","hasHeader":true}}},
+                {"id":"h","position":{"x":0,"y":0},"data":{
+                  "label":"Hash","componentId":"xf.row_hash",
+                  "properties":{"columns":["id","email","status"],"algorithm":"sha256","outputColumn":"fp"}}},
+                {"id":"k","position":{"x":0,"y":0},"data":{
+                  "label":"CSV out","componentId":"snk.csv",
+                  "properties":{"path":"/tmp/o.csv","hasHeader":true}}}
+              ],
+              "edges": [
+                {"id":"e1","source":"s","target":"h",
+                  "data":{"connectionType":"main"}},
+                {"id":"e2","source":"h","target":"k",
+                  "data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let compiled = compile(&p).unwrap();
+        let sql = &compiled.stages[1].sql;
+        assert!(sql.contains("sha256("), "wrong algorithm: {}", sql);
+        assert!(sql.contains("concat_ws('||'"), "wrong separator: {}", sql);
+        assert!(sql.contains("CAST(\"id\" AS VARCHAR)"), "id not cast: {}", sql);
+        assert!(sql.contains("CAST(\"email\" AS VARCHAR)"), "email not cast: {}", sql);
+        assert!(sql.contains(" AS \"fp\""), "custom output column not honoured: {}", sql);
+    }
+
+    #[test]
+    fn row_hash_default_algorithm_is_md5() {
+        let p = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{
+                  "label":"CSV","componentId":"src.csv",
+                  "properties":{"path":"/tmp/x.csv","hasHeader":true}}},
+                {"id":"h","position":{"x":0,"y":0},"data":{
+                  "label":"Hash","componentId":"xf.row_hash",
+                  "properties":{"columns":["id"]}}},
+                {"id":"k","position":{"x":0,"y":0},"data":{
+                  "label":"CSV out","componentId":"snk.csv",
+                  "properties":{"path":"/tmp/o.csv","hasHeader":true}}}
+              ],
+              "edges": [
+                {"id":"e1","source":"s","target":"h",
+                  "data":{"connectionType":"main"}},
+                {"id":"e2","source":"h","target":"k",
+                  "data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let compiled = compile(&p).unwrap();
+        let sql = &compiled.stages[1].sql;
+        assert!(sql.contains("md5("), "default should be md5: {}", sql);
+        assert!(sql.contains(" AS \"_row_hash\""), "default output column wrong: {}", sql);
+    }
+
+    #[test]
+    fn audit_emits_selected_columns_only() {
+        let p = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{
+                  "label":"CSV","componentId":"src.csv",
+                  "properties":{"path":"/tmp/x.csv","hasHeader":true}}},
+                {"id":"a","position":{"x":0,"y":0},"data":{
+                  "label":"Audit","componentId":"xf.audit",
+                  "properties":{"loadedAt":true,"loadedDate":false,"source":"orders_etl","batchId":"2026-05-27"}}},
+                {"id":"k","position":{"x":0,"y":0},"data":{
+                  "label":"CSV out","componentId":"snk.csv",
+                  "properties":{"path":"/tmp/o.csv","hasHeader":true}}}
+              ],
+              "edges": [
+                {"id":"e1","source":"s","target":"a",
+                  "data":{"connectionType":"main"}},
+                {"id":"e2","source":"a","target":"k",
+                  "data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let compiled = compile(&p).unwrap();
+        let sql = &compiled.stages[1].sql;
+        assert!(sql.contains("current_timestamp AS _loaded_at"), "loaded_at missing: {}", sql);
+        assert!(!sql.contains("_loaded_date"), "loaded_date should be off: {}", sql);
+        assert!(sql.contains("'orders_etl' AS _source"), "source literal missing: {}", sql);
+        assert!(sql.contains("'2026-05-27' AS _batch_id"), "batch_id missing: {}", sql);
     }
 
     #[test]
