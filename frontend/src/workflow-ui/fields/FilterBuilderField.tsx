@@ -285,6 +285,12 @@ export function FilterBuilderField({ value, onChange }: Props) {
                                             {col.name}
                                         </option>
                                     ))}
+                                    {c.column &&
+                                    !upstreamSchema.some(col => col.name === c.column) ? (
+                                        <option value={c.column}>
+                                            {c.column}  (not in input)
+                                        </option>
+                                    ) : null}
                                 </select>
                                 <select
                                     className="schema-input filter-condition-op"

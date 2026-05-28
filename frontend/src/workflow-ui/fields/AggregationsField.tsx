@@ -82,6 +82,12 @@ export function AggregationsField({ value, onChange }: Props) {
                                         {c.name}
                                     </option>
                                 ))}
+                                {a.column &&
+                                !upstreamSchema.some(c => c.name === a.column) ? (
+                                    <option value={a.column}>
+                                        {a.column}  (not in input)
+                                    </option>
+                                ) : null}
                             </select>
                             <select
                                 className="schema-input"
