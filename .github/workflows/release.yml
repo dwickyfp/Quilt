@@ -44,10 +44,15 @@ jobs:
           - os: ubuntu-24.04-arm
             binary: duckle
             asset: Duckle-linux-arm64
-          # macOS - macos-13 is the last Intel runner, macos-14 is M-series
-          - os: macos-13
+          # macOS - both built on the macos-14 (Apple Silicon) runner.
+          # The Intel binary is cross-compiled to x86_64-apple-darwin
+          # rather than run on a macos-13 runner: GitHub's Intel-mac
+          # runners are scarce / being deprecated and routinely leave
+          # the job queued for hours, stalling the whole release.
+          - os: macos-14
             binary: duckle
             asset: Duckle-macos-x64
+            target: x86_64-apple-darwin
           - os: macos-14
             binary: duckle
             asset: Duckle-macos-arm64
@@ -74,6 +79,8 @@ jobs:
         run: npm --prefix frontend run build
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target || '' }}
       - uses: Swatinem/rust-cache@v2
 
       - name: Install Linux WebView deps (Tauri)
@@ -85,14 +92,28 @@ jobs:
             libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev
 
       - name: Build raw Duckle binary
-        run: cargo build --release --manifest-path apps/desktop/Cargo.toml --features custom-protocol
+        shell: bash
+        run: |
+          set -e
+          if [ -n "${{ matrix.target }}" ]; then
+            cargo build --release --target "${{ matrix.target }}" \
+              --manifest-path apps/desktop/Cargo.toml --features custom-protocol
+          else
+            cargo build --release \
+              --manifest-path apps/desktop/Cargo.toml --features custom-protocol
+          fi
 
       - name: Stage release asset
         shell: bash
         run: |
           set -e
           mkdir -p _release
-          cp "target/release/${{ matrix.binary }}" "_release/${{ matrix.asset }}"
+          if [ -n "${{ matrix.target }}" ]; then
+            src="target/${{ matrix.target }}/release/${{ matrix.binary }}"
+          else
+            src="target/release/${{ matrix.binary }}"
+          fi
+          cp "$src" "_release/${{ matrix.asset }}"
           ls -lh _release
 
       - name: Upload to release
