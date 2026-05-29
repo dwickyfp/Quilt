@@ -4995,6 +4995,72 @@ fn join_dedupes_shared_key_via_using_clause() {
 }
 
 #[test]
+fn right_join_differently_named_keys_keeps_key() {
+    // Regression: with differently-named keys, the join projected the
+    // LEFT key column and EXCLUDEd the right one. For a RIGHT/FULL join a
+    // right-only row has the left side all NULL, so the join key showed
+    // up as NULL even though the right side carried a value - the key was
+    // silently lost. The builder now COALESCEs the key from whichever
+    // side is present.
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let l = write_file(tmp.path(), "left.csv", "lid,name\n1,alice\n");
+    let r = write_file(tmp.path(), "right.csv", "rid,city\n1,paris\n2,oslo\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let res = engine.execute_pipeline(&doc(
+        json!([
+            node("l", "src.csv", json!({ "path": l, "hasHeader": true })),
+            node("r", "src.csv", json!({ "path": r, "hasHeader": true })),
+            node("j", "xf.join.inner", json!({
+                "leftKey": "lid", "rightKey": "rid", "joinType": "right"
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([
+            main_edge("e1", "l", "j"),
+            lookup_edge("e2", "r", "j"),
+            main_edge("e3", "j", "k"),
+        ]),
+    ));
+    assert_eq!(res.status, "ok", "join failed: {:?}", res.error);
+    // 2 right rows -> 2 output rows; the right-only row (rid=2) must keep
+    // its key value under the left key name `lid`, not NULL.
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 2);
+    let keys = scalar_string(&format!(
+        "SELECT string_agg(CAST(lid AS VARCHAR), ',' ORDER BY lid) FROM read_csv_auto('{}')",
+        out
+    ));
+    assert_eq!(keys, "1,2", "right-only join key was lost, got {}", keys);
+}
+
+#[test]
+fn fan_in_to_single_input_port_fails_loud() {
+    // Regression: wiring two upstreams into one node's single `main`
+    // input silently dropped all but the first (.main() takes .first()).
+    // Now it's a clear compile error telling the user to insert a Union.
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let a = write_file(tmp.path(), "a.csv", "id\n1\n");
+    let b = write_file(tmp.path(), "b.csv", "id\n2\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let res = engine.execute_pipeline(&doc(
+        json!([
+            node("a", "src.csv", json!({ "path": a, "hasHeader": true })),
+            node("b", "src.csv", json!({ "path": b, "hasHeader": true })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "a", "k"), main_edge("e2", "b", "k")]),
+    ));
+    assert_eq!(res.status, "error", "fan-in should fail loud, got {:?}", res.status);
+    let err = res.error.unwrap_or_default();
+    assert!(
+        err.contains("single input"),
+        "error should explain the fan-in, got: {}",
+        err
+    );
+}
+
+#[test]
 fn anti_join_is_null_safe_on_right_keys() {
     // Regression for the NOT IN/NULL gotcha: anti-join used to silently
     // drop every left row when the right side had a single NULL in the

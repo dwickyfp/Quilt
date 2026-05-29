@@ -1402,6 +1402,22 @@ pub fn compile(pipeline: &PipelineDoc) -> Result<CompiledPipeline, EngineError> 
                     ))
                 })?;
         }
+        // Fail loud on fan-in to a single input port. Every component
+        // except Union / set ops reads its primary input via .main()
+        // (which only ever sees the first edge), so a second edge wired
+        // into the same `main` port is silently dropped - real data loss.
+        // Union / intersect / except legitimately take multiple `main`
+        // edges (all_main_ports), so they're exempt.
+        if !is_multi_main_component(component_id) {
+            if let Some(mains) = node_inputs.ports.get("main") {
+                if mains.len() > 1 {
+                    return Err(EngineError::Config(format!(
+                        "{} ({} / {}): {} inputs are wired into this node's single input port, but only one is read - the rest would be silently dropped. Insert a Union to merge upstreams, or use a Join/Diff lookup port.",
+                        node.data.label, component_id, node.id, mains.len()
+                    )));
+                }
+            }
+        }
         let stage = build_stage(node, component_id, node_inputs, &consumer_count)?;
         stages.push(stage);
     }
@@ -1810,6 +1826,16 @@ fn canonical_port(p: &str) -> &str {
         return "main";
     }
     p
+}
+
+/// Components that legitimately accept more than one edge on the `main`
+/// port (they read every upstream via all_main_ports, not just the
+/// first). Everything else is single-input and must reject fan-in.
+fn is_multi_main_component(component_id: &str) -> bool {
+    matches!(
+        component_id,
+        "xf.union" | "xf.unionall" | "xf.intersect" | "xf.except"
+    )
 }
 
 fn is_data_edge(edge: &PipelineEdge) -> bool {
@@ -6335,14 +6361,42 @@ fn build_join(inputs: &NodeInputs, props: &JsonValue, kind: &str) -> Result<Stri
             .map(|(l, r)| format!("m.{} = r.{}", quote_ident(l), quote_ident(r)))
             .collect::<Vec<_>>()
             .join(" AND ");
+        // Project each key as COALESCE(left, right) under the left key
+        // name, and EXCLUDE the key columns from BOTH sides. The previous
+        // `m.*, r.* EXCLUDE(right_keys)` kept the LEFT key column and
+        // dropped the right one - fine for INNER/LEFT, but for RIGHT/FULL
+        // a right-only row has m.* all NULL, so the join key showed up as
+        // NULL even though the right side had a value (data corruption +
+        // the key effectively lost). COALESCE recovers the key value from
+        // whichever side is present.
+        let coalesced = left_keys
+            .iter()
+            .zip(right_keys.iter())
+            .map(|(l, r)| {
+                format!(
+                    "COALESCE(m.{}, r.{}) AS {}",
+                    quote_ident(l),
+                    quote_ident(r),
+                    quote_ident(l)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let left_excl = left_keys
+            .iter()
+            .map(|k| quote_ident(k))
+            .collect::<Vec<_>>()
+            .join(", ");
         let right_excl = right_keys
             .iter()
             .map(|k| quote_ident(k))
             .collect::<Vec<_>>()
             .join(", ");
         Ok(format!(
-            "SELECT m.*, r.* EXCLUDE ({excl}) FROM {l} m {k} JOIN {r} r ON {on}",
-            excl = right_excl,
+            "SELECT {coalesced}, m.* EXCLUDE ({lexcl}), r.* EXCLUDE ({rexcl}) FROM {l} m {k} JOIN {r} r ON {on}",
+            coalesced = coalesced,
+            lexcl = left_excl,
+            rexcl = right_excl,
             l = quote_ident(left),
             k = kind,
             r = quote_ident(right),
