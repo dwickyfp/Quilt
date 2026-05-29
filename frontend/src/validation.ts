@@ -25,6 +25,24 @@ const EMPTY: ValidationResult = {
     errorByNode: {},
 };
 
+// Sinks that write to a file / object-store path (so an empty path is a
+// real error). Database, warehouse, vector-DB, message-broker and HTTP
+// sinks write to a connection / table / topic instead and must NOT be
+// required to have a path (issue #8).
+const PATH_REQUIRED_SINKS = new Set<string>([
+    'snk.csv',
+    'snk.tsv',
+    'snk.parquet',
+    'snk.json',
+    'snk.jsonl',
+    'snk.excel',
+    'snk.xml',
+    'snk.yaml',
+    'snk.toml',
+    'snk.avro',
+    'snk.spatial',
+]);
+
 export function validatePipeline(
     nodes: Node<DuckleNodeData>[],
     edges: Edge[],
@@ -106,11 +124,14 @@ export function validatePipeline(
             }
         }
 
-        // Sinks need a path
-        if (
-            typeof node.data.componentId === 'string' &&
-            node.data.componentId.startsWith('snk.')
-        ) {
+        // Only FILE / object-store sinks need an output path. Database,
+        // warehouse, message-broker and HTTP sinks (snk.oracle,
+        // snk.sqlserver, snk.postgres, snk.mongodb, snk.kafka, ...) write
+        // to a connection / table / topic and have no path - requiring one
+        // wrongly blocked loading data into them (issue #8). Per-connector
+        // required fields are validated from the component manifest
+        // elsewhere; this check is just for the file-path formats.
+        if (PATH_REQUIRED_SINKS.has(node.data.componentId ?? '')) {
             const path =
                 typeof props.path === 'string' ? props.path.trim() : '';
             if (!path) {
