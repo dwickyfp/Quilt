@@ -3993,7 +3993,17 @@ impl DuckdbEngine {
                 .ok_or_else(|| EngineError::Query("js: transform not callable".into()))?
                 .call(&boa_engine::JsValue::Undefined, &[js_in], &mut ctx)
                 .map_err(|e| EngineError::Query(format!("js: transform call: {}", e)))?;
-            // JsValue -> JSON (only objects make sense as rows)
+            // JsValue -> JSON (only objects make sense as rows). Guard the
+            // value's shape BEFORE calling to_json: boa's to_json PANICS
+            // (aborting the whole process) on Undefined, so a transform
+            // that falls off the end with no return value would crash the
+            // run instead of surfacing a clean error.
+            if result.is_undefined() || result.is_null() {
+                return Err(EngineError::Query(format!(
+                    "js: transform must return an object, got {} (did the function return a value?)",
+                    if result.is_undefined() { "undefined" } else { "null" }
+                )));
+            }
             let json_out = result.to_json(&mut ctx).map_err(|e| {
                 EngineError::Query(format!("js: result -> JSON: {}", e))
             })?;

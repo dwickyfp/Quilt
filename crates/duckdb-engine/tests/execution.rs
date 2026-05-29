@@ -7177,6 +7177,34 @@ fn code_javascript_runs_transform_per_row_via_boa() {
     assert_eq!(name1, "WIDGET");
 }
 
+#[test]
+fn code_javascript_undefined_return_errors_not_panics() {
+    // Regression: a transform that returns nothing (undefined) used to
+    // reach boa's to_json, which PANICS on Undefined - aborting the whole
+    // process. It must surface a clean stage error instead.
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let in_csv = write_file(tmp.path(), "in.csv", "id\n1\n");
+    let out = out_path(tmp.path(), "out.csv");
+    // transform with no return statement -> returns undefined.
+    let script = "function transform(row) { var x = row.id; }";
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("s", "src.csv", json!({ "path": in_csv, "hasHeader": true })),
+            node("j", "code.javascript", json!({ "script": script })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s", "j"), main_edge("e2", "j", "k")]),
+    ));
+    assert_eq!(r.status, "error", "undefined return should error, got {:?}", r.status);
+    let err = r.error.unwrap_or_default();
+    assert!(
+        err.contains("must return an object"),
+        "expected a clear 'must return an object' error, got: {}",
+        err
+    );
+}
+
 /// xf.ai.dedupe: pre-stage rows with embedding column, run dedupe at
 /// a tight threshold, verify the near-duplicate row is dropped.
 /// Uses CSV input where the embedding column is a JSON array literal
