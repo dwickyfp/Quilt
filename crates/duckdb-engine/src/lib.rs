@@ -1640,6 +1640,35 @@ impl DuckdbEngine {
             .join(", ");
         let conn = oracle::Connection::connect(&spec.user, &spec.password, &spec.connect)
             .map_err(|e| EngineError::Query(format!("oracle connect: {}", e)))?;
+        // Auto-create the target table if it doesn't exist yet, inferring
+        // column types from the upstream DuckDB view. The sink otherwise
+        // only INSERTs, so loading into a not-yet-created table failed
+        // (issue #8: "newly created tables"). Oracle has no CREATE TABLE
+        // IF NOT EXISTS, so wrap it in a PL/SQL block that swallows
+        // ORA-00955 (name is already used) and re-raises anything else.
+        {
+            let col_types: std::collections::HashMap<String, String> =
+                describe_columns(self, db, &spec.from_view).into_iter().collect();
+            let col_defs = cols
+                .iter()
+                .map(|c| {
+                    let ty = duckdb_type_to_oracle(
+                        col_types.get(c).map(|s| s.as_str()).unwrap_or("VARCHAR"),
+                    );
+                    format!("\"{}\" {}", c.replace('"', "\"\""), ty)
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            let create_inner =
+                format!("CREATE TABLE {} ({})", qualified, col_defs).replace('\'', "''");
+            let create_plsql = format!(
+                "BEGIN EXECUTE IMMEDIATE '{}'; EXCEPTION WHEN OTHERS THEN \
+                 IF SQLCODE != -955 THEN RAISE; END IF; END;",
+                create_inner
+            );
+            conn.execute(&create_plsql, &[])
+                .map_err(|e| EngineError::Query(format!("oracle create table: {}", e)))?;
+        }
         let mut total = 0_usize;
         for chunk in rows.chunks(spec.batch_size) {
             self.check_cancelled()?;
@@ -5026,6 +5055,29 @@ impl DuckdbEngine {
             .map(|c| ss_quote_ident(c))
             .collect::<Vec<_>>()
             .join(", ");
+        // Auto-create the target table when it doesn't exist, inferring
+        // column types from the upstream DuckDB view. The sink otherwise
+        // only INSERTs, so loading into a not-yet-created table failed with
+        // "Invalid object name" (issue #8: "newly created tables"). Wrapped
+        // in IF OBJECT_ID(...) IS NULL so an existing table is untouched.
+        let col_types: std::collections::HashMap<String, String> =
+            describe_columns(self, db, &spec.from_view).into_iter().collect();
+        let col_defs = cols
+            .iter()
+            .map(|c| {
+                let ty = duckdb_type_to_sqlserver(
+                    col_types.get(c).map(|s| s.as_str()).unwrap_or("VARCHAR"),
+                );
+                format!("{} {}", ss_quote_ident(c), ty)
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let create_sql = format!(
+            "IF OBJECT_ID('{}', 'U') IS NULL CREATE TABLE {} ({})",
+            qualified.replace('\'', "''"),
+            qualified,
+            col_defs
+        );
         let cancel = self.cancel.clone();
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -5052,6 +5104,11 @@ impl DuckdbEngine {
                 let mut client = tiberius::Client::connect(config, tcp.compat_write())
                     .await
                     .map_err(|e| format!("tds handshake: {}", e))?;
+                // Create the table if it isn't there yet (no-op otherwise).
+                client
+                    .execute(create_sql.as_str(), &[])
+                    .await
+                    .map_err(|e| format!("create table: {}", e))?;
                 let mut total = 0_usize;
                 for chunk in rows.chunks(spec.batch_size) {
                     if cancel.load(Ordering::Relaxed) {
@@ -6965,6 +7022,79 @@ fn mssql_numeric_to_string(value: i128, scale: u8) -> String {
     } else {
         body
     }
+}
+
+/// Map a DuckDB column type (from DESCRIBE) to the closest SQL Server
+/// type, for auto-creating a sink table that doesn't exist yet.
+fn duckdb_type_to_sqlserver(t: &str) -> String {
+    let up = t.trim().to_ascii_uppercase();
+    if up.starts_with("DECIMAL") || up.starts_with("NUMERIC") {
+        // DECIMAL(p,s) carries straight over; NUMERIC is the same thing.
+        return up.replacen("NUMERIC", "DECIMAL", 1);
+    }
+    match up.as_str() {
+        "BOOLEAN" | "BOOL" => "BIT",
+        "TINYINT" | "UTINYINT" => "SMALLINT",
+        "SMALLINT" | "INT2" | "USMALLINT" => "SMALLINT",
+        "INTEGER" | "INT" | "INT4" | "UINTEGER" => "INT",
+        "BIGINT" | "INT8" => "BIGINT",
+        "UBIGINT" => "DECIMAL(20,0)",
+        "HUGEINT" | "UHUGEINT" => "DECIMAL(38,0)",
+        "REAL" | "FLOAT" | "FLOAT4" => "REAL",
+        "DOUBLE" | "FLOAT8" => "FLOAT",
+        "DATE" => "DATE",
+        "TIME" => "TIME",
+        "TIMESTAMP" | "DATETIME" | "TIMESTAMP_NS" | "TIMESTAMP_MS" | "TIMESTAMP_S" => {
+            "DATETIME2"
+        }
+        "TIMESTAMP WITH TIME ZONE" | "TIMESTAMPTZ" => "DATETIMEOFFSET",
+        "UUID" => "UNIQUEIDENTIFIER",
+        "BLOB" | "BYTEA" | "BINARY" | "VARBINARY" => "VARBINARY(MAX)",
+        _ => "NVARCHAR(MAX)",
+    }
+    .to_string()
+}
+
+/// Map a DuckDB column type to the closest Oracle type, for auto-creating
+/// a sink table that doesn't exist yet.
+#[cfg(feature = "oracle")]
+fn duckdb_type_to_oracle(t: &str) -> String {
+    let up = t.trim().to_ascii_uppercase();
+    if up.starts_with("DECIMAL") || up.starts_with("NUMERIC") {
+        // DECIMAL(p,s) -> NUMBER(p,s).
+        return up.replacen("DECIMAL", "NUMBER", 1).replacen("NUMERIC", "NUMBER", 1);
+    }
+    match up.as_str() {
+        "BOOLEAN" | "BOOL" => "NUMBER(1)",
+        "TINYINT" | "UTINYINT" | "SMALLINT" | "USMALLINT" | "INT2" => "NUMBER(5)",
+        "INTEGER" | "INT" | "INT4" | "UINTEGER" => "NUMBER(10)",
+        "BIGINT" | "INT8" => "NUMBER(19)",
+        "UBIGINT" => "NUMBER(20)",
+        "HUGEINT" | "UHUGEINT" => "NUMBER(38)",
+        "REAL" | "FLOAT" | "FLOAT4" => "BINARY_FLOAT",
+        "DOUBLE" | "FLOAT8" => "BINARY_DOUBLE",
+        "DATE" => "DATE",
+        "TIMESTAMP" | "DATETIME" | "TIMESTAMP_NS" | "TIMESTAMP_MS" | "TIMESTAMP_S" => "TIMESTAMP",
+        "TIMESTAMP WITH TIME ZONE" | "TIMESTAMPTZ" => "TIMESTAMP WITH TIME ZONE",
+        "BLOB" | "BYTEA" | "BINARY" | "VARBINARY" => "BLOB",
+        _ => "VARCHAR2(4000)",
+    }
+    .to_string()
+}
+
+/// (name, DuckDB type) pairs for a view/table, via DuckDB DESCRIBE. Used
+/// by driver sinks to auto-create a target table with sensible types.
+fn describe_columns(engine: &DuckdbEngine, db: &Path, view: &str) -> Vec<(String, String)> {
+    engine
+        .run_rows(Some(db), &format!("DESCRIBE {}", plan::quote_ident(view)))
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|d| {
+            let n = d.get("column_name").and_then(|v| v.as_str())?;
+            let t = d.get("column_type").and_then(|v| v.as_str()).unwrap_or("VARCHAR");
+            Some((n.to_string(), t.to_string()))
+        })
+        .collect()
 }
 
 fn json_to_sql_literal(v: &JsonValue) -> String {
