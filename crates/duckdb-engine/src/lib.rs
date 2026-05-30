@@ -6626,10 +6626,23 @@ fn parse_link_next(header: &str) -> Option<String> {
         };
         let url = &p[1..close];
         let rest = &p[close + 1..];
-        // Look for rel="next" anywhere in the params (case-insensitive).
-        let rest_lower = rest.to_ascii_lowercase();
-        if rest_lower.contains("rel=\"next\"") || rest_lower.contains("rel=next") {
-            return Some(url.to_string());
+        // Each parameter is `name=value`, separated by ';'. RFC 8288 allows
+        // whitespace around '=' (`rel = "next"`), an optional quoted value,
+        // and multiple space-separated rel values (`rel="prefetch next"`),
+        // so match a whitespace-delimited "next" token rather than a raw
+        // substring - the old check missed those forms and could also have
+        // false-matched an unquoted `rel=nextpage`.
+        for param in rest.split(';') {
+            let Some((name, value)) = param.split_once('=') else {
+                continue;
+            };
+            if !name.trim().eq_ignore_ascii_case("rel") {
+                continue;
+            }
+            let value = value.trim().trim_matches('"');
+            if value.split_whitespace().any(|tok| tok.eq_ignore_ascii_case("next")) {
+                return Some(url.to_string());
+            }
         }
     }
     None
@@ -8570,8 +8583,46 @@ fn chunk_text(text: &str, size: usize, overlap: usize) -> Vec<String> {
 mod tests {
     use super::{
         aws_sigv4_sign, chunk_text, cosine_similarity, glob_match, mssql_numeric_to_string,
-        pii_patterns, read_marker, render_prompt_template, unwrap_dynamodb_attrs, MarkerState,
+        parse_link_next, pii_patterns, read_marker, render_prompt_template, unwrap_dynamodb_attrs,
+        MarkerState,
     };
+
+    #[test]
+    fn link_next_basic_and_quoted() {
+        let h = "<https://api.example.com/items?page=2>; rel=\"next\", \
+                 <https://api.example.com/items?page=1>; rel=\"prev\"";
+        assert_eq!(
+            parse_link_next(h).as_deref(),
+            Some("https://api.example.com/items?page=2")
+        );
+    }
+
+    #[test]
+    fn link_next_multi_value_rel() {
+        // RFC 8288 allows several space-separated rel values; the old
+        // substring check missed "next" when it was not exactly rel="next".
+        let h = "<https://api.example.com/p2>; rel=\"prefetch next\"";
+        assert_eq!(parse_link_next(h).as_deref(), Some("https://api.example.com/p2"));
+        let h2 = "<https://api.example.com/p2>; rel=\"next prev\"";
+        assert_eq!(parse_link_next(h2).as_deref(), Some("https://api.example.com/p2"));
+    }
+
+    #[test]
+    fn link_next_whitespace_around_equals() {
+        let h = "<https://api.example.com/p2>; rel = next";
+        assert_eq!(parse_link_next(h).as_deref(), Some("https://api.example.com/p2"));
+    }
+
+    #[test]
+    fn link_next_ignores_lookalikes_and_missing() {
+        // A different rel must not match.
+        assert_eq!(parse_link_next("<https://x/p2>; rel=\"prev\"").as_deref(), None);
+        // "nextpage" is a distinct token and must not match "next".
+        assert_eq!(parse_link_next("<https://x/p2>; rel=\"nextpage\"").as_deref(), None);
+        // No params at all -> no next, and must not panic.
+        assert_eq!(parse_link_next("<https://x/p2>").as_deref(), None);
+        assert_eq!(parse_link_next("").as_deref(), None);
+    }
 
     #[test]
     fn mssql_numeric_to_string_signs_once() {
