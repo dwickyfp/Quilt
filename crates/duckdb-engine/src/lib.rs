@@ -7019,9 +7019,89 @@ fn ss_quote_ident(s: &str) -> String {
     format!("[{}]", s.replace(']', "]]"))
 }
 
-/// Best-effort scylla::CqlValue -> JsonValue conversion. Covers the
-/// common scalar types; falls back to JSON string for anything we
-/// don't know about (lists/sets/maps stringify as Display).
+/// Convert a two's-complement big-endian byte string (CQL varint encoding)
+/// to an exact base-10 string. Arbitrary precision - varints and the
+/// unscaled part of decimals can exceed i64/i128, so we do the base-256
+/// to base-10 conversion by hand rather than going through a fixed int.
+fn cql_be_twos_complement_to_decimal(bytes: &[u8]) -> String {
+    if bytes.is_empty() {
+        return "0".to_string();
+    }
+    let negative = bytes[0] & 0x80 != 0;
+    // Work on the magnitude: for negatives, take the two's complement.
+    let mut mag: Vec<u8> = bytes.to_vec();
+    if negative {
+        for b in mag.iter_mut() {
+            *b = !*b;
+        }
+        let mut carry = 1u16;
+        for b in mag.iter_mut().rev() {
+            let v = *b as u16 + carry;
+            *b = (v & 0xff) as u8;
+            carry = v >> 8;
+            if carry == 0 {
+                break;
+            }
+        }
+    }
+    // Base-256 (big-endian) -> base-10, accumulating little-endian digits.
+    let mut decimal: Vec<u8> = vec![0];
+    for &byte in &mag {
+        let mut carry = byte as u32;
+        for d in decimal.iter_mut() {
+            let v = (*d as u32) * 256 + carry;
+            *d = (v % 10) as u8;
+            carry = v / 10;
+        }
+        while carry > 0 {
+            decimal.push((carry % 10) as u8);
+            carry /= 10;
+        }
+    }
+    while decimal.len() > 1 && *decimal.last().unwrap() == 0 {
+        decimal.pop();
+    }
+    let mut s = String::new();
+    if negative && !(decimal.len() == 1 && decimal[0] == 0) {
+        s.push('-');
+    }
+    for d in decimal.iter().rev() {
+        s.push((b'0' + d) as char);
+    }
+    s
+}
+
+/// Render a CQL decimal (unscaled two's-complement BE bytes + scale) as an
+/// exact decimal string. value = unscaled * 10^(-scale).
+fn cql_decimal_to_string(bytes: &[u8], scale: i32) -> String {
+    let unscaled = cql_be_twos_complement_to_decimal(bytes);
+    if scale == 0 {
+        return unscaled;
+    }
+    let (sign, digits) = match unscaled.strip_prefix('-') {
+        Some(rest) => ("-", rest.to_string()),
+        None => ("", unscaled),
+    };
+    if scale < 0 {
+        // Multiply by 10^(-scale): append zeros.
+        return format!("{}{}{}", sign, digits, "0".repeat((-scale) as usize));
+    }
+    let scale = scale as usize;
+    if digits.len() > scale {
+        let point = digits.len() - scale;
+        format!("{}{}.{}", sign, &digits[..point], &digits[point..])
+    } else {
+        format!("{}0.{}{}", sign, "0".repeat(scale - digits.len()), digits)
+    }
+}
+
+/// scylla::CqlValue -> JsonValue. Scalars map to their natural JSON type;
+/// temporal types render as ISO-8601 strings; decimal/varint keep full
+/// precision (decimal as a string, varint as a number when it fits i64 else
+/// a string); blob as a `0x...` hex string; inet as its textual address;
+/// and list/set/map/tuple/UDT recurse into JSON arrays/objects. Earlier this
+/// fell through to Rust `{:?}` Debug for every non-scalar, corrupting
+/// timestamps, decimals, collections, etc.
 fn cql_value_to_json(v: &scylla::frame::response::result::CqlValue) -> JsonValue {
     use scylla::frame::response::result::CqlValue;
     match v {
@@ -7041,7 +7121,187 @@ fn cql_value_to_json(v: &scylla::frame::response::result::CqlValue) -> JsonValue
         CqlValue::Uuid(u) => JsonValue::String(u.to_string()),
         CqlValue::Timeuuid(u) => JsonValue::String(u.to_string()),
         CqlValue::Empty => JsonValue::Null,
-        other => JsonValue::String(format!("{:?}", other)),
+        // Milliseconds since the unix epoch -> RFC-3339 UTC.
+        CqlValue::Timestamp(ts) => chrono::DateTime::from_timestamp_millis(ts.0)
+            .map(|dt| JsonValue::String(dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)))
+            .unwrap_or_else(|| JsonValue::from(ts.0)),
+        // Days offset by 2^31 from the unix epoch -> YYYY-MM-DD.
+        CqlValue::Date(d) => {
+            let days = d.0 as i64 - (1i64 << 31);
+            chrono::NaiveDate::from_ymd_opt(1970, 1, 1)
+                .and_then(|e| chrono::Duration::try_days(days).and_then(|dur| e.checked_add_signed(dur)))
+                .map(|nd| JsonValue::String(nd.format("%Y-%m-%d").to_string()))
+                .unwrap_or_else(|| JsonValue::from(d.0))
+        }
+        // Nanoseconds since midnight -> HH:MM:SS[.fffffffff].
+        CqlValue::Time(t) => {
+            let secs = (t.0 / 1_000_000_000) as u32;
+            let nanos = (t.0 % 1_000_000_000) as u32;
+            chrono::NaiveTime::from_num_seconds_from_midnight_opt(secs, nanos)
+                .map(|nt| JsonValue::String(nt.to_string()))
+                .unwrap_or_else(|| JsonValue::from(t.0))
+        }
+        CqlValue::Decimal(dec) => {
+            let (bytes, scale) = dec.as_signed_be_bytes_slice_and_exponent();
+            JsonValue::String(cql_decimal_to_string(bytes, scale))
+        }
+        CqlValue::Varint(vi) => {
+            let s = cql_be_twos_complement_to_decimal(vi.as_signed_bytes_be_slice());
+            match s.parse::<i64>() {
+                Ok(n) => JsonValue::from(n),
+                Err(_) => JsonValue::String(s),
+            }
+        }
+        CqlValue::Blob(bytes) => {
+            let mut s = String::with_capacity(2 + bytes.len() * 2);
+            s.push_str("0x");
+            for b in bytes {
+                s.push_str(&format!("{:02x}", b));
+            }
+            JsonValue::String(s)
+        }
+        CqlValue::Inet(addr) => JsonValue::String(addr.to_string()),
+        CqlValue::Duration(d) => {
+            let mut obj = serde_json::Map::new();
+            obj.insert("months".into(), JsonValue::from(d.months));
+            obj.insert("days".into(), JsonValue::from(d.days));
+            obj.insert("nanoseconds".into(), JsonValue::from(d.nanoseconds));
+            JsonValue::Object(obj)
+        }
+        CqlValue::List(items) | CqlValue::Set(items) => {
+            JsonValue::Array(items.iter().map(cql_value_to_json).collect())
+        }
+        CqlValue::Map(pairs) => {
+            let mut obj = serde_json::Map::new();
+            for (k, val) in pairs {
+                let key = match cql_value_to_json(k) {
+                    JsonValue::String(s) => s,
+                    other => other.to_string(),
+                };
+                obj.insert(key, cql_value_to_json(val));
+            }
+            JsonValue::Object(obj)
+        }
+        CqlValue::Tuple(items) => JsonValue::Array(
+            items
+                .iter()
+                .map(|o| o.as_ref().map(cql_value_to_json).unwrap_or(JsonValue::Null))
+                .collect(),
+        ),
+        CqlValue::UserDefinedType { fields, .. } => {
+            let mut obj = serde_json::Map::new();
+            for (name, val) in fields {
+                obj.insert(
+                    name.clone(),
+                    val.as_ref().map(cql_value_to_json).unwrap_or(JsonValue::Null),
+                );
+            }
+            JsonValue::Object(obj)
+        }
+    }
+}
+
+#[cfg(test)]
+mod cql_value_tests {
+    use super::{cql_be_twos_complement_to_decimal, cql_decimal_to_string, cql_value_to_json};
+    use scylla::frame::response::result::CqlValue;
+    use scylla::frame::value::{
+        CqlDate, CqlDecimal, CqlDuration, CqlTime, CqlTimestamp, CqlVarint,
+    };
+    use serde_json::json;
+
+    #[test]
+    fn varint_be_to_decimal() {
+        assert_eq!(cql_be_twos_complement_to_decimal(&[]), "0");
+        assert_eq!(cql_be_twos_complement_to_decimal(&[0x00]), "0");
+        assert_eq!(cql_be_twos_complement_to_decimal(&[0x04, 0xD2]), "1234");
+        assert_eq!(cql_be_twos_complement_to_decimal(&[0xFF]), "-1");
+        assert_eq!(cql_be_twos_complement_to_decimal(&[0x80]), "-128");
+        assert_eq!(cql_be_twos_complement_to_decimal(&[0xFF, 0x00]), "-256");
+    }
+
+    #[test]
+    fn decimal_with_scale() {
+        assert_eq!(cql_decimal_to_string(&[0x04, 0xD2], 2), "12.34");
+        assert_eq!(cql_decimal_to_string(&[0x04, 0xD2], 0), "1234");
+        assert_eq!(cql_decimal_to_string(&[0x01], 4), "0.0001");
+        // 0xFF9C = -100, scale 1 -> -10.0
+        assert_eq!(cql_decimal_to_string(&[0xFF, 0x9C], 1), "-10.0");
+        // negative scale multiplies by 10^(-scale)
+        assert_eq!(cql_decimal_to_string(&[0x01], -3), "1000");
+    }
+
+    #[test]
+    fn temporal_types_render_iso() {
+        assert_eq!(
+            cql_value_to_json(&CqlValue::Timestamp(CqlTimestamp(1_700_000_000_000))),
+            json!("2023-11-14T22:13:20.000Z")
+        );
+        assert_eq!(
+            cql_value_to_json(&CqlValue::Date(CqlDate(1u32 << 31))),
+            json!("1970-01-01")
+        );
+        assert_eq!(
+            cql_value_to_json(&CqlValue::Time(CqlTime(3_661_000_000_000))),
+            json!("01:01:01")
+        );
+    }
+
+    #[test]
+    fn numeric_and_binary_types() {
+        assert_eq!(
+            cql_value_to_json(&CqlValue::Varint(CqlVarint::from_signed_bytes_be_slice(&[0x04, 0xD2]))),
+            json!(1234)
+        );
+        assert_eq!(
+            cql_value_to_json(&CqlValue::Decimal(
+                CqlDecimal::from_signed_be_bytes_slice_and_exponent(&[0x04, 0xD2], 2)
+            )),
+            json!("12.34")
+        );
+        assert_eq!(
+            cql_value_to_json(&CqlValue::Blob(vec![0xDE, 0xAD, 0xBE, 0xEF])),
+            json!("0xdeadbeef")
+        );
+        assert_eq!(
+            cql_value_to_json(&CqlValue::Inet("10.0.0.1".parse().unwrap())),
+            json!("10.0.0.1")
+        );
+    }
+
+    #[test]
+    fn collections_recurse() {
+        assert_eq!(
+            cql_value_to_json(&CqlValue::List(vec![CqlValue::Int(1), CqlValue::Int(2)])),
+            json!([1, 2])
+        );
+        assert_eq!(
+            cql_value_to_json(&CqlValue::Map(vec![(
+                CqlValue::Text("a".into()),
+                CqlValue::Int(1)
+            )])),
+            json!({ "a": 1 })
+        );
+        assert_eq!(
+            cql_value_to_json(&CqlValue::Tuple(vec![Some(CqlValue::Int(1)), None])),
+            json!([1, null])
+        );
+        assert_eq!(
+            cql_value_to_json(&CqlValue::UserDefinedType {
+                keyspace: "ks".into(),
+                type_name: "t".into(),
+                fields: vec![("x".into(), Some(CqlValue::Int(5)))],
+            }),
+            json!({ "x": 5 })
+        );
+        assert_eq!(
+            cql_value_to_json(&CqlValue::Duration(CqlDuration {
+                months: 1,
+                days: 2,
+                nanoseconds: 3,
+            })),
+            json!({ "months": 1, "days": 2, "nanoseconds": 3 })
+        );
     }
 }
 
