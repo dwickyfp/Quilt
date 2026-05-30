@@ -3808,7 +3808,7 @@ fn build_stage(
         // Switch materializes one table per case + default; it has no
         // main output table, so the count_rows fallback in the executor
         // (which would target node.id) just returns None for it.
-        let sql = build_switch(&node.id, inputs, &props).map_err(|e| {
+        let sql = build_switch(&node.id, inputs, &props, consumer_count).map_err(|e| {
             EngineError::Config(format!("{} ({} / {}): {}", node.data.label, component_id, node.id, e))
         })?;
         (format!("{}{}", attach, sql), StageKind::View, None)
@@ -5593,7 +5593,12 @@ fn build_transpose(inputs: &NodeInputs) -> Result<String, String> {
 /// 3 cases (matching the fixed port set) plus a default for the
 /// remainder. The form's branch object preserves insertion order
 /// because the workspace enables serde_json's preserve_order feature.
-fn build_switch(node_id: &str, inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+fn build_switch(
+    node_id: &str,
+    inputs: &NodeInputs,
+    props: &JsonValue,
+    consumer_count: &HashMap<String, usize>,
+) -> Result<String, String> {
     let upstream = inputs.main().ok_or_else(|| missing_input_msg("ctl.switch"))?;
     // `branches` is a key-value field. The UI saves it as an ARRAY of
     // {key,value} (which also preserves branch order = case_1, case_2, ...);
@@ -5623,6 +5628,23 @@ fn build_switch(node_id: &str, inputs: &NodeInputs, props: &JsonValue) -> Result
     if conds.is_empty() {
         return Err("Switch needs at least one branch condition".to_string());
     }
+    // Each branch/default port picks VIEW vs TABLE by its OWN downstream
+    // consumer count, matching the main/reject policy (audit B9): a single
+    // consumer -> lazy VIEW (DuckDB inlines it, no row copy), 2+ -> TABLE.
+    // A case port with ZERO consumers is skipped entirely - but its
+    // condition is STILL pushed into the negation chain (`prior`), or
+    // first-match-wins routing would break and later branches/default would
+    // wrongly claim its rows. DUCKLE_FORCE_VIEWS forces views as elsewhere.
+    let force_views = std::env::var("DUCKLE_FORCE_VIEWS")
+        .map(|v| {
+            let v = v.trim();
+            v == "1" || v.eq_ignore_ascii_case("true")
+        })
+        .unwrap_or(false);
+    let kw = |relation: &str| -> &'static str {
+        let consumers = consumer_count.get(relation).copied().unwrap_or(0);
+        if force_views || consumers <= 1 { "VIEW" } else { "TABLE" }
+    };
     let up = quote_ident(upstream);
     let mut stmts: Vec<String> = Vec::new();
     let mut prior: Vec<String> = Vec::new();
@@ -5633,7 +5655,7 @@ fn build_switch(node_id: &str, inputs: &NodeInputs, props: &JsonValue) -> Result
     // case AND the default and is silently lost. COALESCE makes NULL
     // behave as "did not match", routing the row to the default branch.
     for (i, cond) in conds.iter().enumerate() {
-        let case_table = format!("{}__case_{}", node_id, i + 1);
+        let case_rel = format!("{}__case_{}", node_id, i + 1);
         let positive = format!("COALESCE(({}), FALSE)", cond);
         let where_clause = if prior.is_empty() {
             positive
@@ -5645,24 +5667,33 @@ fn build_switch(node_id: &str, inputs: &NodeInputs, props: &JsonValue) -> Result
                 .join(" AND ");
             format!("{} AND {}", positive, neg)
         };
-        stmts.push(format!(
-            "CREATE OR REPLACE TABLE {} AS SELECT * FROM {} WHERE {}",
-            quote_ident(&case_table),
-            up,
-            where_clause
-        ));
+        // Skip a dead (unwired) branch port, but ALWAYS extend the negation
+        // chain below so first-match-wins for later branches stays correct.
+        let consumers = consumer_count.get(&case_rel).copied().unwrap_or(0);
+        if consumers >= 1 || force_views {
+            stmts.push(format!(
+                "CREATE OR REPLACE {} {} AS SELECT * FROM {} WHERE {}",
+                kw(&case_rel),
+                quote_ident(&case_rel),
+                up,
+                where_clause
+            ));
+        }
         prior.push(cond.clone());
     }
     // Default: rows that no branch matched (including NULL-condition rows).
-    let default_table = format!("{}__default", node_id);
+    // Always emitted so the stage SQL is never empty even if every case
+    // port is unwired. Lazy VIEW unless 2+ consumers.
+    let default_rel = format!("{}__default", node_id);
     let default_where = prior
         .iter()
         .map(|p| format!("NOT COALESCE(({}), FALSE)", p))
         .collect::<Vec<_>>()
         .join(" AND ");
     stmts.push(format!(
-        "CREATE OR REPLACE TABLE {} AS SELECT * FROM {} WHERE {}",
-        quote_ident(&default_table),
+        "CREATE OR REPLACE {} {} AS SELECT * FROM {} WHERE {}",
+        kw(&default_rel),
+        quote_ident(&default_rel),
         up,
         default_where
     ));
