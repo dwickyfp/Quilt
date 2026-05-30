@@ -320,10 +320,14 @@ export const MANIFESTS: Record<string, ComponentManifest> = {
                 label: 'Source table',
                 fields: [
                     {
+                        // Not required: the custom-SQL field below is a
+                        // documented alternative ("used only when no table is
+                        // set above"), and build_duckdb_source falls back to
+                        // `sql` when no table is given. Forcing a table here
+                        // wrongly rejected valid custom-SQL reads.
                         key: 'tableName',
                         label: 'Table',
                         kind: 'text',
-                        required: true,
                         placeholder: 'orders',
                     },
                     {
