@@ -121,6 +121,7 @@ export const PALETTE: Category[] = [
                     src('duckdb', 'DuckDB', 'available', 'Read a table from a DuckDB file'),
                     src('clickhouse', 'ClickHouse', 'available', 'Read ClickHouse via the HTTP interface (POST SELECT ... FORMAT JSON). User/password auth via X-ClickHouse-User / X-ClickHouse-Key headers.'),
                     src('cockroach', 'CockroachDB', 'available', 'Read from CockroachDB via the DuckDB postgres extension'),
+                    src('adbc', 'ADBC (Arrow)', 'available', 'Read any database that ships an ADBC (Arrow Database Connectivity) driver. Point at a prebuilt driver shared library (.dll / .so / .dylib) plus a connection URI and SQL; rows stream back as Arrow for fast loads. Friendly wrappers can map their own fields onto driver / options.'),
                     src('jdbc', 'Generic JDBC', 'planned'),
                 ],
             },

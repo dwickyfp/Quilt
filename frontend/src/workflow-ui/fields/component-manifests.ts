@@ -251,6 +251,79 @@ export const MANIFESTS: Record<string, ComponentManifest> = {
         ],
     },
 
+    'src.adbc': {
+        id: 'src.adbc',
+        kind: 'source',
+        label: 'ADBC (Arrow)',
+        description:
+            'Read any database that ships an ADBC driver. Load a prebuilt driver shared library at runtime, connect via a URI, and run SQL; rows stream back as Arrow.',
+        schemaSource: 'declared',
+        sections: [
+            {
+                label: 'Driver',
+                fields: [
+                    {
+                        key: 'driver',
+                        label: 'Driver library',
+                        kind: 'file-path',
+                        required: true,
+                        placeholder: 'e.g. C:\\drivers\\adbc_driver_sqlite.dll',
+                        description: 'Path to the prebuilt ADBC driver shared library (.dll / .so / .dylib). Any dependent libraries must sit next to it.',
+                        filters: [
+                            { name: 'Shared library', extensions: ['dll', 'so', 'dylib'] },
+                            { name: 'All files', extensions: ['*'] },
+                        ],
+                    },
+                    {
+                        key: 'entrypoint',
+                        label: 'Init entrypoint (optional)',
+                        kind: 'text',
+                        placeholder: 'AdbcDriverInit',
+                        description: 'Custom driver init symbol. Leave blank for the standard AdbcDriverInit.',
+                    },
+                ],
+            },
+            {
+                label: 'Connection',
+                fields: [
+                    {
+                        key: 'uri',
+                        label: 'URI',
+                        kind: 'text',
+                        placeholder: 'a database file path or a server URI',
+                        description: 'Passed to the driver as the ADBC uri option. Driver-specific: a file path for SQLite, a DSN / URL for server drivers.',
+                    },
+                    {
+                        key: 'options',
+                        label: 'Driver options',
+                        kind: 'key-value',
+                        description: 'Extra ADBC database options (username, password, and any driver-specific keys).',
+                    },
+                ],
+            },
+            {
+                label: 'Query',
+                fields: [
+                    {
+                        key: 'query',
+                        label: 'SQL query',
+                        kind: 'expression',
+                        rows: 5,
+                        required: true,
+                        placeholder: 'SELECT * FROM my_table',
+                    },
+                ],
+            },
+        ],
+        ports: {
+            inputs: [],
+            outputs: [
+                { id: 'main', label: 'main', type: 'main' },
+                { id: 'reject', label: 'reject', type: 'reject', optional: true },
+            ],
+        },
+    },
+
     'src.s3': {
         id: 'src.s3',
         kind: 'source',
