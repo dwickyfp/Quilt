@@ -4233,29 +4233,42 @@ fn build_stage(
             !uses_dynamic_pivot && !attach_backed && (force_views || consumers <= 1)
         };
         let main_kw = if view_ok(main_consumers) { "VIEW" } else { "TABLE" };
-        // Slow network-DB sources (postgres / mysql / mariadb / cockroach /
-        // redshift) that exactly one stage consumes: COPY the already-typed
-        // rows to a temp parquet once and expose a read_parquet VIEW instead of
-        // inserting them into the on-disk run-db table. The parquet write is
-        // cheaper than the table insert and the consumer gets projection /
-        // predicate pushdown - the same proven path as src.adbc, and lossless
-        // because the rows are already typed. The executor fills in the run-
-        // scoped temp path, so we hand it the attach prelude + the SELECT body.
-        // Local file ATTACHes (sqlite / duckdb) stay on the table path: they
-        // have no scan bottleneck and the parquet round-trip would only add
-        // overhead. 2+ consumers also stay a table (materialize once), and the
+        // Remote / catalog sources that exactly one stage consumes: COPY the
+        // already-typed rows to a temp parquet once and expose a read_parquet
+        // VIEW instead of inserting them into the on-disk run-db table. The
+        // parquet write is cheaper than the table insert, the consumer gets
+        // projection / predicate pushdown, and it reads the parquet file with
+        // no re-attach and no extension LOAD - the same proven path as
+        // src.adbc, lossless because the rows are already typed. The executor
+        // fills in the run-scoped temp path, so we hand it the prelude + body.
+        //
+        // Covers the relational / warehouse / catalog DBs (read via the
+        // duckle_src ATTACH alias) and the lakehouse formats (read via the
+        // iceberg_scan / delta_scan functions - a plain VIEW would fail
+        // downstream because the consumer's process never LOADed the extension,
+        // so COPY-to-parquet is what makes them lazy at all). EXCLUDED: local
+        // file ATTACHes (sqlite / duckdb) and local file-scan sources (avro /
+        // excel / spatial) - no scan bottleneck, so the round-trip would only
+        // add overhead. 2+ consumers also stay a table (materialize once), and
         // reject-split components never take this branch.
-        const NETWORK_DB_SOURCES: &[&str] = &[
+        const ATTACH_PARQUET_SOURCES: &[&str] = &[
             "src.postgres",
+            "src.cockroach",
+            "src.pgvector",
+            "src.redshift",
             "src.mysql",
             "src.mariadb",
-            "src.cockroach",
-            "src.redshift",
+            "src.motherduck",
+            "src.bigquery",
+            "src.quack",
+            "src.ducklake",
+            "src.iceberg",
+            "src.delta",
         ];
         let mut sql = if attach_backed
             && main_consumers <= 1
             && reject_sql.is_none()
-            && NETWORK_DB_SOURCES.contains(&component_id)
+            && ATTACH_PARQUET_SOURCES.contains(&component_id)
         {
             attach_parquet_source = Some(AttachParquetSourceSpec {
                 node_id: node.id.clone(),
@@ -10995,7 +11008,15 @@ mod tests {
             }"#,
         );
         let compiled = compile(&p).unwrap();
-        let src_sql = &compiled.stages[0].sql;
+        // Single-consumer quack now materializes via the attach-parquet path,
+        // so the ATTACH + secret live on the spec; concatenate spec.attach +
+        // body to assert the same logic regardless of where it lands.
+        let stage = &compiled.stages[0];
+        let src_sql = stage
+            .attach_parquet_source
+            .as_ref()
+            .map(|s| format!("{}{}", s.attach, s.body))
+            .unwrap_or_else(|| stage.sql.clone());
         assert!(
             src_sql.contains("CREATE OR REPLACE SECRET duckle_quack_secret"),
             "missing SECRET creation: {}",
@@ -11038,7 +11059,12 @@ mod tests {
             }"#,
         );
         let compiled = compile(&p).unwrap();
-        let src_sql = &compiled.stages[0].sql;
+        let stage = &compiled.stages[0];
+        let src_sql = stage
+            .attach_parquet_source
+            .as_ref()
+            .map(|s| format!("{}{}", s.attach, s.body))
+            .unwrap_or_else(|| stage.sql.clone());
         assert!(
             !src_sql.contains("CREATE OR REPLACE SECRET"),
             "should not emit empty SECRET: {}",
