@@ -26,6 +26,7 @@
     },
     "clipboard-manager:allow-write-text",
     "clipboard-manager:allow-read-text",
-    "opener:allow-open-url"
+    "opener:allow-open-url",
+    "opener:allow-default-urls"
   ]
 }
