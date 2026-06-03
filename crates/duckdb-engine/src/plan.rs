@@ -4265,7 +4265,7 @@ fn build_stage(
             "src.iceberg",
             "src.delta",
         ];
-        let mut sql = if attach_backed
+        if attach_backed
             && main_consumers <= 1
             && reject_sql.is_none()
             && ATTACH_PARQUET_SOURCES.contains(&component_id)
@@ -4275,16 +4275,19 @@ fn build_stage(
                 attach: attach.to_string(),
                 body: body.to_string(),
             });
-            String::new()
-        } else {
-            format!(
-                "{}CREATE OR REPLACE {} {} AS {}",
-                attach,
-                main_kw,
-                quote_ident(&node.id),
-                body
-            )
-        };
+        }
+        // Always build the logical CREATE TABLE as the stage SQL. When the
+        // attach-parquet spec above is set the executor prefers it (the fast
+        // parquet path) and ignores this sql; it is kept so the SQL export /
+        // Copy-SQL view still shows - and redacts secrets in - the real source
+        // statement instead of a bare placeholder.
+        let mut sql = format!(
+            "{}CREATE OR REPLACE {} {} AS {}",
+            attach,
+            main_kw,
+            quote_ident(&node.id),
+            body
+        );
         // Components that split rows (filter, quality validators) also emit
         // a `<node>__reject` relation - but only when the reject port is
         // wired (see reject_sql above), and as a VIEW unless it has 2+
