@@ -76,6 +76,9 @@ pub struct SnowflakeSinkSpec {
     pub role: Option<String>,
     pub table: String,
     pub batch_size: usize,
+    /// Non-empty in "upsert" write mode: the key columns to MERGE on.
+    /// Empty means plain INSERT.
+    pub upsert_keys: Vec<String>,
 }
 
 /// src.snowflake: SQL API read. Sends a SELECT (either user-provided
@@ -110,6 +113,9 @@ pub struct OracleSinkSpec {
     pub schema: Option<String>,
     pub table: String,
     pub batch_size: usize,
+    /// Non-empty in "upsert" write mode: the key columns to MERGE on.
+    /// Empty means plain INSERT.
+    pub upsert_keys: Vec<String>,
 }
 
 /// src.oracle: Oracle SELECT via the oracle crate. Same feature gate.
@@ -755,6 +761,9 @@ pub struct SqlServerSinkSpec {
     /// If true, skip TLS cert verification - useful for self-signed
     /// dev servers. Production users leave this off.
     pub trust_cert: bool,
+    /// Non-empty in "upsert" write mode: the key columns to MERGE on.
+    /// Empty means plain INSERT (append / create).
+    pub upsert_keys: Vec<String>,
 }
 
 /// src.sqlserver / src.synapse: TDS SELECT via tiberius.

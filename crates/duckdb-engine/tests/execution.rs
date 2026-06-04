@@ -1575,6 +1575,25 @@ fn mysql_env() -> Option<(String, u64, String, String, String)> {
     Some((host, port, db, user, pass))
 }
 
+fn mssql_env() -> Option<(String, u64, String, String, String)> {
+    let host = std::env::var("DUCKLE_MSSQL_HOST").ok()?;
+    let port = std::env::var("DUCKLE_MSSQL_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1433);
+    let db = std::env::var("DUCKLE_MSSQL_DB").unwrap_or_else(|_| "master".into());
+    let user = std::env::var("DUCKLE_MSSQL_USER").unwrap_or_else(|_| "sa".into());
+    let pass = std::env::var("DUCKLE_MSSQL_PASS").unwrap_or_default();
+    Some((host, port, db, user, pass))
+}
+
+fn oracle_env() -> Option<(String, String, String)> {
+    let connect = std::env::var("DUCKLE_ORACLE_CONNECT").ok()?;
+    let user = std::env::var("DUCKLE_ORACLE_USER").unwrap_or_else(|_| "system".into());
+    let pass = std::env::var("DUCKLE_ORACLE_PASS").unwrap_or_else(|_| "duckle".into());
+    Some((connect, user, pass))
+}
+
 #[test]
 fn mysql_sink_then_source_roundtrip() {
     let engine = engine_or_skip!();
@@ -1625,6 +1644,156 @@ fn mysql_sink_then_source_roundtrip() {
         out
     ));
     assert_eq!(name, "bob", "got {}", name);
+}
+
+// Shared upsert assertion: after seeding (1,alice)(2,bob)(3,carol) and
+// upserting (2,BOB)(4,dave) on key `id`, the table must hold exactly
+// (1,alice)(2,BOB)(3,carol)(4,dave). `out` is the CSV the read-back wrote.
+fn assert_upsert_result(out: &str) {
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 4, "row count after upsert");
+    let updated = scalar_string(&format!(
+        "SELECT name FROM read_csv_auto('{}') WHERE id = 2",
+        out
+    ));
+    assert_eq!(updated, "BOB", "id=2 should be updated to BOB, got {}", updated);
+    let inserted = scalar_string(&format!(
+        "SELECT name FROM read_csv_auto('{}') WHERE id = 4",
+        out
+    ));
+    assert_eq!(inserted, "dave", "id=4 should be inserted, got {}", inserted);
+}
+
+#[test]
+fn sqlserver_upsert_merges_and_inserts() {
+    let engine = engine_or_skip!();
+    let (host, port, db, user, pass) = match mssql_env() {
+        Some(x) => x,
+        None => {
+            eprintln!("skipping: set DUCKLE_MSSQL_HOST to run against a real SQL Server");
+            return;
+        }
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let seed = write_file(tmp.path(), "seed.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
+    let upd = write_file(tmp.path(), "upd.csv", "id,name\n2,BOB\n4,dave\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let table = format!("duckle_upsert_{}", std::process::id());
+    let snk = |path: &str, mode: &str| {
+        json!([
+            node("s", "src.csv", json!({ "path": path, "hasHeader": true })),
+            node("w", "snk.sqlserver", json!({
+                "host": host, "port": port, "database": db, "user": user, "password": pass,
+                "schema": "dbo", "tableName": table, "mode": mode,
+                "conflictColumns": ["id"], "trustCert": true
+            })),
+        ])
+    };
+    let r1 = engine.execute_pipeline(&doc(snk(&seed, "overwrite"), json!([main_edge("e", "s", "w")])));
+    assert_eq!(r1.status, "ok", "seed failed: {:?}", r1.error);
+    let r2 = engine.execute_pipeline(&doc(snk(&upd, "upsert"), json!([main_edge("e", "s", "w")])));
+    assert_eq!(r2.status, "ok", "upsert failed: {:?}", r2.error);
+    let read = doc(
+        json!([
+            node("r", "src.sqlserver", json!({
+                "host": host, "port": port, "database": db, "user": user, "password": pass,
+                "schema": "dbo", "tableName": table, "mode": "table", "trustCert": true
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e", "r", "k")]),
+    );
+    let r3 = engine.execute_pipeline(&read);
+    assert_eq!(r3.status, "ok", "readback failed: {:?}", r3.error);
+    assert_upsert_result(&out);
+}
+
+#[test]
+fn oracle_upsert_merges_and_inserts() {
+    let engine = engine_or_skip!();
+    let (connect, user, pass) = match oracle_env() {
+        Some(x) => x,
+        None => {
+            eprintln!("skipping: set DUCKLE_ORACLE_CONNECT to run against a real Oracle");
+            return;
+        }
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let seed = write_file(tmp.path(), "seed.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
+    let upd = write_file(tmp.path(), "upd.csv", "id,name\n2,BOB\n4,dave\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let table = format!("DUCKLE_UPSERT_{}", std::process::id());
+    let snk = |path: &str, mode: &str| {
+        json!([
+            node("s", "src.csv", json!({ "path": path, "hasHeader": true })),
+            node("w", "snk.oracle", json!({
+                "connect": connect, "user": user, "password": pass,
+                "tableName": table, "mode": mode, "conflictColumns": ["id"]
+            })),
+        ])
+    };
+    let r1 = engine.execute_pipeline(&doc(snk(&seed, "overwrite"), json!([main_edge("e", "s", "w")])));
+    assert_eq!(r1.status, "ok", "seed failed: {:?}", r1.error);
+    let r2 = engine.execute_pipeline(&doc(snk(&upd, "upsert"), json!([main_edge("e", "s", "w")])));
+    assert_eq!(r2.status, "ok", "upsert failed: {:?}", r2.error);
+    let read = doc(
+        json!([
+            node("r", "src.oracle", json!({
+                "connect": connect, "user": user, "password": pass,
+                "query": format!("SELECT \"id\", \"name\" FROM \"{}\"", table)
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e", "r", "k")]),
+    );
+    let r3 = engine.execute_pipeline(&read);
+    assert_eq!(r3.status, "ok", "readback failed: {:?}", r3.error);
+    assert_upsert_result(&out);
+}
+
+#[test]
+fn snowflake_upsert_merges_and_inserts() {
+    // Verified against the nnnkkk7/snowflake-emulator (DuckDB-backed) which
+    // serves the real /api/v2/statements REST API and supports MERGE.
+    let engine = engine_or_skip!();
+    let endpoint = match std::env::var("DUCKLE_SNOWFLAKE_ENDPOINT") {
+        Ok(e) if !e.is_empty() => e,
+        _ => {
+            eprintln!("skipping: set DUCKLE_SNOWFLAKE_ENDPOINT to run against a Snowflake-compatible endpoint");
+            return;
+        }
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let seed = write_file(tmp.path(), "seed.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
+    let upd = write_file(tmp.path(), "upd.csv", "id,name\n2,BOB\n4,dave\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let table = format!("DUCKLE_UPSERT_{}", std::process::id());
+    let snk = |path: &str, mode: &str| {
+        json!([
+            node("s", "src.csv", json!({ "path": path, "hasHeader": true })),
+            node("w", "snk.snowflake", json!({
+                "account": "local", "endpoint": endpoint, "authType": "pat", "pat": "test",
+                "database": "TEST_DB", "schema": "PUBLIC", "tableName": table,
+                "mode": mode, "conflictColumns": ["id"]
+            })),
+        ])
+    };
+    let r1 = engine.execute_pipeline(&doc(snk(&seed, "overwrite"), json!([main_edge("e", "s", "w")])));
+    assert_eq!(r1.status, "ok", "seed failed: {:?}", r1.error);
+    let r2 = engine.execute_pipeline(&doc(snk(&upd, "upsert"), json!([main_edge("e", "s", "w")])));
+    assert_eq!(r2.status, "ok", "upsert failed: {:?}", r2.error);
+    let read = doc(
+        json!([
+            node("r", "src.snowflake", json!({
+                "account": "local", "endpoint": endpoint, "authType": "pat", "pat": "test",
+                "query": format!("SELECT \"id\", \"name\" FROM TEST_DB.PUBLIC.{}", table)
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e", "r", "k")]),
+    );
+    let r3 = engine.execute_pipeline(&read);
+    assert_eq!(r3.status, "ok", "readback failed: {:?}", r3.error);
+    assert_upsert_result(&out);
 }
 
 #[test]

@@ -242,6 +242,29 @@ impl DuckdbEngine {
             .map(|c| sf_quote_ident(c))
             .collect::<Vec<_>>()
             .join(", ");
+        // Upsert (MERGE) clauses when key columns are configured. Each batch is
+        // one MERGE whose source is an inline VALUES table - stateless, so it
+        // works against the per-request Snowflake SQL API (no temp table).
+        let is_upsert = !spec.upsert_keys.is_empty();
+        let on_clause = spec
+            .upsert_keys
+            .iter()
+            .map(|k| format!("t.{q} = s.{q}", q = sf_quote_ident(k)))
+            .collect::<Vec<_>>()
+            .join(" AND ");
+        let sf_key_set: std::collections::HashSet<&str> =
+            spec.upsert_keys.iter().map(|s| s.as_str()).collect();
+        let update_set = cols
+            .iter()
+            .filter(|c| !sf_key_set.contains(c.as_str()))
+            .map(|c| format!("t.{q} = s.{q}", q = sf_quote_ident(c)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let insert_vals = cols
+            .iter()
+            .map(|c| format!("s.{}", sf_quote_ident(c)))
+            .collect::<Vec<_>>()
+            .join(", ");
         let url = spec.endpoint.clone().unwrap_or_else(|| {
             format!(
                 "https://{}.snowflakecomputing.com/api/v2/statements",
@@ -271,12 +294,29 @@ impl DuckdbEngine {
                     format!("({})", vals.join(", "))
                 })
                 .collect();
-            let stmt = format!(
-                "INSERT INTO {} ({}) VALUES {}",
-                qualified,
-                cols_list,
-                values.join(", ")
-            );
+            let stmt = if is_upsert {
+                let matched = if update_set.is_empty() {
+                    String::new()
+                } else {
+                    format!(" WHEN MATCHED THEN UPDATE SET {}", update_set)
+                };
+                format!(
+                    "MERGE INTO {tgt} t USING (SELECT * FROM (VALUES {vals}) AS v ({cols})) s ON {on}{matched} WHEN NOT MATCHED THEN INSERT ({cols}) VALUES ({ins})",
+                    tgt = qualified,
+                    vals = values.join(", "),
+                    cols = cols_list,
+                    on = on_clause,
+                    matched = matched,
+                    ins = insert_vals,
+                )
+            } else {
+                format!(
+                    "INSERT INTO {} ({}) VALUES {}",
+                    qualified,
+                    cols_list,
+                    values.join(", ")
+                )
+            };
             let mut body_obj = serde_json::Map::new();
             body_obj.insert("statement".into(), JsonValue::String(stmt));
             body_obj.insert("timeout".into(), JsonValue::Number(60.into()));
@@ -320,7 +360,8 @@ impl DuckdbEngine {
             }
         }
         Ok(format!(
-            "snowflake: inserted {} rows into {}",
+            "snowflake: {} {} rows into {}",
+            if is_upsert { "merged" } else { "inserted" },
             total_inserted, spec.table
         ))
     }
@@ -435,6 +476,93 @@ impl DuckdbEngine {
         // Commit periodically, not after every statement: a commit forces a
         // redo-log flush, so per-batch commits dominated large-load wall-clock.
         const COMMIT_EVERY: usize = 200_000;
+
+        // Upsert (MERGE) path: each batch is one MERGE whose source is an
+        // inline `SELECT ... FROM dual UNION ALL ...` (Oracle has no multi-row
+        // VALUES). Reuses the literal renderer; correct insert-or-update by the
+        // configured key columns. Runs before the plain-insert fast/fallback
+        // paths and returns when done.
+        if !spec.upsert_keys.is_empty() {
+            let select = format!("SELECT * FROM {}", plan::quote_ident(&spec.from_view));
+            let rows = self.run_rows(Some(db), &select)?;
+            if rows.is_empty() {
+                return Ok(format!("oracle: 0 rows to merge into {}", qualified));
+            }
+            let key_set: std::collections::HashSet<&str> =
+                spec.upsert_keys.iter().map(|s| s.as_str()).collect();
+            let oq = |c: &str| format!("\"{}\"", c.replace('"', "\"\""));
+            let on_clause = spec
+                .upsert_keys
+                .iter()
+                .map(|k| format!("t.{0} = s.{0}", oq(k)))
+                .collect::<Vec<_>>()
+                .join(" AND ");
+            let update_set = cols
+                .iter()
+                .filter(|c| !key_set.contains(c.as_str()))
+                .map(|c| format!("t.{0} = s.{0}", oq(c)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let insert_vals = cols
+                .iter()
+                .map(|c| format!("s.{}", oq(c)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let matched = if update_set.is_empty() {
+                String::new()
+            } else {
+                format!(" WHEN MATCHED THEN UPDATE SET {}", update_set)
+            };
+            // Oracle caps a SELECT at 1000 expressions and statements at 64K;
+            // keep each MERGE source small so wide tables stay within limits.
+            let rows_per_stmt = (50_000 / cols.len().max(1)).clamp(1, 200);
+            let mut total = 0_usize;
+            let mut uncommitted = 0_usize;
+            for chunk in rows.chunks(rows_per_stmt) {
+                self.check_cancelled()?;
+                let selects: Vec<String> = chunk
+                    .iter()
+                    .map(|row| {
+                        let obj = row.as_object();
+                        let items: Vec<String> = cols
+                            .iter()
+                            .map(|c| {
+                                let v =
+                                    obj.and_then(|o| o.get(c)).unwrap_or(&JsonValue::Null);
+                                let lit = sql_literal(
+                                    v,
+                                    col_types.get(c).map(|s| s.as_str()),
+                                    Dialect::Oracle,
+                                );
+                                format!("{} AS {}", lit, oq(c))
+                            })
+                            .collect();
+                        format!("SELECT {} FROM dual", items.join(", "))
+                    })
+                    .collect();
+                let merge = format!(
+                    "MERGE INTO {tgt} t USING ({src}) s ON ({on}){matched} WHEN NOT MATCHED THEN INSERT ({cols}) VALUES ({ins})",
+                    tgt = qualified,
+                    src = selects.join(" UNION ALL "),
+                    on = on_clause,
+                    matched = matched,
+                    cols = cols_list,
+                    ins = insert_vals,
+                );
+                conn.execute(&merge, &[])
+                    .map_err(|e| EngineError::Query(format!("oracle merge: {}", e)))?;
+                total += chunk.len();
+                uncommitted += chunk.len();
+                if uncommitted >= COMMIT_EVERY {
+                    conn.commit()
+                        .map_err(|e| EngineError::Query(format!("oracle commit: {}", e)))?;
+                    uncommitted = 0;
+                }
+            }
+            conn.commit()
+                .map_err(|e| EngineError::Query(format!("oracle commit: {}", e)))?;
+            return Ok(format!("oracle: merged {} rows into {}", total, qualified));
+        }
 
         // Fast path: one prepared INSERT, array-bound and array-executed
         // (dpiStmt_executeMany). Replaces the old per-99-row INSERT ALL, each
@@ -4183,6 +4311,29 @@ impl DuckdbEngine {
             qualified,
             col_defs
         );
+        // Upsert (MERGE) clauses, when key columns are configured. Each batch
+        // becomes a single MERGE whose source is an inline VALUES table -
+        // stateless and correct against real SQL Server (no #temp needed).
+        let is_upsert = !spec.upsert_keys.is_empty();
+        let on_clause = spec
+            .upsert_keys
+            .iter()
+            .map(|k| format!("t.{q} = s.{q}", q = ss_quote_ident(k)))
+            .collect::<Vec<_>>()
+            .join(" AND ");
+        let key_set: std::collections::HashSet<&str> =
+            spec.upsert_keys.iter().map(|s| s.as_str()).collect();
+        let update_set = cols
+            .iter()
+            .filter(|c| !key_set.contains(c.as_str()))
+            .map(|c| format!("t.{q} = s.{q}", q = ss_quote_ident(c)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let insert_vals = cols
+            .iter()
+            .map(|c| format!("s.{}", ss_quote_ident(c)))
+            .collect::<Vec<_>>()
+            .join(", ");
         let cancel = self.cancel.clone();
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -4239,12 +4390,29 @@ impl DuckdbEngine {
                             format!("({})", vals.join(", "))
                         })
                         .collect();
-                    let stmt = format!(
-                        "INSERT INTO {} ({}) VALUES {}",
-                        qualified,
-                        cols_list,
-                        values.join(", ")
-                    );
+                    let stmt = if is_upsert {
+                        let matched = if update_set.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" WHEN MATCHED THEN UPDATE SET {}", update_set)
+                        };
+                        format!(
+                            "MERGE INTO {tgt} AS t USING (VALUES {vals}) AS s ({cols}) ON {on}{matched} WHEN NOT MATCHED THEN INSERT ({cols}) VALUES ({ins});",
+                            tgt = qualified,
+                            vals = values.join(", "),
+                            cols = cols_list,
+                            on = on_clause,
+                            matched = matched,
+                            ins = insert_vals,
+                        )
+                    } else {
+                        format!(
+                            "INSERT INTO {} ({}) VALUES {}",
+                            qualified,
+                            cols_list,
+                            values.join(", ")
+                        )
+                    };
                     client
                         .execute(stmt, &[])
                         .await
@@ -4259,7 +4427,8 @@ impl DuckdbEngine {
                 EngineError::Query(format!("sqlserver sink: {}", e))
             })?;
         Ok(format!(
-            "sqlserver: inserted {} rows into [{}].[{}].[{}]",
+            "sqlserver: {} {} rows into [{}].[{}].[{}]",
+            if is_upsert { "merged" } else { "inserted" },
             total, spec.database, spec.schema, spec.table
         ))
     }

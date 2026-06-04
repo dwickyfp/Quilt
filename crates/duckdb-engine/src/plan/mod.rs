@@ -409,6 +409,17 @@ pub fn compile(pipeline: &PipelineDoc) -> Result<CompiledPipeline, EngineError> 
 mod graph;
 use graph::*;
 
+/// Key columns for a sink's "upsert" write mode, or empty for plain insert.
+/// Driver sinks (SQL Server / Oracle / Snowflake / Databricks) MERGE on these
+/// when the form sets `mode = "upsert"` and supplies `conflictColumns`.
+fn upsert_keys_from(props: &JsonValue) -> Vec<String> {
+    if string_prop(props, "mode").as_deref() == Some("upsert") {
+        columns_list(props, "conflictColumns")
+    } else {
+        Vec::new()
+    }
+}
+
 fn build_stage(
     node: &PipelineNode,
     component_id: &str,
@@ -774,6 +785,7 @@ fn build_stage(
             schema: string_prop(&props, "schema").filter(|s| !s.is_empty()),
             table,
             batch_size: props.get("batchSize").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(1000) as usize,
+            upsert_keys: upsert_keys_from(&props),
         });
         (String::new(), StageKind::Sink, Some(from_view.to_string()))
     } else if component_id == "snk.redis" {
@@ -853,6 +865,7 @@ fn build_stage(
             table,
             batch_size: props.get("batchSize").and_then(|v| v.as_u64()).filter(|n| *n > 0).unwrap_or(1000) as usize,
             trust_cert: props.get("trustCert").and_then(|v| v.as_bool()).unwrap_or(false),
+            upsert_keys: upsert_keys_from(&props),
         });
         (String::new(), StageKind::Sink, Some(from_view.to_string()))
     } else if component_id == "snk.clickhouse" {
@@ -956,6 +969,7 @@ fn build_stage(
                 .and_then(|v| v.as_u64())
                 .filter(|n| *n > 0)
                 .unwrap_or(1000) as usize,
+            upsert_keys: upsert_keys_from(&props),
         });
         (String::new(), StageKind::Sink, Some(from_view.to_string()))
     } else if component_id == "snk.elastic" || component_id == "snk.opensearch" {
