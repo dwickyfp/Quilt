@@ -598,6 +598,8 @@ export const PALETTE: Category[] = [
                 components: [
                     ctl('runpipeline', 'Run Pipeline', 'available', 'Reads + executes another pipeline file inline as a side effect, then passes the upstream view through unchanged. Useful for triggering helper pipelines (refresh dimension tables, kick off cleanup) without composing their output into the parent.'),
                     ctl('trigger', 'Trigger Pipeline', 'available', 'Alias of ctl.runpipeline; same executor branch.'),
+                    ctl('runjob', 'Run Job (tRunJob)', 'available', 'Talend-style tRunJob: calls a child pipeline (job) as a side effect, passing parent context variables that are substituted as ${VAR} into the child before it runs. Chain several Run Job nodes to build a Master Job that orchestrates child jobs in sequence. The child runs in its own temp DB; its output is not composed back into the parent.'),
+                    ctl('parallelize', 'Parallelize (tParallelize)', 'available', 'Talend-style tParallelize: runs the independent downstream branches wired to its outputs concurrently. The upstream input is snapshotted once and each branch reads that snapshot in its own isolated execution, joining when all finish (any branch failure fails the node).'),
                     ctl('checkpoint', 'Checkpoint', 'available', 'Pass rows through and also write a parquet snapshot to a path - the durable artifact a future run can read back via src.parquet'),
                 ],
             },

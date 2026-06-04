@@ -4963,6 +4963,52 @@ impl DuckdbEngine {
         self.run_subpipeline_with_subs(path, &std::collections::HashMap::new())
     }
 
+    /// ctl.parallelize: run each branch sub-pipeline doc (JSON, carrying a
+    /// `${__PSNAP__}` snapshot placeholder) concurrently. Each branch parses +
+    /// executes in its own temp DB on a worker thread; branches read the shared
+    /// snapshot Parquet read-only, so there is no write contention. Runs in
+    /// waves of `max_concurrency` (0 = all at once) and fails on the first
+    /// branch error.
+    pub(crate) fn run_parallel_branches(
+        &self,
+        branches: &[String],
+        snapshot: &Path,
+        max_concurrency: usize,
+    ) -> Result<(), EngineError> {
+        // Forward slashes + no quotes -> safe to splice into the branch JSON.
+        let snap = snapshot.display().to_string().replace('\\', "/");
+        let wave = if max_concurrency == 0 {
+            branches.len().max(1)
+        } else {
+            max_concurrency
+        };
+        for chunk in branches.chunks(wave) {
+            let mut handles = Vec::with_capacity(chunk.len());
+            for doc_json in chunk {
+                let engine = self.clone();
+                let content = doc_json.replace("${__PSNAP__}", &snap);
+                handles.push(std::thread::spawn(move || -> Result<(), String> {
+                    let doc: plan::PipelineDoc = serde_json::from_str(&content)
+                        .map_err(|e| format!("branch parse: {}", e))?;
+                    let r = engine.execute_pipeline(&doc);
+                    if r.status == "ok" {
+                        Ok(())
+                    } else {
+                        Err(r.error.unwrap_or_else(|| "branch failed".into()))
+                    }
+                }));
+            }
+            for h in handles {
+                match h.join() {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => return Err(EngineError::Query(e)),
+                    Err(_) => return Err(EngineError::Query("branch thread panicked".into())),
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Read a pipeline file, perform `${KEY}` text substitution from
     /// the supplied map, parse the result as a PipelineDoc, and run
     /// it inline. Used by ctl.iterate (${ITER_INDEX}) and ctl.foreach

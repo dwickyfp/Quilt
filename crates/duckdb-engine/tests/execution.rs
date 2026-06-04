@@ -8550,3 +8550,78 @@ fn code_shell_timeout_kills_long_running_child() {
         elapsed.as_millis()
     );
 }
+
+#[test]
+fn runjob_passes_context_vars_to_child() {
+    // tRunJob / Master Job: a parent ctl.runjob calls a child pipeline file,
+    // passing context variables that are substituted as ${VAR} into the child
+    // before it runs. The child here writes to a path templated with the var,
+    // proving the parent->child substitution + side-effect execution work.
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
+    let out_template = out_path(tmp.path(), "out_${OUTNAME}.csv");
+    let child_val = json!({
+        "nodes": [
+            node("cs", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("ck", "snk.csv", json!({ "path": out_template, "hasHeader": true })),
+        ],
+        "edges": [ main_edge("ce", "cs", "ck") ]
+    });
+    let child_path = write_file(
+        tmp.path(),
+        "child.json",
+        &serde_json::to_string(&child_val).unwrap(),
+    );
+
+    let engine = engine_or_skip!();
+    let parent = doc(
+        json!([node(
+            "rj",
+            "ctl.runjob",
+            json!({ "pipelineRef": child_path, "contextVariables": { "OUTNAME": "customers" } })
+        )]),
+        json!([]),
+    );
+    let result = engine.execute_pipeline(&parent);
+    assert_eq!(result.status, "ok", "runjob failed: {:?}", result.error);
+    let expected = out_path(tmp.path(), "out_customers.csv");
+    assert!(
+        Path::new(&expected).exists(),
+        "child job did not write the templated output {}",
+        expected
+    );
+    assert_eq!(count(&format!("read_csv_auto('{}')", expected)), 3);
+}
+
+#[test]
+fn parallelize_runs_independent_branches() {
+    // tParallelize: ctl.parallelize snapshots its upstream once, then runs the
+    // two independent downstream branches concurrently (each in its own temp
+    // DB reading the snapshot). Branch 1 copies all rows; branch 2 limits to 2.
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "id,name\n1,a\n2,b\n3,c\n");
+    let out1 = out_path(tmp.path(), "branch1.csv");
+    let out2 = out_path(tmp.path(), "branch2.csv");
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("p", "ctl.parallelize", json!({})),
+            node("k1", "snk.csv", json!({ "path": out1, "hasHeader": true })),
+            node("lim", "xf.limit", json!({ "limit": 2 })),
+            node("k2", "snk.csv", json!({ "path": out2, "hasHeader": true })),
+        ]),
+        json!([
+            main_edge("e1", "s", "p"),
+            port_edge("e2", "p", "main_1", "k1"),
+            port_edge("e3", "p", "main_2", "lim"),
+            main_edge("e4", "lim", "k2"),
+        ]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "parallelize failed: {:?}", result.error);
+    assert!(Path::new(&out1).exists(), "branch 1 output missing");
+    assert!(Path::new(&out2).exists(), "branch 2 output missing");
+    assert_eq!(count(&format!("read_csv_auto('{}')", out1)), 3);
+    assert_eq!(count(&format!("read_csv_auto('{}')", out2)), 2);
+}

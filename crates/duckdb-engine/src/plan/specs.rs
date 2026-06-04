@@ -5,6 +5,18 @@
 //! `pub use specs::*` from the parent module, so existing `plan::XxxSpec`
 //! paths are unchanged.
 
+/// ctl.parallelize: run the independent downstream branches concurrently.
+/// Each branch is a self-contained sub-pipeline doc (JSON) whose source is an
+/// injected src.parquet reading the `${__PSNAP__}` snapshot placeholder; the
+/// executor snapshots the upstream once, substitutes the real snapshot path,
+/// and runs each branch in its own temp DB on a worker thread.
+#[derive(Debug, Clone)]
+pub struct ParallelizeSpec {
+    pub branches: Vec<String>,
+    /// Max branches running at once; 0 = all at once.
+    pub max_concurrency: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct TextSearchSpec {
     pub from_view: String,

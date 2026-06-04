@@ -354,6 +354,29 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // Run Job (tRunJob) - optional upstream, pass-through out so several
+    // Run Job nodes can be chained into a Master Job.
+    if (id === 'ctl.runjob') {
+        return {
+            inputs: [{ id: 'main', label: 'main', type: 'main', optional: true }],
+            outputs: [MAIN_OUT],
+        };
+    }
+
+    // Parallelize (tParallelize) - one input, multiple branch outputs that
+    // run concurrently; each branch is an independent downstream subgraph.
+    if (id === 'ctl.parallelize') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [
+                { id: 'main_1', label: 'branch 1', type: 'main' },
+                { id: 'main_2', label: 'branch 2', type: 'main' },
+                { id: 'main_3', label: 'branch 3', type: 'main', optional: true },
+                { id: 'main_4', label: 'branch 4', type: 'main', optional: true },
+            ],
+        };
+    }
+
     // Quality validators - pass + reject
     if (comp.kind === 'quality') {
         return {
@@ -3178,14 +3201,35 @@ function synthTimingControl(comp: ComponentDef): ComponentManifest {
 }
 
 function synthPipelineControl(comp: ComponentDef): ComponentManifest {
-    if (comp.id === 'ctl.runpipeline' || comp.id === 'ctl.trigger') {
+    if (comp.id === 'ctl.runpipeline' || comp.id === 'ctl.trigger' || comp.id === 'ctl.runjob') {
+        const isJob = comp.id === 'ctl.runjob';
         return base(comp, [
             {
-                label: 'Pipeline',
+                label: isJob ? 'Child job' : 'Pipeline',
                 fields: [
-                    { key: 'pipelineRef', label: 'Pipeline', kind: 'text', required: true, placeholder: 'pipelines/customers_sync' },
+                    { key: 'pipelineRef', label: isJob ? 'Child job / pipeline' : 'Pipeline', kind: 'text', required: true, placeholder: 'pipelines/customers_sync' },
                     { key: 'waitForCompletion', label: 'Wait for completion', kind: 'bool', defaultValue: true },
-                    { key: 'parameters', label: 'Parameters', kind: 'key-value' },
+                    {
+                        key: isJob ? 'contextVariables' : 'parameters',
+                        label: isJob ? 'Context variables' : 'Parameters',
+                        kind: 'key-value',
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
+    if (comp.id === 'ctl.parallelize') {
+        return base(comp, [
+            {
+                label: 'Parallelize',
+                fields: [
+                    {
+                        key: 'maxConcurrency',
+                        label: 'Max concurrent branches',
+                        kind: 'integer',
+                        defaultValue: 0,
+                        placeholder: '0 = all at once',
+                    },
                 ],
             },
         ], 'upstream');

@@ -412,6 +412,152 @@ pub(crate) fn passthrough_placeholder_sql(node_id: &str, marker: &str) -> String
     )
 }
 
+/// Extract the independent downstream branches of a ctl.parallelize node into
+/// self-contained sub-pipeline docs (one per output branch) for concurrent
+/// execution, plus the set of branch node ids to exclude from the main plan.
+///
+/// Each branch sub-doc gets an injected `src.parquet` source whose id equals
+/// the parallelize node's id (so the branch's edges from it resolve) reading a
+/// `${__PSNAP__}` snapshot placeholder the executor fills at run time. Branches
+/// must be independent: a branch node may not also be fed from outside the
+/// branches, nor feed a node outside them (output composition isn't supported).
+pub(crate) fn build_parallelize_branches(
+    p_node: &PipelineNode,
+    nodes: &[PipelineNode],
+    data_edges: &[&PipelineEdge],
+) -> Result<(ParallelizeSpec, Vec<String>), EngineError> {
+    let p_id = p_node.id.as_str();
+    // Roots per output handle (branch entry nodes).
+    let mut handles: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for e in data_edges {
+        if e.source == p_id {
+            let h = e.source_handle.clone().unwrap_or_else(|| "main".into());
+            handles.entry(h).or_default().push(e.target.clone());
+        }
+    }
+    if handles.is_empty() {
+        return Err(EngineError::Config(format!(
+            "ctl.parallelize ({}): wire at least one branch to an output before running",
+            p_id
+        )));
+    }
+
+    let node_by_id: HashMap<&str, &PipelineNode> =
+        nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+    let mut downstream: HashMap<&str, Vec<&str>> = HashMap::new();
+    for e in data_edges {
+        downstream
+            .entry(e.source.as_str())
+            .or_default()
+            .push(e.target.as_str());
+    }
+
+    let mut all_branch: HashSet<String> = HashSet::new();
+    let mut branches: Vec<String> = Vec::new();
+
+    for roots in handles.values() {
+        // BFS downstream from the branch roots.
+        let mut order: Vec<String> = Vec::new();
+        let mut seen: HashSet<&str> = HashSet::new();
+        let mut queue: Vec<&str> = roots.iter().map(|s| s.as_str()).collect();
+        while let Some(n) = queue.pop() {
+            if n == p_id || !seen.insert(n) {
+                continue;
+            }
+            order.push(n.to_string());
+            if let Some(succ) = downstream.get(n) {
+                for &t in succ {
+                    if t != p_id {
+                        queue.push(t);
+                    }
+                }
+            }
+        }
+        for n in &order {
+            if all_branch.contains(n) {
+                return Err(EngineError::Config(format!(
+                    "ctl.parallelize ({}): node '{}' is reachable from more than one branch; branches must be independent",
+                    p_id, n
+                )));
+            }
+        }
+        let branch_set: HashSet<&str> = order.iter().map(|s| s.as_str()).collect();
+        // Sub-doc nodes: injected snapshot source (id = parallelize id) + branch nodes.
+        let mut sub_nodes: Vec<serde_json::Value> = vec![serde_json::json!({
+            "id": p_id,
+            "position": { "x": 0, "y": 0 },
+            "data": {
+                "label": "snapshot",
+                "componentId": "src.parquet",
+                "properties": { "path": "${__PSNAP__}" }
+            }
+        })];
+        for n in &order {
+            let node = node_by_id.get(n.as_str()).ok_or_else(|| {
+                EngineError::Config(format!("ctl.parallelize ({}): unknown branch node '{}'", p_id, n))
+            })?;
+            sub_nodes.push(
+                serde_json::to_value(node)
+                    .map_err(|e| EngineError::Config(format!("ctl.parallelize: serialize node: {}", e)))?,
+            );
+        }
+        let mut sub_edges: Vec<serde_json::Value> = Vec::new();
+        for e in data_edges {
+            let src_in = e.source == p_id || branch_set.contains(e.source.as_str());
+            if src_in && branch_set.contains(e.target.as_str()) {
+                sub_edges.push(
+                    serde_json::to_value(e)
+                        .map_err(|e| EngineError::Config(format!("ctl.parallelize: serialize edge: {}", e)))?,
+                );
+            }
+        }
+        let sub_doc = serde_json::json!({ "nodes": sub_nodes, "edges": sub_edges });
+        branches.push(
+            serde_json::to_string(&sub_doc)
+                .map_err(|e| EngineError::Config(format!("ctl.parallelize: serialize branch: {}", e)))?,
+        );
+        for n in order {
+            all_branch.insert(n);
+        }
+    }
+
+    // Independence checks: no branch node may exchange data with a node outside
+    // the branches (that would require composing branch output back).
+    for e in data_edges {
+        if all_branch.contains(e.target.as_str())
+            && e.source != p_id
+            && !all_branch.contains(e.source.as_str())
+        {
+            return Err(EngineError::Config(format!(
+                "ctl.parallelize ({}): branch node '{}' also receives data from '{}' outside the parallel branches; branches must be independent",
+                p_id, e.target, e.source
+            )));
+        }
+        if all_branch.contains(e.source.as_str()) && !all_branch.contains(e.target.as_str()) {
+            return Err(EngineError::Config(format!(
+                "ctl.parallelize ({}): branch node '{}' feeds '{}' outside the parallel branches; branch outputs can't be composed back (end each branch in its own sink)",
+                p_id, e.source, e.target
+            )));
+        }
+    }
+
+    let max_concurrency = p_node
+        .data
+        .properties
+        .as_ref()
+        .and_then(|p| p.get("maxConcurrency"))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as usize;
+
+    Ok((
+        ParallelizeSpec {
+            branches,
+            max_concurrency,
+        },
+        all_branch.into_iter().collect(),
+    ))
+}
+
 pub(crate) fn canonical_port(p: &str) -> &str {
     // Collapse port handle ids to canonical names. The frontend uses
     // 'main', 'lookup_1', 'lookup_2', 'lookup_3', 'reject', 'filter',

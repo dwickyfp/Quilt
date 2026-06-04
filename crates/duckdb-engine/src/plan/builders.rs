@@ -4890,6 +4890,43 @@ pub(crate) fn string_prop(props: &JsonValue, key: &str) -> Option<String> {
 /// Reads the `headers` key-value pairs from a HTTP connector's props.
 /// Forms write them as either an object ({k: v}) or an array of
 /// {key, value} entries; accept both shapes.
+/// Read a key-value prop (object `{k: v}` or array of `{key, value}`) into
+/// ordered pairs. Used for context variables, parameters, etc.
+pub(crate) fn kv_pairs(props: &JsonValue, key: &str) -> Vec<(String, String)> {
+    let raw = match props.get(key) {
+        Some(v) => v,
+        None => return Vec::new(),
+    };
+    if let Some(obj) = raw.as_object() {
+        return obj
+            .iter()
+            .filter_map(|(k, v)| {
+                let val = v.as_str().map(String::from).unwrap_or_else(|| v.to_string());
+                (!k.is_empty()).then(|| (k.clone(), val))
+            })
+            .collect();
+    }
+    if let Some(arr) = raw.as_array() {
+        return arr
+            .iter()
+            .filter_map(|item| {
+                let k = item.get("key").and_then(|x| x.as_str())?;
+                if k.is_empty() {
+                    return None;
+                }
+                let v = item.get("value");
+                let val = v
+                    .and_then(|x| x.as_str())
+                    .map(String::from)
+                    .or_else(|| v.map(|x| x.to_string()))
+                    .unwrap_or_default();
+                Some((k.to_string(), val))
+            })
+            .collect();
+    }
+    Vec::new()
+}
+
 pub(crate) fn headers_from_props(props: &JsonValue) -> Vec<(String, String)> {
     let raw = match props.get("headers") {
         Some(v) => v,

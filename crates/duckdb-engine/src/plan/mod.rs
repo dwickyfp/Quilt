@@ -71,17 +71,23 @@ impl Stage {
 
 /// The single non-SQL action a Stage performs (or None for pure SQL).
 /// Terminal variants (sources / sinks / transforms) replace the stage's
-/// SQL run in the executor; control-flow variants (RunPipeline / Iterate /
+/// SQL run in the executor; control-flow variants (RunJob / Iterate /
 /// Foreach / InstallFallback) run as a side effect and then fall through to
 /// the stage's pass-through SQL.
 #[derive(Debug)]
 pub enum RuntimeSpec {
     Upsert(UpsertSpec),
     TextSearch(TextSearchSpec),
-    RunPipeline(String),
+    /// Parent -> child job call (ctl.runpipeline / ctl.trigger / ctl.runjob).
+    /// `vars` are substituted as ${KEY} into the child before it runs.
+    RunJob {
+        path: String,
+        vars: Vec<(String, String)>,
+    },
     InstallFallback(String),
     Iterate { path: String, count: u64 },
     Foreach(String),
+    Parallelize(ParallelizeSpec),
     Webhook(WebhookSpec),
     SnowflakeSink(SnowflakeSinkSpec),
     DatabricksSink(DatabricksSinkSpec),
@@ -287,6 +293,29 @@ pub fn compile(pipeline: &PipelineDoc) -> Result<CompiledPipeline, EngineError> 
         known_columns.insert(node.id.clone(), derived);
     }
 
+    // ctl.parallelize: extract each node's independent downstream branches
+    // into sub-pipelines that run concurrently, and exclude those branch
+    // nodes from the main (sequential) plan so they don't also run inline.
+    let mut excluded: HashSet<String> = HashSet::new();
+    let mut parallelize_specs: HashMap<String, ParallelizeSpec> = HashMap::new();
+    for node in &pipeline.nodes {
+        if node.data.component_id.as_deref() == Some("ctl.parallelize")
+            && !node.data.disabled.unwrap_or(false)
+        {
+            let (spec, branch_nodes) =
+                build_parallelize_branches(node, &pipeline.nodes, &data_edges)?;
+            for bn in branch_nodes {
+                if !excluded.insert(bn.clone()) {
+                    return Err(EngineError::Config(format!(
+                        "node '{}' belongs to more than one ctl.parallelize",
+                        bn
+                    )));
+                }
+            }
+            parallelize_specs.insert(node.id.clone(), spec);
+        }
+    }
+
     let mut stages = Vec::with_capacity(order.len());
     for node_id in &order {
         let node = node_index
@@ -303,6 +332,11 @@ pub fn compile(pipeline: &PipelineDoc) -> Result<CompiledPipeline, EngineError> 
                 ))
             })?;
         if node.data.disabled.unwrap_or(false) {
+            continue;
+        }
+        // Nodes pulled into a ctl.parallelize branch run inside that branch's
+        // sub-pipeline, not in the main sequential plan.
+        if excluded.contains(node_id.as_str()) {
             continue;
         }
         let empty = NodeInputs::default();
@@ -339,15 +373,24 @@ pub fn compile(pipeline: &PipelineDoc) -> Result<CompiledPipeline, EngineError> 
                 }
             }
         }
-        let stage = build_stage(node, component_id, node_inputs, &consumer_count)?;
+        let mut stage = build_stage(node, component_id, node_inputs, &consumer_count)?;
+        if let Some(spec) = parallelize_specs.remove(node_id) {
+            stage.runtime = Some(RuntimeSpec::Parallelize(spec));
+        }
         stages.push(stage);
     }
 
-    // Leaves = data-flow nodes that nothing else consumes from
-    let has_downstream: HashSet<&str> = data_edges.iter().map(|e| e.source.as_str()).collect();
+    // Leaves = data-flow nodes that nothing else (still in the plan) consumes
+    // from. Edges into excluded parallelize-branch nodes don't count, so a
+    // parallelize node whose only consumers are its branches stays a leaf.
+    let has_downstream: HashSet<&str> = data_edges
+        .iter()
+        .filter(|e| !excluded.contains(e.target.as_str()))
+        .map(|e| e.source.as_str())
+        .collect();
     let leaves: Vec<String> = order
         .iter()
-        .filter(|id| !has_downstream.contains(id.as_str()))
+        .filter(|id| !excluded.contains(id.as_str()) && !has_downstream.contains(id.as_str()))
         .cloned()
         .collect();
 
@@ -374,7 +417,7 @@ fn build_stage(
     let mut upsert: Option<UpsertSpec> = None;
     let mut text_search: Option<TextSearchSpec> = None;
     let mut webhook: Option<WebhookSpec> = None;
-    let mut run_pipeline_path: Option<String> = None;
+    let mut run_job: Option<(String, Vec<(String, String)>)> = None;
     let mut install_fallback_path: Option<String> = None;
     let mut iterate_pipeline_path: Option<String> = None;
     let mut iterate_count: Option<u64> = None;
@@ -1224,28 +1267,42 @@ fn build_stage(
             None => passthrough_placeholder_sql(&node.id, "try-installed"),
         };
         (sql, StageKind::View, None)
-    } else if component_id == "ctl.runpipeline" || component_id == "ctl.trigger" {
-        // Side-effect: read + execute the referenced pipeline file
-        // before passing this node's upstream view through. Form
-        // writes `pipelineRef` (path to a .json pipeline doc) +
-        // optional `waitForCompletion` (currently always true; async
-        // fire-and-forget would need scheduler integration).
-        // Without an upstream input, the stage emits an empty table
-        // so downstream nodes can still chain off it as a 'trigger
-        // happened' signal.
+    } else if component_id == "ctl.runpipeline"
+        || component_id == "ctl.trigger"
+        || component_id == "ctl.runjob"
+    {
+        // Parent -> child job call (Talend tRunJob). Reads + executes the
+        // referenced pipeline file as a side effect before passing this
+        // node's upstream view through. `pipelineRef` is the child path;
+        // optional context variables (key-value) are substituted as ${VAR}
+        // into the child before it runs - same mechanism as ctl.iterate /
+        // ctl.foreach. Side-effect model: the child runs in its own temp DB
+        // and its output is not composed back into the parent (full
+        // composition needs the DAG-block refactor noted in the README).
+        // Without an upstream input the stage emits an empty placeholder so
+        // downstream wiring still has a target ('master job' orchestration).
         let path = string_prop(&props, "pipelineRef")
             .or_else(|| string_prop(&props, "path"))
             .filter(|s| !s.trim().is_empty())
             .ok_or_else(|| EngineError::Config(format!("{}: pipelineRef (path to a pipeline file) required", component_id)))?;
-        run_pipeline_path = Some(path);
-        // Pass-through view: use main input if present, otherwise
-        // synthesize an empty placeholder so downstream wiring still
-        // has a target.
+        let mut vars = kv_pairs(&props, "contextVariables");
+        if vars.is_empty() {
+            vars = kv_pairs(&props, "parameters");
+        }
+        run_job = Some((path, vars));
         let sql = match inputs.main() {
             Some(from_view) => passthrough_view_sql(&node.id, from_view),
             None => passthrough_placeholder_sql(&node.id, "triggered"),
         };
         (sql, StageKind::View, None)
+    } else if component_id == "ctl.parallelize" {
+        // The branch sub-pipelines + concurrency are attached by compile() as
+        // RuntimeSpec::Parallelize. Here we just set `from` so the executor
+        // knows which upstream to snapshot, and pass the input through as a
+        // view so the node stays previewable.
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let sql = passthrough_view_sql(&node.id, from_view);
+        (sql, StageKind::View, Some(from_view.to_string()))
     } else if component_id == "ctl.wait" {
         // Pass-through view. Engine sleeps wait_ms before running the SQL.
         // Form writes { duration: int, unit: 'milliseconds'|'seconds'|'minutes'|'hours' }.
@@ -2703,7 +2760,7 @@ fn build_stage(
     let runtime: Option<RuntimeSpec> = None
         .or_else(|| upsert.map(RuntimeSpec::Upsert))
         .or_else(|| text_search.map(RuntimeSpec::TextSearch))
-        .or_else(|| run_pipeline_path.map(RuntimeSpec::RunPipeline))
+        .or_else(|| run_job.map(|(path, vars)| RuntimeSpec::RunJob { path, vars }))
         .or_else(|| install_fallback_path.map(RuntimeSpec::InstallFallback))
         .or_else(|| iterate_pipeline_path
             .map(|path| RuntimeSpec::Iterate { path, count: iterate_count.unwrap_or(0) }))

@@ -98,8 +98,16 @@ pub(crate) fn redact_secret_values(sql: &str, secrets: &[Secret]) -> String {
 /// complete + self-documenting instead of emitting a bare empty stage.
 pub(crate) fn procedural_note(s: &plan::Stage) -> String {
     let cid = s.component_id.as_str();
-    let body = if let Some(RuntimeSpec::RunPipeline(p)) = s.runtime.as_ref() {
-        format!("control step: runs sub-pipeline '{}' as a side effect", p)
+    let body = if let Some(RuntimeSpec::RunJob { path, vars }) = s.runtime.as_ref() {
+        if vars.is_empty() {
+            format!("control step: runs sub-pipeline '{}' as a side effect", path)
+        } else {
+            format!(
+                "control step: runs job '{}' with {} context var(s) (tRunJob)",
+                path,
+                vars.len()
+            )
+        }
     } else if let Some(RuntimeSpec::Iterate { path, count }) = s.runtime.as_ref() {
         format!(
             "control step: runs sub-pipeline '{}' x{} (ctl.iterate)",
@@ -107,6 +115,11 @@ pub(crate) fn procedural_note(s: &plan::Stage) -> String {
         )
     } else if let Some(RuntimeSpec::Foreach(p)) = s.runtime.as_ref() {
         format!("control step: runs sub-pipeline '{}' once per upstream row (ctl.foreach)", p)
+    } else if let Some(RuntimeSpec::Parallelize(spec)) = s.runtime.as_ref() {
+        format!(
+            "control step: runs {} downstream branch(es) in parallel (tParallelize)",
+            spec.branches.len()
+        )
     } else if let Some(RuntimeSpec::InstallFallback(p)) = s.runtime.as_ref() {
         format!("control step: installs fallback pipeline '{}' (ctl.try)", p)
     } else if cid.starts_with("snk.") {

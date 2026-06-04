@@ -522,12 +522,16 @@ impl DuckdbEngine {
                 // isn't composed into the parent (the side-effect /
                 // trigger model). Full block-scope composition needs
                 // the DAG-engine refactor noted in the README.
-                if let Some(RuntimeSpec::RunPipeline(sub_path)) = stage.runtime.as_ref() {
-                    if let Err(e) = self.run_subpipeline(sub_path) {
-                        result = Err(EngineError::Query(format!(
-                            "ctl.runpipeline({}): {}",
-                            sub_path, e
-                        )));
+                if let Some(RuntimeSpec::RunJob { path, vars }) = stage.runtime.as_ref() {
+                    let res = if vars.is_empty() {
+                        self.run_subpipeline(path)
+                    } else {
+                        let subs: std::collections::HashMap<String, String> =
+                            vars.iter().cloned().collect();
+                        self.run_subpipeline_with_subs(path, &subs)
+                    };
+                    if let Err(e) = res {
+                        result = Err(EngineError::Query(format!("ctl.runjob({}): {}", path, e)));
                         continue;
                     }
                 }
@@ -599,6 +603,30 @@ impl DuckdbEngine {
                     }
                     if let Some(e) = each_err {
                         result = Err(EngineError::Query(e));
+                        continue;
+                    }
+                }
+                // ctl.parallelize: snapshot the upstream once, then run each
+                // independent branch sub-pipeline concurrently (each in its own
+                // temp DB). Side-effect before the pass-through SQL.
+                if let Some(RuntimeSpec::Parallelize(spec)) = stage.runtime.as_ref() {
+                    let from = stage.from.clone().unwrap_or_else(|| stage.node_id.clone());
+                    let snap = unique_rest_tmp_path(&stage.node_id).with_extension("parquet");
+                    let snap_sql = snap.display().to_string().replace('\\', "/").replace('\'', "''");
+                    let copy = format!(
+                        "COPY (SELECT * FROM {}) TO '{}' (FORMAT PARQUET)",
+                        plan::quote_ident(&from),
+                        snap_sql
+                    );
+                    let outcome = self.run(Some(&db_path), &copy, false).and_then(|_| {
+                        self.run_parallel_branches(&spec.branches, &snap, spec.max_concurrency)
+                    });
+                    let _ = std::fs::remove_file(&snap);
+                    if let Err(e) = outcome {
+                        result = Err(EngineError::Query(format!(
+                            "ctl.parallelize({}): {}",
+                            stage.node_id, e
+                        )));
                         continue;
                     }
                 }
@@ -715,7 +743,7 @@ impl DuckdbEngine {
                     Some(RuntimeSpec::TextSearch(spec)) => {
                         self.run_text_search(&db_path, &secret_prefix, &stage.node_id, spec)
                     }
-                    // Control-flow variants (RunPipeline / InstallFallback /
+                    // Control-flow variants (RunJob / InstallFallback /
                     // Iterate / Foreach) already ran their side effect above, so
                     // they fall through here to the stage's pass-through SQL -
                     // as does a plain SQL stage (None).
