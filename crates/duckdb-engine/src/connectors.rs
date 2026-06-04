@@ -5030,8 +5030,9 @@ impl DuckdbEngine {
         path: &str,
         subs: &std::collections::HashMap<String, String>,
     ) -> Result<(), EngineError> {
-        let mut content = std::fs::read_to_string(path).map_err(|e| {
-            EngineError::Config(format!("sub-pipeline: read '{}': {}", path, e))
+        let resolved = resolve_subpipeline_ref(path);
+        let mut content = std::fs::read_to_string(&resolved).map_err(|e| {
+            EngineError::Config(format!("sub-pipeline: read '{}': {}", resolved, e))
         })?;
         for (key, val) in subs {
             let placeholder = format!("${{{}}}", key);
@@ -5494,4 +5495,33 @@ impl DuckdbEngine {
         );
         self.run(Some(db), &index_sql, false)
     }
+}
+
+/// Resolve a child-pipeline reference (Run Job / Iterate / Foreach / Try)
+/// to a file path the engine can read. An explicit path - absolute, or
+/// containing a separator, or ending in `.json` - is used verbatim. A bare
+/// workspace pipeline id is looked up under `$DUCKLE_WORKSPACE/pipelines/`,
+/// matching how the desktop stores pipelines. This is the single resolution
+/// point that makes id references work for every run mode: interactive runs
+/// pre-resolve in the frontend (and arrive here as a real path, untouched),
+/// while headless runs (scheduler, file-watch) carry the bare id and resolve
+/// here. A bare id that doesn't resolve is returned as-is so the caller's
+/// open error names the original reference.
+fn resolve_subpipeline_ref(reference: &str) -> String {
+    let looks_like_path =
+        reference.contains('/') || reference.contains('\\') || reference.ends_with(".json");
+    if looks_like_path {
+        return reference.to_string();
+    }
+    if let Ok(ws) = std::env::var("DUCKLE_WORKSPACE") {
+        if !ws.is_empty() {
+            let candidate = std::path::Path::new(&ws)
+                .join("pipelines")
+                .join(format!("{}.json", reference));
+            if candidate.exists() {
+                return candidate.display().to_string();
+            }
+        }
+    }
+    reference.to_string()
 }

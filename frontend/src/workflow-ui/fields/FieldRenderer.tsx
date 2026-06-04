@@ -16,6 +16,7 @@ import { KeyValueField } from './KeyValueField';
 import { FilterBuilderField } from './FilterBuilderField';
 import { ConnectionRefField } from './ConnectionRefField';
 import { RoutineRefField } from './RoutineRefField';
+import { PipelineRefField } from './PipelineRefField';
 import { FieldContext } from './FieldContext';
 
 type Props = {
@@ -189,6 +190,14 @@ function renderInput(field: Field, value: unknown, onChange: (v: unknown) => voi
         case 'routine-ref':
             return (
                 <RoutineRefField
+                    field={field}
+                    value={value as string | undefined}
+                    onChange={onChange}
+                />
+            );
+        case 'pipeline-ref':
+            return (
+                <PipelineRefField
                     field={field}
                     value={value as string | undefined}
                     onChange={onChange}

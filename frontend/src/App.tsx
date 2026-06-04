@@ -807,7 +807,7 @@ export default function App() {
         const start = performance.now();
         // Inline SQL routines + substitute ${context.var} before running;
         // the canvas keeps the editable, un-substituted values.
-        const runNodes = resolveForRun(nodes, repo);
+        const runNodes = resolveForRun(nodes, repo, workspacePathState);
         void runPipeline(runNodes, edges, handleEvent, activeJobId, workspacePathState)
             .then(result => finishRun(start, result))
             .finally(() => setIsRunning(false));
@@ -822,7 +822,7 @@ export default function App() {
             setIsRunning(true);
             setRunResult(null);
             const start = performance.now();
-            const runNodes = resolveForRun(nodes, repo);
+            const runNodes = resolveForRun(nodes, repo, workspacePathState);
             void runPipelinePartial(
                 runNodes,
                 edges,

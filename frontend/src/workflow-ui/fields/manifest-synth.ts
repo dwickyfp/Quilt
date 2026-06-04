@@ -3207,7 +3207,7 @@ function synthPipelineControl(comp: ComponentDef): ComponentManifest {
             {
                 label: isJob ? 'Child job' : 'Pipeline',
                 fields: [
-                    { key: 'pipelineRef', label: isJob ? 'Child job / pipeline' : 'Pipeline', kind: 'text', required: true, placeholder: 'pipelines/customers_sync' },
+                    { key: 'pipelineRef', label: isJob ? 'Child job / pipeline' : 'Pipeline', kind: 'pipeline-ref', required: true, description: 'Pick a pipeline from this workspace.' },
                     { key: 'waitForCompletion', label: 'Wait for completion', kind: 'bool', defaultValue: true },
                     {
                         key: isJob ? 'contextVariables' : 'parameters',

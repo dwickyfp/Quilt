@@ -317,6 +317,16 @@ fn scheduler() -> Result<&'static Scheduler, String> {
 #[tauri::command]
 fn schedule_set_workspace(path: String) -> Result<(), String> {
     let sched = scheduler()?;
+    // Publish the workspace to the engine so child-pipeline references
+    // (Run Job / Iterate / Foreach) stored as bare pipeline ids resolve to
+    // their `<workspace>/pipelines/<id>.json` file, including for headless
+    // scheduled runs that never pass through the frontend. Called whenever
+    // the workspace changes, so this stays in sync.
+    if path.is_empty() {
+        std::env::remove_var("DUCKLE_WORKSPACE");
+    } else {
+        std::env::set_var("DUCKLE_WORKSPACE", &path);
+    }
     let p = if path.is_empty() {
         None
     } else {

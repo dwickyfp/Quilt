@@ -8594,6 +8594,55 @@ fn runjob_passes_context_vars_to_child() {
 }
 
 #[test]
+fn runjob_resolves_bare_pipeline_id_via_workspace_env() {
+    // A Run Job stored by the workspace picker carries a bare pipeline id
+    // (not a path). Headless runs (scheduler) execute the saved file
+    // directly, so the engine must resolve a bare id against
+    // $DUCKLE_WORKSPACE/pipelines/<id>.json. This proves that resolution.
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let ws = tmp.path();
+    let csv = write_file(ws, "in.csv", "id\n1\n2\n3\n4\n");
+    let out = out_path(ws, "child_out.csv");
+    let child_id = "child_pipeline_xyz";
+    let child_val = json!({
+        "nodes": [
+            node("cs", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("ck", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ],
+        "edges": [ main_edge("ce", "cs", "ck") ]
+    });
+    // Lay the child out exactly as the workspace stores pipelines.
+    let pipelines_dir = ws.join("pipelines");
+    std::fs::create_dir_all(&pipelines_dir).unwrap();
+    std::fs::write(
+        pipelines_dir.join(format!("{}.json", child_id)),
+        serde_json::to_string(&child_val).unwrap(),
+    )
+    .unwrap();
+
+    std::env::set_var("DUCKLE_WORKSPACE", ws);
+    let parent = doc(
+        json!([node("rj", "ctl.runjob", json!({ "pipelineRef": child_id }))]),
+        json!([]),
+    );
+    let result = engine.execute_pipeline(&parent);
+    std::env::remove_var("DUCKLE_WORKSPACE");
+
+    assert_eq!(
+        result.status, "ok",
+        "runjob with bare id failed: {:?}",
+        result.error
+    );
+    assert!(
+        Path::new(&out).exists(),
+        "child resolved from a bare id did not write its output {}",
+        out
+    );
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 4);
+}
+
+#[test]
 fn parallelize_runs_independent_branches() {
     // Parallelize: ctl.parallelize snapshots its upstream once, then runs the
     // two independent downstream branches concurrently (each in its own temp

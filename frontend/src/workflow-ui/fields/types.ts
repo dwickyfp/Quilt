@@ -18,7 +18,8 @@ export type FieldKind =
     | 'aggregations'
     | 'key-value'
     | 'connection-ref'
-    | 'routine-ref';
+    | 'routine-ref'
+    | 'pipeline-ref';
 
 export type SelectOption = { label: string; value: string };
 
