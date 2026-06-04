@@ -1,6 +1,6 @@
 //! In-app Git integration for the user's workspace folder.
 //!
-//! Talend-style: connect a workspace to a remote (GitHub / GitLab),
+//! Connect a workspace to a remote (GitHub / GitLab),
 //! commit + push + pull from inside Duckle, manage branches, see CI
 //! build status. Wraps the system `git` CLI rather than embedding
 //! libgit2 - same pattern as `src.git` in the engine. Trade-off:

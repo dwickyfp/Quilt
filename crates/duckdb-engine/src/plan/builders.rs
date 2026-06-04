@@ -2183,7 +2183,7 @@ pub(crate) fn build_rename(inputs: &NodeInputs, props: &JsonValue) -> Result<Str
     ))
 }
 
-/// A configured lookup join on a Map (tMap-style) node.
+/// A configured lookup join on a Map node.
 pub(crate) struct MapLookup {
     port: String,
     view: String,

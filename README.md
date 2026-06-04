@@ -217,7 +217,7 @@ For CSV / TSV sources, the **Schema** panel accepts an optional per-column **For
 
 | Group | Operations |
 |---|---|
-| **Fields** | Map (tMap-style visual mapper: joins a main input to up to 3 lookup inputs with inner / left joins and per-output expressions + filter), Project / Select, Cast, Rename, Add / Drop / Reorder Column, Coalesce, UUID v4 |
+| **Fields** | Map (visual mapper: joins a main input to up to 3 lookup inputs with inner / left joins and per-output expressions + filter), Project / Select, Cast, Rename, Add / Drop / Reorder Column, Coalesce, UUID v4 |
 | **Rows** | Filter (visual or raw SQL, with reject port), Distinct, Sample, Top N / Limit, Sort, Skip, Top N per Group, Forward Fill, Backward Fill, Constant Fill |
 | **Aggregate** | Group By, Rollup, Cube, Count, Window Aggregate, Cumulative, Approx Quantile (t-digest), Approx Count Distinct (HyperLogLog) |
 | **Join** | Inner, Left, Right, Full Outer, Cross, Lookup, Semi, Anti, Spatial Join |
@@ -553,7 +553,7 @@ More examples live in [`samples/`](samples) - drop the pipeline files into a wor
 
 > Push, pull, branch, and watch CI from inside Duckle. No terminal required.
 
-Click the **Git icon** in the topbar to open the workspace Git panel. Talend-style integration with GitHub and GitLab, built on the system `git` CLI (no FFI, no embedded git library):
+Click the **Git icon** in the topbar to open the workspace Git panel. Built-in integration with GitHub and GitLab, on the system `git` CLI (no FFI, no embedded git library):
 
 | Feature | What it does |
 |---|---|

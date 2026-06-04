@@ -1271,7 +1271,7 @@ fn build_stage(
         || component_id == "ctl.trigger"
         || component_id == "ctl.runjob"
     {
-        // Parent -> child job call (Talend tRunJob). Reads + executes the
+        // Parent -> child job call (Run Job). Reads + executes the
         // referenced pipeline file as a side effect before passing this
         // node's upstream view through. `pipelineRef` is the child path;
         // optional context variables (key-value) are substituted as ${VAR}

@@ -19,7 +19,7 @@
 
     #[test]
     fn map_with_lookups_emits_join_chain() {
-        // tMap-style: main CSV + two lookup CSVs, joined, with expressions
+        // Visual mapper: main CSV + two lookup CSVs, joined, with expressions
         // referencing each input and a filter referencing a lookup.
         let doc = pipeline_from_json(
             r#"{

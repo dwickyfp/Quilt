@@ -354,8 +354,8 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
-    // Run Job (tRunJob) - optional upstream, pass-through out so several
-    // Run Job nodes can be chained into a Master Job.
+    // Run Job - optional upstream, pass-through out so several Run Job nodes
+    // can be chained into a Master Job.
     if (id === 'ctl.runjob') {
         return {
             inputs: [{ id: 'main', label: 'main', type: 'main', optional: true }],
@@ -363,8 +363,8 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
-    // Parallelize (tParallelize) - one input, multiple branch outputs that
-    // run concurrently; each branch is an independent downstream subgraph.
+    // Parallelize - one input, multiple branch outputs that run concurrently;
+    // each branch is an independent downstream subgraph.
     if (id === 'ctl.parallelize') {
         return {
             inputs: [MAIN_IN],

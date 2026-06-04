@@ -103,7 +103,7 @@ pub(crate) fn procedural_note(s: &plan::Stage) -> String {
             format!("control step: runs sub-pipeline '{}' as a side effect", path)
         } else {
             format!(
-                "control step: runs job '{}' with {} context var(s) (tRunJob)",
+                "control step: runs job '{}' with {} context var(s)",
                 path,
                 vars.len()
             )
@@ -117,7 +117,7 @@ pub(crate) fn procedural_note(s: &plan::Stage) -> String {
         format!("control step: runs sub-pipeline '{}' once per upstream row (ctl.foreach)", p)
     } else if let Some(RuntimeSpec::Parallelize(spec)) = s.runtime.as_ref() {
         format!(
-            "control step: runs {} downstream branch(es) in parallel (tParallelize)",
+            "control step: runs {} downstream branch(es) in parallel",
             spec.branches.len()
         )
     } else if let Some(RuntimeSpec::InstallFallback(p)) = s.runtime.as_ref() {
