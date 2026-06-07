@@ -5035,6 +5035,17 @@ pub(crate) fn build_parquet_sink(props: &JsonValue, from_view: &str) -> String {
         "FORMAT PARQUET".to_string(),
         format!("COMPRESSION '{}'", sql_escape(&compression)),
     ];
+    // Forward the "Row group size" UI field. Without it DuckDB falls back to
+    // its internal default (~122,880 rows); a larger value (e.g. 1,000,000)
+    // cuts per-row-group metadata overhead on big writes. Accept a number or a
+    // numeric string; ignore absent / zero (keep DuckDB's default).
+    let row_group_size = props.get("rowGroupSize").and_then(|v| {
+        v.as_u64()
+            .or_else(|| v.as_str().and_then(|s| s.trim().parse::<u64>().ok()))
+    });
+    if let Some(n) = row_group_size.filter(|n| *n > 0) {
+        options.push(format!("ROW_GROUP_SIZE {}", n));
+    }
     if !partition.is_empty() {
         let cols = partition
             .iter()

@@ -1655,6 +1655,33 @@
     }
 
     #[test]
+    fn parquet_sink_forwards_row_group_size() {
+        // issue-#16 perf report: the "Row group size" UI field was dropped by
+        // build_parquet_sink, so DuckDB used its internal default. Forward it.
+        let sql = build_parquet_sink(
+            &serde_json::json!({"path": "out.parquet", "rowGroupSize": 1_000_000}),
+            "input",
+        );
+        assert!(sql.contains("ROW_GROUP_SIZE 1000000"), "row group size not forwarded: {sql}");
+
+        // A numeric string (forms sometimes serialize integers as strings).
+        let sql_str = build_parquet_sink(
+            &serde_json::json!({"path": "out.parquet", "rowGroupSize": "250000"}),
+            "input",
+        );
+        assert!(sql_str.contains("ROW_GROUP_SIZE 250000"), "string row group size not forwarded: {sql_str}");
+
+        // Absent or zero => omit it, leaving DuckDB's default.
+        let sql_none = build_parquet_sink(&serde_json::json!({"path": "out.parquet"}), "input");
+        assert!(!sql_none.contains("ROW_GROUP_SIZE"), "must not emit a default: {sql_none}");
+        let sql_zero = build_parquet_sink(
+            &serde_json::json!({"path": "out.parquet", "rowGroupSize": 0}),
+            "input",
+        );
+        assert!(!sql_zero.contains("ROW_GROUP_SIZE"), "zero must be ignored: {sql_zero}");
+    }
+
+    #[test]
     fn cloud_csv_sink_honors_options_but_not_partitionby() {
         // audit B1: a cloud CSV sink must honor delimiter/nullValue (ignored
         // before), but must NOT emit PARTITION_BY (unvalidated over httpfs).

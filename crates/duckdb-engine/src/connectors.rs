@@ -2622,7 +2622,28 @@ impl DuckdbEngine {
         use base64::Engine as _;
         use suppaftp::FtpStream;
         self.check_cancelled()?;
-        let addr = format!("{}:{}", spec.host, spec.port);
+        // SFTP (SSH File Transfer Protocol) is a completely different protocol
+        // from FTP / FTPS and is not supported yet (issue #16; on the roadmap,
+        // it needs an SSH stack). Catch the common mistake of pointing this
+        // component at an SFTP server - port 22, or an sftp:// / ssh:// host -
+        // and fail with a clear message instead of suppaftp's cryptic
+        // "Response contains an invalid syntax" (which is what you get when an
+        // FTP client reads an SSH banner).
+        let host_l = spec.host.trim().to_ascii_lowercase();
+        if spec.port == 22 || host_l.starts_with("sftp://") || host_l.starts_with("ssh://") {
+            return Err(EngineError::Config(
+                "src.ftp speaks FTP / FTPS, not SFTP (SSH File Transfer). SFTP is a different protocol and is not supported yet (it is on the roadmap). If this is an FTP/FTPS server, use its FTP port (commonly 21); if it is genuinely SFTP, it cannot be read through this component."
+                    .into(),
+            ));
+        }
+        // Accept an ftp:// / ftps:// scheme on the host by stripping it; the
+        // connect address is host:port.
+        let host = host_l
+            .strip_prefix("ftps://")
+            .or_else(|| host_l.strip_prefix("ftp://"))
+            .map(|h| h.trim_end_matches('/'))
+            .unwrap_or_else(|| spec.host.trim());
+        let addr = format!("{}:{}", host, spec.port);
         let mut ftp = FtpStream::connect(&addr)
             .map_err(|e| EngineError::Query(format!("ftp connect {}: {}", addr, e)))?;
         if spec.secure {
