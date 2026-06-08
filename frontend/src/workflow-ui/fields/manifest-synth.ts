@@ -29,11 +29,21 @@ function placeholderAutodetect(format?: string): (
     props: Record<string, unknown>,
 ) => Promise<AutodetectResult> {
     return async (props: Record<string, unknown>) => {
-        // If we know the format and a path is set, try the real Rust
-        // autodetect command via Tauri; fall back to a placeholder.
+        // If we know the format and the node has a location set, try the real
+        // Rust autodetect command via Tauri; fall back to a placeholder.
+        // Different connectors carry "where to look" under different keys
+        // (file path, DuckDB/DuckLake database/catalog, a URL, or a host), so
+        // accept any of them - keying only on `path` skipped embedded and
+        // network sources entirely (issue #18).
         if (format) {
-            const path = typeof props.path === 'string' ? props.path.trim() : '';
-            if (path) {
+            const stringy = (v: unknown) => typeof v === 'string' && v.trim().length > 0;
+            const hasLocation =
+                stringy(props.path) ||
+                stringy(props.database) ||
+                stringy(props.catalog) ||
+                stringy(props.url) ||
+                stringy(props.host);
+            if (hasLocation) {
                 const real = await tauriAutodetect(format, props);
                 if (real) return { columns: real.columns, sampleRows: real.sampleRows };
             }
@@ -516,6 +526,12 @@ function defaultDescription(comp: ComponentDef): string {
 
 function synthFileSource(comp: ComponentDef): ComponentManifest {
     const ext = comp.id.split('.').pop() ?? 'txt';
+    // The component id rarely matches the on-disk extension (src.excel ->
+    // .xlsx, not ".excel"; issue #18). Map the known mismatches; everything
+    // else uses the id suffix as before.
+    const EXT_OVERRIDES: Record<string, string[]> = {
+        'src.excel': ['xlsx', 'xls'],
+    };
     // src.spatial reads many geo formats via GDAL; surface the common
     // ones in the file picker rather than a useless ".spatial" filter.
     const filters = comp.id === 'src.spatial'
@@ -524,7 +540,7 @@ function synthFileSource(comp: ComponentDef): ComponentManifest {
             { name: 'All files', extensions: ['*'] },
         ]
         : [
-            { name: comp.label, extensions: [ext] },
+            { name: comp.label, extensions: EXT_OVERRIDES[comp.id] ?? [ext] },
             { name: 'All files', extensions: ['*'] },
         ];
     return base(comp, [
@@ -865,7 +881,15 @@ function synthLakehouseSink(comp: ComponentDef): ComponentManifest {
                             { label: 'Create or replace', value: 'overwrite' },
                             { label: 'Append (insert)', value: 'append' },
                             { label: 'Truncate + insert', value: 'truncate' },
+                            { label: 'Upsert (delete-by-key + re-insert)', value: 'upsert' },
                         ],
+                        description: 'Upsert deletes rows matching the conflict columns, then re-inserts (issue #19).',
+                    },
+                    {
+                        key: 'conflictColumns',
+                        label: 'Conflict columns (upsert key)',
+                        kind: 'columns',
+                        description: 'Key columns to match on for Upsert. Required when Write mode is Upsert.',
                     },
                 ],
             },
@@ -968,6 +992,43 @@ function synthDbSource(comp: ComponentDef): ComponentManifest {
 }
 
 function synthDbSink(comp: ComponentDef): ComponentManifest {
+    // Embedded file databases (SQLite / DuckDB). These attach a local file as
+    // duckle_dst and write a table into it - they have no host/account, so the
+    // generic network-DB fallback below would show the wrong fields. The engine
+    // (build_db_sink) supports overwrite / append / upsert here, so surface the
+    // full upsert mode picker, not just overwrite (issue #19).
+    if (comp.id === 'snk.sqlite' || comp.id === 'snk.duckdb') {
+        const isSqlite = comp.id === 'snk.sqlite';
+        return base(comp, [
+            {
+                label: 'Database file',
+                fields: [
+                    {
+                        key: 'database',
+                        label: 'Database file',
+                        kind: 'save-path',
+                        required: true,
+                        filters: isSqlite
+                            ? [
+                                { name: 'SQLite', extensions: ['sqlite', 'db', 'sqlite3'] },
+                                { name: 'All files', extensions: ['*'] },
+                            ]
+                            : [
+                                { name: 'DuckDB', extensions: ['duckdb', 'db'] },
+                                { name: 'All files', extensions: ['*'] },
+                            ],
+                    },
+                ],
+            },
+            {
+                label: 'Destination',
+                fields: [
+                    { key: 'tableName', label: 'Table', kind: 'text', required: true, placeholder: 'orders' },
+                    ...upsertModeFields(),
+                ],
+            },
+        ], 'upstream');
+    }
     if (comp.id === 'snk.oracle') {
         return base(comp, [
             {

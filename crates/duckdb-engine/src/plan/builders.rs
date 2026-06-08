@@ -7,6 +7,10 @@ use super::*;
 /// The `SELECT * FROM <reader>` SQL for a source format - used by the
 /// engine's inspect path to DESCRIBE / sample without materializing.
 pub fn source_select_for_format(format: &str, props: &JsonValue) -> Option<String> {
+    // Autodetect (inspect) must build the SAME source SELECT as a real run,
+    // or the schema preview diverges from what the node actually reads
+    // (issue #18: formats missing here returned None -> the UI fell back to a
+    // col_1/col_2/col_3 placeholder even though running the node worked).
     Some(match format {
         "csv" => build_csv_source(props, None),
         "tsv" => build_tsv_source(props, None),
@@ -14,6 +18,16 @@ pub fn source_select_for_format(format: &str, props: &JsonValue) -> Option<Strin
         "json" | "jsonl" | "ndjson" => build_json_source(props),
         "sqlite" => build_sqlite_source(props),
         "duckdb" => build_duckdb_source(props),
+        "excel" => build_excel_source(props),
+        "avro" => build_avro_source(props),
+        "iceberg" => build_iceberg_source(props),
+        "delta" => build_delta_source(props),
+        "spatial" => build_spatial_source(props),
+        "fixedwidth" => return build_fixedwidth_source(props).ok(),
+        // DuckLake is DuckDB-backed; the catalog is ATTACHed as duckle_src by
+        // the inspect prelude (see source_prelude), so the SELECT is identical
+        // to the run path.
+        "ducklake" => return build_relational_source("src.ducklake", props).ok(),
         "s3" | "gcs" | "azureblob" | "http" | "https" => build_cloud_source(format, props, None),
         _ => return None,
     })
@@ -3249,8 +3263,52 @@ pub(crate) fn build_relational_sink(
             q = qual,
             from = quote_ident(from_view)
         )),
+        // Upsert: set-based DELETE-by-key + re-INSERT, run by DuckDB against the
+        // ATTACHed target (DuckLake / MotherDuck / Quack and the DuckDB
+        // postgres/mysql extensions all execute DELETE + INSERT). No PRIMARY
+        // KEY required. An optional delete-flag column (deleteColumn =
+        // deleteValue) removes matched rows without re-inserting them, which is
+        // how CDC / diff deletes propagate (issue #19).
+        "upsert" => {
+            let keys = columns_list(props, "conflictColumns");
+            if keys.is_empty() {
+                return Err(EngineError::Config(format!(
+                    "{}: upsert needs at least one conflict column",
+                    component_id
+                )));
+            }
+            let del_col = string_prop(props, "deleteColumn").filter(|s| !s.is_empty());
+            let del_val = string_prop(props, "deleteValue").unwrap_or_else(|| "delete".into());
+            let sel = match &del_col {
+                Some(c) => format!("* EXCLUDE ({})", quote_ident(c)),
+                None => "*".to_string(),
+            };
+            let key_tuple = keys
+                .iter()
+                .map(|k| quote_ident(k))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let insert_filter = match &del_col {
+                Some(c) => format!(
+                    " WHERE {} IS DISTINCT FROM '{}'",
+                    quote_ident(c),
+                    sql_escape(&del_val)
+                ),
+                None => String::new(),
+            };
+            Ok(format!(
+                "CREATE TABLE IF NOT EXISTS {q} AS SELECT {sel} FROM {from} LIMIT 0; \
+                 DELETE FROM {q} WHERE ({keys}) IN (SELECT {keys} FROM {from}); \
+                 INSERT INTO {q} SELECT {sel} FROM {from}{insert_filter}",
+                q = qual,
+                sel = sel,
+                from = quote_ident(from_view),
+                keys = key_tuple,
+                insert_filter = insert_filter,
+            ))
+        }
         other => Err(EngineError::Config(format!(
-            "{}: write mode '{}' isn't implemented yet (use 'overwrite', 'append', or 'truncate')",
+            "{}: write mode '{}' isn't implemented yet (use 'overwrite', 'append', 'truncate', or 'upsert')",
             component_id, other
         ))),
     }
@@ -4837,14 +4895,107 @@ pub(crate) fn build_delta_source(props: &JsonValue) -> String {
 /// and a `hasHeader` toggle.
 pub(crate) fn build_excel_source(props: &JsonValue) -> String {
     let path = string_prop(props, "path").unwrap_or_default();
-    let mut args = vec![format!("'{}'", sql_escape(&path))];
+
+    // Extra read_xlsx options (sheet / header) are shared by every file.
+    let mut opts: Vec<String> = Vec::new();
     if let Some(sheet) = string_prop(props, "sheet").filter(|s| !s.is_empty()) {
-        args.push(format!("sheet = '{}'", sql_escape(&sheet)));
+        opts.push(format!("sheet = '{}'", sql_escape(&sheet)));
     }
     if let Some(has_header) = props.get("hasHeader").and_then(JsonValue::as_bool) {
-        args.push(format!("header = {}", has_header));
+        opts.push(format!("header = {}", has_header));
     }
-    format!("SELECT * FROM read_xlsx({})", args.join(", "))
+    let one = |p: &str| {
+        let mut args = vec![format!("'{}'", sql_escape(p))];
+        args.extend(opts.iter().cloned());
+        format!("SELECT * FROM read_xlsx({})", args.join(", "))
+    };
+
+    // DuckDB's excel reader can't glob (duckdb-excel#30): a wildcard or a
+    // directory would silently read only the first file. Expand it ourselves
+    // and UNION the per-file reads (BY NAME tolerates column-order drift).
+    let files = expand_excel_paths(&path);
+    match files.len() {
+        0 => one(&path), // nothing matched (or no fs access) - let DuckDB report it
+        1 => one(&files[0]),
+        _ => files
+            .iter()
+            .map(|f| one(f))
+            .collect::<Vec<_>>()
+            .join(" UNION ALL BY NAME "),
+    }
+}
+
+/// Expand an Excel `path` into concrete .xlsx/.xls files. Handles a plain
+/// file, a directory (all workbooks inside), and a `*`/`?` wildcard in the
+/// final path segment. Returns an empty Vec when nothing matches or the
+/// filesystem can't be read, in which case the caller falls back to handing
+/// the literal path to DuckDB so it can surface the error.
+fn expand_excel_paths(path: &str) -> Vec<String> {
+    use std::path::Path;
+    let is_excel = |name: &str| {
+        let l = name.to_ascii_lowercase();
+        l.ends_with(".xlsx") || l.ends_with(".xls")
+    };
+    let collect_dir = |dir: &Path, pat: Option<&str>| -> Vec<String> {
+        let mut out: Vec<String> = std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().into_owned();
+                let keep = is_excel(&name) && pat.map(|p| wildcard_match(p, &name)).unwrap_or(true);
+                keep.then(|| e.path().to_string_lossy().into_owned())
+            })
+            .collect();
+        out.sort();
+        out
+    };
+
+    let p = Path::new(path);
+    if p.is_file() {
+        return vec![path.to_string()];
+    }
+    if p.is_dir() {
+        return collect_dir(p, None);
+    }
+    // Wildcard in the final segment: match siblings in the parent directory.
+    if path.contains('*') || path.contains('?') {
+        let parent = p.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+        if let Some(pat) = p.file_name().and_then(|s| s.to_str()) {
+            return collect_dir(parent, Some(pat));
+        }
+    }
+    Vec::new()
+}
+
+/// Minimal shell-style wildcard match supporting `*` (any run) and `?`
+/// (single char), case-insensitive. Enough for `*.xlsx`, `2026-*.xls`, etc.
+fn wildcard_match(pattern: &str, name: &str) -> bool {
+    let pat: Vec<char> = pattern.to_ascii_lowercase().chars().collect();
+    let txt: Vec<char> = name.to_ascii_lowercase().chars().collect();
+    // Classic two-pointer glob match with backtracking on '*'.
+    let (mut pi, mut ti) = (0usize, 0usize);
+    let (mut star, mut mark): (Option<usize>, usize) = (None, 0);
+    while ti < txt.len() {
+        if pi < pat.len() && (pat[pi] == '?' || pat[pi] == txt[ti]) {
+            pi += 1;
+            ti += 1;
+        } else if pi < pat.len() && pat[pi] == '*' {
+            star = Some(pi);
+            mark = ti;
+            pi += 1;
+        } else if let Some(s) = star {
+            pi = s + 1;
+            mark += 1;
+            ti = mark;
+        } else {
+            return false;
+        }
+    }
+    while pi < pat.len() && pat[pi] == '*' {
+        pi += 1;
+    }
+    pi == pat.len()
 }
 
 /// Cloud sources (S3 / GCS / Azure Blob / HTTP). DuckDB's httpfs +

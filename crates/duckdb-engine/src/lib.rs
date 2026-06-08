@@ -308,6 +308,11 @@ impl DuckdbEngine {
                 ));
             }
         }
+        // DuckLake autodetect: ATTACH the catalog read-only as duckle_src so
+        // the inspect SELECT (build_relational_source) resolves (issue #18).
+        if format == "ducklake" {
+            p.push_str(&plan::ducklake_attach(options, true));
+        }
         p
     }
 
