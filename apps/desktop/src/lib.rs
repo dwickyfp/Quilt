@@ -992,6 +992,7 @@ fn mcp_inject_config(app: tauri::AppHandle, client: String) -> Result<String, St
             "duckle".to_string(),
             serde_json::json!({
                 "command": mcp_path.to_string_lossy(),
+                "args": [],
                 "env": {
                     "DUCKLE_DUCKDB_BIN": duckdb.to_string_lossy(),
                     "DUCKLE_RUNNER_BIN": runner_path.to_string_lossy()
