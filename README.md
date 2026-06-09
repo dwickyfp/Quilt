@@ -16,7 +16,10 @@
 <img alt="typescript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white"/>
 <img alt="duckdb" src="https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black"/>
 <img alt="stars" src="https://img.shields.io/github/stars/SouravRoy-ETL/duckle?style=social"/>
+<a href="https://github.com/sponsors/SouravRoy-ETL"><img alt="sponsor" src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white"/></a>
 </p>
+
+<p><b>Duckle is free and open source.</b> If it saves you time, please consider <a href="https://github.com/sponsors/SouravRoy-ETL">sponsoring its development</a> - see <a href="SPONSORS.md">SPONSORS.md</a>.</p>
 
 </div>
 
@@ -82,6 +85,7 @@
 - [Status](#status)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
+- [Sponsor Duckle](SPONSORS.md)
 - [License](#license)
 - [Releases](https://github.com/SouravRoy-ETL/duckle/releases)
 - [Roadmap doc](docs/roadmap.md)
