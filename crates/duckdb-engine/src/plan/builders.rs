@@ -3515,7 +3515,11 @@ pub(crate) fn build_spatial_sink(props: &JsonValue, from_view: &str) -> String {
 /// SQLite / DuckDB sink - write the upstream into a table inside the
 /// ATTACHed `duckle_dst` database. DROP+CREATE works for both writers
 /// (the SQLite writer doesn't support CREATE OR REPLACE).
-pub(crate) fn build_db_sink(props: &JsonValue, from_view: &str) -> String {
+pub(crate) fn build_db_sink(
+    component_id: &str,
+    props: &JsonValue,
+    from_view: &str,
+) -> Result<String, EngineError> {
     let table = string_prop(props, "tableName")
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "output".into());
@@ -3531,7 +3535,17 @@ pub(crate) fn build_db_sink(props: &JsonValue, from_view: &str) -> String {
     // rows to remove: their keys are deleted and they are not re-inserted -
     // this is how DuckLake CDC (change_type='delete') / cdc.diff deletes flow
     // through to the target.
-    if mode == "upsert" && !keys.is_empty() {
+    if mode == "upsert" {
+        // Fail loud instead of silently overwriting (GitHub #19): without a
+        // key there is nothing to match on, so "upsert" with no conflict
+        // columns used to fall through to DROP TABLE + CREATE - matching the
+        // relational sinks' behavior, surface a clear error instead.
+        if keys.is_empty() {
+            return Err(EngineError::Config(format!(
+                "{}: upsert needs at least one conflict column",
+                component_id
+            )));
+        }
         let del_col = string_prop(props, "deleteColumn").filter(|s| !s.is_empty());
         let del_val = string_prop(props, "deleteValue").unwrap_or_else(|| "delete".into());
         let sel = match &del_col {
@@ -3551,7 +3565,7 @@ pub(crate) fn build_db_sink(props: &JsonValue, from_view: &str) -> String {
             ),
             None => String::new(),
         };
-        return format!(
+        return Ok(format!(
             "CREATE TABLE IF NOT EXISTS duckle_dst.{t} AS SELECT {sel} FROM {up} LIMIT 0; \
              DELETE FROM duckle_dst.{t} WHERE ({keys}) IN (SELECT {keys} FROM {up}); \
              INSERT INTO duckle_dst.{t} SELECT {sel} FROM {up}{insert_filter}",
@@ -3560,20 +3574,32 @@ pub(crate) fn build_db_sink(props: &JsonValue, from_view: &str) -> String {
             up = up,
             keys = key_tuple,
             insert_filter = insert_filter,
-        );
+        ));
     }
     if mode == "append" {
-        return format!(
+        return Ok(format!(
             "CREATE TABLE IF NOT EXISTS duckle_dst.{t} AS SELECT * FROM {up} LIMIT 0; \
              INSERT INTO duckle_dst.{t} SELECT * FROM {up}",
             t = t,
             up = up,
-        );
+        ));
     }
-    format!(
+    if mode == "truncate" {
+        // Keep the existing table (and its rowids / downstream references),
+        // replace just the rows. CREATE IF NOT EXISTS so a first run still
+        // works against a fresh target file.
+        return Ok(format!(
+            "CREATE TABLE IF NOT EXISTS duckle_dst.{t} AS SELECT * FROM {up} LIMIT 0; \
+             DELETE FROM duckle_dst.{t}; \
+             INSERT INTO duckle_dst.{t} SELECT * FROM {up}",
+            t = t,
+            up = up,
+        ));
+    }
+    Ok(format!(
         "DROP TABLE IF EXISTS duckle_dst.{}; CREATE TABLE duckle_dst.{} AS (SELECT * FROM {})",
         t, t, up
-    )
+    ))
 }
 
 /// Avro source. The `avro` DuckDB community extension exposes
@@ -5083,7 +5109,7 @@ pub(crate) fn build_sink_sql(
         "snk.parquet" => Ok(build_parquet_sink(props, from_view)),
         "snk.json" | "snk.jsonl" => Ok(build_json_sink(props, from_view)),
         "snk.s3" | "snk.gcs" | "snk.azureblob" => Ok(build_cloud_sink(props, from_view)),
-        "snk.sqlite" | "snk.duckdb" => Ok(build_db_sink(props, from_view)),
+        "snk.sqlite" | "snk.duckdb" => build_db_sink(component_id, props, from_view),
         "snk.postgres" | "snk.cockroach" | "snk.mysql" | "snk.mariadb"
         | "snk.motherduck" | "snk.ducklake" | "snk.pgvector"
         | "snk.redshift" | "snk.bigquery" | "snk.quack" => build_relational_sink(component_id, props, from_view),

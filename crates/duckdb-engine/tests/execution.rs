@@ -1916,6 +1916,34 @@ fn duckdb_upsert_with_delete_propagation() {
 }
 
 #[test]
+fn duckdb_upsert_without_conflict_columns_errors() {
+    // GitHub #19: selecting Upsert on a DuckDB/SQLite sink WITHOUT conflict
+    // columns must fail loud (like the relational sinks), not silently fall
+    // back to DROP TABLE + CREATE (which is what the reporter saw).
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let seed = write_file(tmp.path(), "in.csv", "id,name\n1,alice\n");
+    let dbfile = out_path(tmp.path(), "out.duckdb");
+    let d = doc(
+        json!([
+            node("s", "src.csv", json!({ "path": seed, "hasHeader": true })),
+            node("w", "snk.duckdb", json!({
+                "database": dbfile, "tableName": "people", "mode": "upsert"
+            })),
+        ]),
+        json!([main_edge("e", "s", "w")]),
+    );
+    let r = engine.execute_pipeline(&d);
+    assert_eq!(r.status, "error", "upsert without conflict columns should error");
+    let err = format!("{:?}", r.error).to_lowercase();
+    assert!(
+        err.contains("conflict column"),
+        "error should ask for conflict columns, got: {}",
+        err
+    );
+}
+
+#[test]
 fn sqlserver_upsert_delete_propagation() {
     let engine = engine_or_skip!();
     let (host, port, db, user, pass) = match mssql_env() {
