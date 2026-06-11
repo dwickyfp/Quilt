@@ -550,10 +550,24 @@ fn build_stage(
         .and_then(|v| v.as_u64())
         .filter(|n| *n > 0)
         .map(|n| n as u32);
-    // ATTACH statements for external-DB nodes (DuckDB/SQLite). Each stage
-    // runs in its own CLI process, so fixed aliases are collision-free.
+    // ATTACH statements for external-DB nodes (DuckDB/SQLite/relational).
+    // The prelude uses fixed aliases (duckle_src / duckle_dst). In batched
+    // mode every pure-SQL stage shares ONE DuckDB connection, so two
+    // attach-backed stages would each ATTACH the same alias and the second
+    // fails with `database with name "duckle_src" already exists`. Each
+    // attach-backed stage copies its rows into <node> (downstream never
+    // reads the alias - see the materialize-as-TABLE note below), so we
+    // DETACH the alias at the end of the stage (further down) to free it for
+    // the next stage's ATTACH.
     let attach = attach_prelude(component_id, &props);
-    let (sql, kind, from) = if component_id == "snk.graphql" {
+    let attach_alias: Option<&str> = if attach.contains("AS duckle_src") {
+        Some("duckle_src")
+    } else if attach.contains("AS duckle_dst") {
+        Some("duckle_dst")
+    } else {
+        None
+    };
+    let (mut sql, kind, from) = if component_id == "snk.graphql" {
         // GraphQL mutation: POST one request per row with the row's
         // JSON as `variables`. Rides the WebhookSpec pipeline.
         let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
@@ -3151,6 +3165,19 @@ fn build_stage(
         .or_else(|| ai_classify.map(RuntimeSpec::AiClassify))
         .or_else(|| ai_dedupe.map(RuntimeSpec::AiDedupe))
         ;
+    // Free the ATTACH alias so the next batched stage can re-ATTACH it (see
+    // attach_alias above). Only stages that embed the ATTACH in their own SQL
+    // qualify - the sql starts with the prelude. Runtime-spec sources/sinks
+    // (the parquet fast-path, upsert, relational drivers, ...) run in their
+    // own connection and either leave sql empty or have the executor ignore
+    // it, so they are unaffected.
+    if let Some(alias) = attach_alias {
+        if sql.starts_with(attach.as_str()) {
+            let trimmed = sql.trim_end();
+            let sep = if trimmed.ends_with(';') { " " } else { "; " };
+            sql = format!("{}{}DETACH {};", trimmed, sep, alias);
+        }
+    }
     Ok(Stage {
         node_id: node.id.clone(),
         component_id: component_id.to_string(),

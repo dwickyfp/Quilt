@@ -1087,6 +1087,41 @@ fn duckdb_source_reads_table() {
 }
 
 #[test]
+fn two_duckdb_sources_same_database() {
+    // Regression (GonzoEOZ, v0.3.0): two src.duckdb nodes reading different
+    // tables from the SAME DuckDB file failed in batched mode with "database
+    // with name duckle_src already exists" - every attach-backed stage
+    // re-ATTACHed the fixed alias inside the one shared connection. Each
+    // attach-backed stage now DETACHes the alias so the next can re-attach.
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let srcdb = out_path(tmp.path(), "src.duckdb");
+    duckdb_exec(
+        &srcdb,
+        "CREATE TABLE customers AS SELECT * FROM (VALUES (1,'alice'),(2,'bob')) t(id,name); \
+         CREATE TABLE orders AS SELECT * FROM (VALUES (1,100),(2,200),(1,50)) t(id,amount)",
+    );
+    let out = out_path(tmp.path(), "out.csv");
+    let d = doc(
+        json!([
+            node("c", "src.duckdb", json!({ "database": srcdb, "tableName": "customers" })),
+            node("o", "src.duckdb", json!({ "database": srcdb, "tableName": "orders" })),
+            node("j", "xf.join.inner", json!({ "leftKey": "id", "rightKey": "id" })),
+            node("k1", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([
+            main_edge("e1", "c", "j"),
+            lookup_edge("e2", "o", "j"),
+            main_edge("e3", "j", "k1"),
+        ]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    // 3 orders, each matching its customer on id -> 3 joined rows.
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 3);
+}
+
+#[test]
 fn window_aggregate_keeps_rows() {
     let tmp = tempfile::tempdir().unwrap();
     let csv = write_file(tmp.path(), "in.csv", "g,amt\na,10\na,20\nb,5\n");
