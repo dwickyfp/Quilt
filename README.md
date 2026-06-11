@@ -275,6 +275,7 @@ Validators split their input: passing rows continue on the main port, failures r
 | **Inline SQL** | Write a `SELECT`; the upstream node is exposed as `input`, result runs as a real materialized stage |
 | **SQL Template** | Parameterized SQL with `${context.var}` substitution |
 | **SQL Routines** | Reusable, named SQL saved in the workspace |
+| **dbt** | Run a dbt project (or one inline model) as a node, against the pipeline's DuckDB. Wire several upstream sources in and the project reads them all via dbt `sources`, so one project models across Postgres, MySQL, files, and lakes at once. Powered by the dbt Fusion engine, fetched free at first launch (Apache dbt-core fallback); no Python setup. |
 | **Shell** | Run any shell command; emits `{stdout, stderr, exit_code, duration_ms}`. Platform-aware default shell. Optional `timeoutMs` kills the child. |
 | **WebAssembly UDF** | Per-row WASM transform via pure-Rust `wasmi`. Sandboxed (no fs / net / env). Works with any WASM toolchain (Rust, AssemblyScript, C, TinyGo). |
 | **JavaScript UDF** | Per-row JS transform via pure-Rust `boa` interpreter. Sandboxed. Define a `transform(row)` function. |
@@ -389,7 +390,7 @@ When the installer downloads the DuckDB CLI it also pre-fetches the extensions D
 
 ## Download / Install
 
-Pick the binary for your OS from the [latest release](https://github.com/SouravRoy-ETL/duckle/releases/tag/v0.2.0):
+Pick the binary for your OS from the [latest release](https://github.com/SouravRoy-ETL/duckle/releases/tag/v0.3.0):
 
 | OS | Asset | How to run |
 |---|---|---|
