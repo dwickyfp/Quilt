@@ -23,9 +23,11 @@ use std::sync::Arc;
 use std::time::Instant;
 use thiserror::Error;
 
+pub mod error_category;
 pub mod history;
 pub mod plan;
 pub mod tls;
+pub mod watermark;
 mod connectors;
 mod run_log;
 mod util;
@@ -37,7 +39,8 @@ use plan::{
     quote_ident, AiChunkSpec, AiClassifySpec, AiDedupeSpec, AiEmbedSpec, AiLlmSpec, AiPiiSpec,
     AvroSinkSpec, AvroSourceSpec, CassandraSinkSpec, CassandraSourceSpec, ClickHouseSinkSpec,
     ClickHouseSourceSpec, ClipboardSourceSpec, DatabricksSinkSpec, DatabricksSourceSpec,
-    DynamoDbSourceSpec, ElasticSourceSpec, EmailSinkSpec, EmailSourceSpec, FormatFileSinkSpec,
+    DbtSpec, DynamoDbSourceSpec, ElasticSourceSpec, EmailSinkSpec, EmailSourceSpec,
+    FormatFileSinkSpec,
     FormatFileSourceSpec, FormatKind, FtpSinkSpec, FtpSourceSpec, GitSourceSpec, JavaScriptSpec,
     KafkaSinkSpec, KafkaSourceSpec, KinesisSourceSpec, MilvusSourceSpec, MongoSinkSpec,
     MongoSourceSpec,
@@ -726,6 +729,7 @@ impl DuckdbEngine {
                                             rows: st.rows,
                                             duration_ms: st.duration_ms,
                                             error: st.error.clone(),
+                                            category: st.category.clone(),
                                         },
                                     );
                                 }
@@ -842,6 +846,7 @@ impl DuckdbEngine {
                     Some(RuntimeSpec::RabbitSource(spec)) => self.run_rabbit_source(&db_path, spec),
                     Some(RuntimeSpec::GitSource(spec)) => self.run_git_source(&db_path, spec),
                     Some(RuntimeSpec::Shell(spec)) => self.run_shell(&db_path, spec),
+                    Some(RuntimeSpec::Dbt(spec)) => self.run_dbt(&db_path, spec),
                     Some(RuntimeSpec::FtpSource(spec)) => self.run_ftp_source(&db_path, spec),
                     Some(RuntimeSpec::SftpSource(spec)) => self.run_sftp_source(&db_path, spec),
                     Some(RuntimeSpec::FtpSink(spec)) => self.run_ftp_sink(&db_path, spec),
@@ -951,6 +956,7 @@ impl DuckdbEngine {
                             rows: rows_opt,
                             duration_ms: Some(elapsed_ms),
                             error: None,
+                            category: None,
                         },
                     );
                     on_event(PipelineEvent::StageFinished {
@@ -972,6 +978,7 @@ impl DuckdbEngine {
                 }
                 Err(err) => {
                     let msg = err.to_string();
+                    let category = error_category::categorize_error(&msg);
                     nodes.insert(
                         stage.node_id.clone(),
                         NodeRunStatus {
@@ -980,6 +987,7 @@ impl DuckdbEngine {
                             rows: None,
                             duration_ms: Some(elapsed_ms),
                             error: Some(msg.clone()),
+                            category: Some(category.into()),
                         },
                     );
                     on_event(PipelineEvent::StageFinished {
@@ -1043,12 +1051,16 @@ impl DuckdbEngine {
             duration_ms: total_start.elapsed().as_millis() as u64,
         });
 
+        let category = overall_error
+            .as_deref()
+            .map(|e| error_category::categorize_error(e).to_string());
         RunResult {
             status: final_status.into(),
             duration_ms: total_start.elapsed().as_millis() as u64,
             nodes,
             preview,
             error: overall_error,
+            category,
         }
     }
 
@@ -1431,6 +1443,7 @@ impl DuckdbEngine {
                         rows: None,
                         duration_ms: Some(elapsed),
                         error: Some(msg.clone()),
+                        category: Some(error_category::categorize_error(&msg).into()),
                     },
                 );
                 on_event(PipelineEvent::StageFinished {
@@ -1483,12 +1496,16 @@ impl DuckdbEngine {
             duration_ms,
         });
 
+        let category = overall_error
+            .as_deref()
+            .map(|e| error_category::categorize_error(e).to_string());
         RunResult {
             status: final_status.into(),
             duration_ms,
             nodes,
             preview,
             error: overall_error,
+            category,
         }
     }
 
@@ -1702,6 +1719,7 @@ fn drain_batched_markers(
                 rows,
                 duration_ms: Some(elapsed),
                 error: None,
+                category: None,
             },
         );
         on_event(PipelineEvent::StageFinished {
@@ -2033,7 +2051,13 @@ fn materialize_typed_arrayrows(
 /// the process env is empty (tests, embedded hosts).
 fn apply_duckdb_sql(bin: &Path, db: &Path, sql: &str) -> Result<(), EngineError> {
     use std::process::Command;
-    let output = Command::new(bin)
+    let mut cmd = Command::new(bin);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    let output = cmd
         .arg(db.to_string_lossy().to_string())
         .arg("-c")
         .arg(sql)
@@ -3208,16 +3232,21 @@ pub struct RunResult {
     pub preview: Vec<NodePreview>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Coarse bucket of `error` (see error_category) - present only on failure.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
 }
 
 impl RunResult {
     fn failed(start: Instant, error: String) -> Self {
+        let category = error_category::categorize_error(&error);
         RunResult {
             status: "error".into(),
             duration_ms: start.elapsed().as_millis() as u64,
             nodes: Default::default(),
             preview: Vec::new(),
             error: Some(error),
+            category: Some(category.into()),
         }
     }
 }
@@ -3233,6 +3262,10 @@ pub struct NodeRunStatus {
     pub duration_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Coarse error bucket (auth/network/timeout/oom/disk/schema/syntax/
+    /// cancelled/other) - present only when `error` is. See error_category.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

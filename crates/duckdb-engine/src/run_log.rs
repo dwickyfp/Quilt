@@ -121,6 +121,12 @@ impl RunLog {
                 set("rows", json!(rows));
                 set("duration_ms", json!(duration_ms));
                 set("error", json!(error));
+                if let Some(err) = error {
+                    set(
+                        "category",
+                        json!(crate::error_category::categorize_error(err)),
+                    );
+                }
                 self.enrich(&mut m, node_id);
             }
             PipelineEvent::Cancelled => {

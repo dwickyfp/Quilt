@@ -3034,10 +3034,34 @@ pub(crate) fn build_parquet_source(props: &JsonValue) -> String {
 
 pub(crate) fn build_json_source(props: &JsonValue) -> String {
     let path = string_prop(props, "path").unwrap_or_default();
-    format!(
-        "SELECT * FROM read_json_auto('{}')",
-        sql_escape(&path)
-    )
+    // recordsPath: a dotted key path to the array of records inside the JSON
+    // (e.g. a REST envelope like {"data":[...]} or {"response":{"records":[...]}}).
+    // When set, walk to that array and unnest + recursively flatten each record
+    // into columns. Without it, read_json_auto handles plain top-level arrays and
+    // newline-delimited JSON as before. The 100 MB object cap keeps large API
+    // responses from tripping DuckDB's 16 MB default.
+    let records_path = string_prop(props, "recordsPath")
+        .or_else(|| string_prop(props, "recordPath"))
+        .filter(|s| !s.trim().is_empty());
+    match records_path {
+        Some(rp) => {
+            let accessor = rp
+                .split('.')
+                .filter(|s| !s.trim().is_empty())
+                .map(|seg| quote_ident(seg.trim()))
+                .collect::<Vec<_>>()
+                .join(".");
+            format!(
+                "SELECT unnest({}, recursive := true) FROM read_json_auto('{}', maximum_object_size=104857600)",
+                accessor,
+                sql_escape(&path)
+            )
+        }
+        None => format!(
+            "SELECT * FROM read_json_auto('{}', maximum_object_size=104857600)",
+            sql_escape(&path)
+        ),
+    }
 }
 
 pub(crate) fn build_sqlite_source(props: &JsonValue) -> String {

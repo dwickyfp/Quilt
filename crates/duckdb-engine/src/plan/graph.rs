@@ -581,10 +581,15 @@ pub(crate) fn canonical_port(p: &str) -> &str {
 /// Components that legitimately accept more than one edge on the `main`
 /// port (they read every upstream via all_main_ports, not just the
 /// first). Everything else is single-input and must reject fan-in.
+///
+/// xf.dbt is multi-input: every wired upstream source is materialized as a
+/// real table named by its node id, and the dbt project reads them all via
+/// `sources` (cross-system modeling). The first edge is also exposed as
+/// var('duckle_input') for the single-source / inline case.
 pub(crate) fn is_multi_main_component(component_id: &str) -> bool {
     matches!(
         component_id,
-        "xf.union" | "xf.unionall" | "xf.intersect" | "xf.except"
+        "xf.union" | "xf.unionall" | "xf.intersect" | "xf.except" | "xf.dbt"
     )
 }
 

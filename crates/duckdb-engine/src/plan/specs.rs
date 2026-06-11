@@ -502,6 +502,41 @@ pub struct ShellSpec {
     pub timeout_ms: Option<u64>,
 }
 
+/// xf.dbt: run a dbt Core project through the dbt-duckdb adapter. The
+/// engine generates a profiles.yml pointing dbt at the run's working
+/// database (or `database` when set), so dbt models see every upstream
+/// node table and their output tables are readable downstream. The
+/// upstream table name is passed to dbt as the `duckle_input` var. With
+/// `output_model` set the node's output is that model's rows; otherwise
+/// it is a per-model summary parsed from target/run_results.json.
+/// Requires a user-installed dbt with the duckdb adapter (pip/pipx
+/// install dbt-duckdb); `dbt_bin` overrides the executable path.
+#[derive(Debug, Clone)]
+pub struct DbtSpec {
+    pub node_id: String,
+    /// Directory containing dbt_project.yml. None = inline mode: the engine
+    /// scaffolds an ephemeral one-model project from `inline_model`.
+    pub project_dir: Option<String>,
+    /// Inline model SQL (UI authoring, no external project). Scaffolded as
+    /// models/<inline_model_name>.sql in a temp project when project_dir is None.
+    pub inline_model: Option<String>,
+    /// Name of the inline model (and its output table). Default "duckle_model".
+    pub inline_model_name: String,
+    /// dbt subcommand + args, e.g. "run --select staging". Default "run".
+    pub command: String,
+    /// dbt executable override; otherwise DUCKLE_DBT_BIN / bundled / PATH.
+    pub dbt_bin: Option<String>,
+    /// Target DuckDB file; default = the run's working database.
+    pub database: Option<String>,
+    /// Schema for the generated profile. Default "main".
+    pub schema: String,
+    /// Model/table to read back as this node's output rows.
+    pub output_model: Option<String>,
+    /// Upstream node table, exposed to dbt as var("duckle_input").
+    pub from_view: Option<String>,
+    pub timeout_ms: Option<u64>,
+}
+
 /// src.ftp: download files from an FTP / FTPS server and emit one row
 /// per file with {filename, size, content, modified}. Synchronous
 /// connection via the suppaftp crate. SFTP is a separate protocol

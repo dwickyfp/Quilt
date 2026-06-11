@@ -400,9 +400,23 @@ fn resolve_duckdb_src(flag: &Option<PathBuf>) -> Option<PathBuf> {
     }
 }
 
+/// Windows: suppress the console window that pops up when a windowless parent
+/// (the desktop spawns the runner headless) shells out to a console child.
+/// No-op on other platforms.
+fn no_window(cmd: &mut std::process::Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    let _ = cmd;
+}
+
 /// Run `<duckdb> --version` and parse the `vX.Y.Z` token.
 fn duckdb_version(bin: &Path) -> Option<String> {
-    let out = std::process::Command::new(bin).arg("--version").output().ok()?;
+    let mut cmd = std::process::Command::new(bin);
+    no_window(&mut cmd);
+    let out = cmd.arg("--version").output().ok()?;
     let s = String::from_utf8_lossy(&out.stdout);
     s.split_whitespace()
         .find(|t| t.starts_with('v') && t[1..].chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false))
@@ -411,7 +425,9 @@ fn duckdb_version(bin: &Path) -> Option<String> {
 
 /// Run `<duckdb> -c "PRAGMA platform;"` and read the single value.
 fn duckdb_platform(bin: &Path) -> Option<String> {
-    let out = std::process::Command::new(bin)
+    let mut cmd = std::process::Command::new(bin);
+    no_window(&mut cmd);
+    let out = cmd
         .arg("-noheader")
         .arg("-list")
         .arg("-c")

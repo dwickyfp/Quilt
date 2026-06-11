@@ -2426,6 +2426,11 @@ impl DuckdbEngine {
         let rows: Vec<JsonValue> = match mode {
             "log" => {
                 let mut cmd = std::process::Command::new("git");
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+                }
                 cmd.arg("-C")
                     .arg(&spec.repo)
                     .arg("log")
@@ -2452,6 +2457,11 @@ impl DuckdbEngine {
             }
             "files" => {
                 let mut cmd = std::process::Command::new("git");
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+                }
                 cmd.arg("-C")
                     .arg(&spec.repo)
                     .arg("ls-tree")
@@ -2510,6 +2520,11 @@ impl DuckdbEngine {
             }
         };
         let mut cmd = std::process::Command::new(&shell_cmd);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        }
         cmd.arg(&flag).arg(&spec.command);
         if let Some(dir) = &spec.working_dir {
             cmd.current_dir(dir);
@@ -2608,6 +2623,290 @@ impl DuckdbEngine {
         Ok(format!(
             "shell: exit {} in {}ms -> {}",
             exit_code, duration_ms, spec.node_id
+        ))
+    }
+
+    /// xf.dbt: run a dbt Core project (dbt-duckdb adapter) against the run's
+    /// working database. The per-stage CLI spawn model means no process holds
+    /// the database open between stages, so dbt gets exclusive access during
+    /// this stage: its models read upstream node tables directly and the
+    /// tables it builds are readable by downstream stages. profiles.yml is
+    /// generated per run into a temp dir, named after the project's declared
+    /// profile, so the user's project runs unmodified. The upstream table
+    /// name (when wired) is passed as var("duckle_input").
+    pub(crate) fn run_dbt(&self, db: &Path, spec: &DbtSpec) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+        let started = std::time::Instant::now();
+        // Resolve the project directory. Inline mode (no project_dir) scaffolds
+        // an ephemeral one-model project from spec.inline_model into a temp dir.
+        let scaffolded;
+        let project_dir: &Path = match &spec.project_dir {
+            Some(dir) => Path::new(dir),
+            None => {
+                let model = spec.inline_model.as_deref().ok_or_else(|| {
+                    EngineError::Config(
+                        "xf.dbt: inline mode needs model SQL (or set projectDir)".into(),
+                    )
+                })?;
+                scaffolded = scaffold_inline_dbt_project(&spec.node_id, &spec.inline_model_name, model)
+                    .map_err(|e| EngineError::Query(format!("xf.dbt: scaffold inline project: {e}")))?;
+                scaffolded.as_path()
+            }
+        };
+        let project_dir_str = project_dir.to_string_lossy().into_owned();
+        let project_file = project_dir.join("dbt_project.yml");
+        let project_text = std::fs::read_to_string(&project_file).map_err(|_| {
+            EngineError::Config(format!(
+                "xf.dbt: '{}' does not look like a dbt project (dbt_project.yml not found)",
+                project_dir_str
+            ))
+        })?;
+        // Name the generated profile after the project's `profile:` so the
+        // project runs unmodified; fall back to "duckle" + --profile flag.
+        let declared_profile = serde_yaml::from_str::<serde_yaml::Value>(&project_text)
+            .ok()
+            .and_then(|v| v.get("profile").and_then(|p| p.as_str().map(String::from)));
+        let (profile_name, force_profile_flag) = match declared_profile {
+            Some(p) if !p.trim().is_empty() => (p, false),
+            _ => ("duckle".to_string(), true),
+        };
+
+        // Target database: the run db by default, so dbt composes with the
+        // rest of the canvas. YAML wants forward slashes on Windows.
+        let target_db = spec
+            .database
+            .clone()
+            .unwrap_or_else(|| db.to_string_lossy().into_owned());
+        let target_db_yaml = target_db.replace('\\', "/");
+
+        let profiles_dir = std::env::temp_dir().join(format!(
+            "duckle_dbt_{}_{}",
+            std::process::id(),
+            spec.node_id.replace(|c: char| !c.is_alphanumeric(), "_")
+        ));
+        std::fs::create_dir_all(&profiles_dir)
+            .map_err(|e| EngineError::Query(format!("xf.dbt: profiles dir: {}", e)))?;
+        let profiles_yaml = format!(
+            "{}:\n  target: duckle\n  outputs:\n    duckle:\n      type: duckdb\n      path: \"{}\"\n      schema: {}\n      threads: 1\n",
+            profile_name, target_db_yaml, spec.schema
+        );
+        std::fs::write(profiles_dir.join("profiles.yml"), profiles_yaml)
+            .map_err(|e| EngineError::Query(format!("xf.dbt: write profiles.yml: {}", e)))?;
+
+        // Assemble: dbt <user command tokens> --project-dir .. --profiles-dir ..
+        // The command is split on whitespace (documented; no shell quoting),
+        // which avoids cmd.exe/sh quoting pitfalls entirely.
+        let mut args: Vec<String> =
+            spec.command.split_whitespace().map(|s| s.to_string()).collect();
+        if args.is_empty() {
+            args.push("run".into());
+        }
+        args.push("--project-dir".into());
+        args.push(project_dir_str.clone());
+        args.push("--profiles-dir".into());
+        args.push(profiles_dir.to_string_lossy().into_owned());
+        if force_profile_flag {
+            args.push("--profile".into());
+            args.push(profile_name.clone());
+        }
+        if let Some(fv) = &spec.from_view {
+            args.push("--vars".into());
+            args.push(serde_json::json!({ "duckle_input": fv }).to_string());
+        }
+
+        let dbt_bin = resolve_dbt_bin(spec.dbt_bin.as_deref());
+        let mut cmd = std::process::Command::new(&dbt_bin);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        }
+        cmd.args(&args);
+        cmd.current_dir(project_dir);
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        let mut child = cmd.spawn().map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                EngineError::Config(format!(
+                    "xf.dbt: dbt was not found (tried '{}'). Duckle ships a bundled dbt \
+                     engine; if you are running a bare build, install dbt with the DuckDB \
+                     adapter (pipx install dbt-duckdb) or set the 'dbtBin' property to the \
+                     dbt executable path.",
+                    dbt_bin
+                ))
+            } else {
+                EngineError::Query(format!("xf.dbt: spawn {}: {}", dbt_bin, e))
+            }
+        })?;
+
+        // Same pipe-drain + cancel/timeout discipline as run_shell: reader
+        // threads keep both pipes drained (dbt logs are chatty), the poll
+        // loop kills the child on cancel or deadline.
+        use std::io::Read;
+        let mut stdout_pipe = child
+            .stdout
+            .take()
+            .ok_or_else(|| EngineError::Query("xf.dbt: stdout not captured".into()))?;
+        let mut stderr_pipe = child
+            .stderr
+            .take()
+            .ok_or_else(|| EngineError::Query("xf.dbt: stderr not captured".into()))?;
+        let stdout_reader = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = stdout_pipe.read_to_end(&mut buf);
+            buf
+        });
+        let stderr_reader = std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = stderr_pipe.read_to_end(&mut buf);
+            buf
+        });
+        let deadline = spec
+            .timeout_ms
+            .map(|ms| std::time::Instant::now() + std::time::Duration::from_millis(ms));
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(s)) => break s,
+                Ok(None) => {}
+                Err(e) => {
+                    let _ = child.kill();
+                    return Err(EngineError::Query(format!("xf.dbt: wait: {}", e)));
+                }
+            }
+            if self.cancel.load(Ordering::Relaxed) {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(EngineError::Cancelled);
+            }
+            if let Some(d) = deadline {
+                if std::time::Instant::now() >= d {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(EngineError::Query(format!(
+                        "xf.dbt: timeout after {}ms",
+                        spec.timeout_ms.unwrap_or(0)
+                    )));
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        };
+        let stdout_text =
+            String::from_utf8_lossy(&stdout_reader.join().unwrap_or_default()).into_owned();
+        let stderr_text =
+            String::from_utf8_lossy(&stderr_reader.join().unwrap_or_default()).into_owned();
+        let duration_ms = started.elapsed().as_millis() as i64;
+
+        if !status.success() {
+            // dbt reports model errors on stdout; keep the tail of both
+            // streams so the failure names the model and the SQL error.
+            let mut detail = String::new();
+            if !stdout_text.trim().is_empty() {
+                detail.push_str(tail_chars(stdout_text.trim(), 2000));
+            }
+            if !stderr_text.trim().is_empty() {
+                if !detail.is_empty() {
+                    detail.push('\n');
+                }
+                detail.push_str(tail_chars(stderr_text.trim(), 1000));
+            }
+            return Err(EngineError::Query(format!(
+                "xf.dbt: dbt exited with code {} after {}ms\n{}",
+                status.code().unwrap_or(-1),
+                duration_ms,
+                detail
+            )));
+        }
+
+        // Per-model summary from target/run_results.json (written by run /
+        // build / test / seed / snapshot). Commands that build nothing
+        // (deps, parse) produce a single status row instead.
+        let results_path = project_dir.join("target").join("run_results.json");
+        let model_rows: Vec<JsonValue> = std::fs::read_to_string(&results_path)
+            .ok()
+            .and_then(|t| serde_json::from_str::<JsonValue>(&t).ok())
+            .and_then(|v| v.get("results").and_then(|r| r.as_array()).cloned())
+            .map(|results| {
+                results
+                    .iter()
+                    .map(|r| {
+                        let mut row = serde_json::Map::new();
+                        let model = r
+                            .get("unique_id")
+                            .and_then(|u| u.as_str())
+                            .map(|u| u.rsplit('.').next().unwrap_or(u).to_string())
+                            .unwrap_or_default();
+                        row.insert("model".into(), JsonValue::String(model));
+                        row.insert(
+                            "status".into(),
+                            r.get("status").cloned().unwrap_or(JsonValue::Null),
+                        );
+                        row.insert(
+                            "execution_time_s".into(),
+                            r.get("execution_time").cloned().unwrap_or(JsonValue::Null),
+                        );
+                        row.insert(
+                            "message".into(),
+                            r.get("message").cloned().unwrap_or(JsonValue::Null),
+                        );
+                        JsonValue::Object(row)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let model_count = model_rows.len();
+
+        match &spec.output_model {
+            Some(model) => {
+                // The node's output is the built model itself, read back
+                // from the target database into the run db when they differ.
+                let select = if spec.database.is_some() {
+                    let attach_path = target_db.replace('\'', "''");
+                    format!(
+                        "ATTACH '{}' AS __dbt_out (READ_ONLY); \
+                         CREATE OR REPLACE TABLE {} AS SELECT * FROM __dbt_out.{}.{};",
+                        attach_path,
+                        plan::quote_ident(&spec.node_id),
+                        plan::quote_ident(&spec.schema),
+                        plan::quote_ident(model)
+                    )
+                } else {
+                    format!(
+                        "CREATE OR REPLACE TABLE {} AS SELECT * FROM {};",
+                        plan::quote_ident(&spec.node_id),
+                        plan::quote_ident(model)
+                    )
+                };
+                self.run(Some(db), &select, false).map_err(|e| {
+                    EngineError::Query(format!(
+                        "xf.dbt: dbt succeeded but reading outputModel '{}' back failed: {}",
+                        model, e
+                    ))
+                })?;
+            }
+            None => {
+                let rows = if model_rows.is_empty() {
+                    let mut row = serde_json::Map::new();
+                    row.insert("model".into(), JsonValue::Null);
+                    row.insert("status".into(), JsonValue::String("success".into()));
+                    row.insert("execution_time_s".into(), JsonValue::Null);
+                    row.insert(
+                        "message".into(),
+                        JsonValue::String(
+                            "dbt exited 0; no run_results.json (command builds no models)"
+                                .into(),
+                        ),
+                    );
+                    vec![JsonValue::Object(row)]
+                } else {
+                    model_rows
+                };
+                materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &rows)?;
+            }
+        }
+
+        Ok(format!(
+            "dbt: exit 0 in {}ms, {} model result(s) -> {}",
+            duration_ms, model_count, spec.node_id
         ))
     }
 
@@ -6645,6 +6944,113 @@ impl DuckdbEngine {
 /// `$DUCKLE_WORKSPACE/state/<pipeline>/<node>.json`. None when there's no
 /// workspace (then the mark can't persist and every run loads from the
 /// configured initial value, which is safe - just not incremental).
+/// Scaffold an ephemeral one-model dbt project for xf.dbt inline mode. Writes
+/// `dbt_project.yml` (profile `duckle`, matching the generated profiles.yml) and
+/// `models/<model_name>.sql` holding the user's inline SQL (which may reference
+/// `{{ var('duckle_input') }}` for the upstream table). Returns the temp project
+/// dir. The model name is sanitized to a SQL/dbt-safe identifier.
+/// Write `content` to `path` only if it differs from what's already there.
+/// Preserves file mtime when unchanged, which keeps dbt's partial-parse cache
+/// valid across runs.
+fn write_str_if_changed(path: &Path, content: &str) -> std::io::Result<()> {
+    if let Ok(existing) = std::fs::read_to_string(path) {
+        if existing == content {
+            return Ok(());
+        }
+    }
+    std::fs::write(path, content)
+}
+
+fn scaffold_inline_dbt_project(
+    node_id: &str,
+    model_name: &str,
+    model_sql: &str,
+) -> std::io::Result<std::path::PathBuf> {
+    let safe_model: String = {
+        let s: String = model_name
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })
+            .collect();
+        let s = s.trim_matches('_').to_string();
+        if s.is_empty() { "duckle_model".to_string() } else { s }
+    };
+    // Stable per-node project dir (NOT process-id keyed) so dbt's
+    // target/partial_parse.msgpack survives across app launches. dbt-core's
+    // parse is the dominant cost of an inline run; a warm partial-parse cache
+    // shaves ~1s off an otherwise-cold start.
+    let root = std::env::temp_dir().join(format!(
+        "duckle_dbt_proj_{}",
+        node_id.replace(|c: char| !c.is_alphanumeric(), "_")
+    ));
+    let models = root.join("models");
+    std::fs::create_dir_all(&models)?;
+    // Drop any stale model left by a previous run (e.g. the model was renamed),
+    // so the project only ever contains the current inline model.
+    if let Ok(entries) = std::fs::read_dir(&models) {
+        for e in entries.flatten() {
+            let p = e.path();
+            if p.extension().and_then(|x| x.to_str()) == Some("sql")
+                && p.file_stem().and_then(|x| x.to_str()) != Some(safe_model.as_str())
+            {
+                let _ = std::fs::remove_file(p);
+            }
+        }
+    }
+    let project_yml = "name: duckle\nversion: '1.0.0'\nprofile: duckle\nconfig-version: 2\nmodel-paths: [\"models\"]\nmodels:\n  duckle:\n    +materialized: table\n";
+    // Write only when content differs: a touched dbt_project.yml forces dbt to
+    // discard the partial-parse cache, and a re-touched model file needlessly
+    // re-parses it. Identical content keeps the whole cache valid.
+    write_str_if_changed(&root.join("dbt_project.yml"), project_yml)?;
+    write_str_if_changed(&models.join(format!("{}.sql", safe_model)), model_sql)?;
+    Ok(root)
+}
+
+/// Resolve the dbt executable. Order: explicit `dbtBin` prop -> DUCKLE_DBT_BIN
+/// env -> a bundled dbt/Fusion binary next to the running executable (the
+/// shipped sidecar) -> `dbt` on PATH. The bundled binary makes xf.dbt work
+/// out of the box without a Python install.
+fn resolve_dbt_bin(explicit: Option<&str>) -> String {
+    if let Some(b) = explicit.filter(|s| !s.trim().is_empty()) {
+        return b.to_string();
+    }
+    if let Ok(env) = std::env::var("DUCKLE_DBT_BIN") {
+        if !env.is_empty() && Path::new(&env).exists() {
+            return env;
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            // Names we may ship the bundled dbt under (Fusion or frozen dbt).
+            for name in [
+                "dbt-fusion",
+                "dbt-fusion.exe",
+                "dbtf",
+                "dbtf.exe",
+                "dbt",
+                "dbt.exe",
+            ] {
+                let p = dir.join(name);
+                if p.exists() {
+                    return p.to_string_lossy().into_owned();
+                }
+            }
+        }
+    }
+    "dbt".to_string()
+}
+
+/// Last `max` characters of `s` (UTF-8-safe) - used to keep the useful end
+/// of a long tool log (dbt prints the failing model last) in error messages.
+fn tail_chars(s: &str, max: usize) -> &str {
+    let count = s.chars().count();
+    if count <= max {
+        return s;
+    }
+    let skip = count - max;
+    let (idx, _) = s.char_indices().nth(skip).unwrap_or((0, ' '));
+    &s[idx..]
+}
+
 fn incremental_state_path(pipeline_name: Option<&str>, node_id: &str) -> Option<std::path::PathBuf> {
     let ws = std::env::var("DUCKLE_WORKSPACE").ok().filter(|s| !s.is_empty())?;
     let folder = sanitize_path_segment(pipeline_name.unwrap_or("pipeline"));

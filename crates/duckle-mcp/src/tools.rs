@@ -345,6 +345,11 @@ fn t_build_pipeline(args: &Value) -> Result<Value, String> {
     .map_err(|e| format!("write pipeline: {e}"))?;
 
     let mut cmd = std::process::Command::new(&runner);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
     cmd.arg("build")
         .arg("--workspace")
         .arg(&ws)

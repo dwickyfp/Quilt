@@ -39,15 +39,41 @@ OPTIONS:
                          DUCKLE_DUCKDB_BIN, then bin/duckdb next to this
                          runner, then 'duckdb' on PATH.
     --log-dir <dir>      Run-log directory (default: <workspace>/logs)
-    --name <label>       Run-log folder name (default: pipeline file stem)
+    --name <label>       Run-log + state folder name (default: pipeline file stem)
+
+BACKFILL (manage xf.incremental / src.ducklake.changes saved state, then exit
+without running). Resolve the state folder from --name or the pipeline stem,
+under --workspace (or the pipeline's parent):
+    --list-watermarks            Print saved watermarks/snapshots and exit
+    --set-watermark <node=value> Set an incremental watermark; repeatable
+    --watermark-type <SQLTYPE>   SQL type for the next --set-watermark (default VARCHAR)
+    --set-snapshot <node=id>     Set a DuckLake CDC snapshot id; repeatable
+    --clear-watermark <node>     Delete a node's saved state (forces full reload); repeatable
+
     -h, --help           Print this help";
 
 struct Args {
-    pipeline: PathBuf,
+    pipeline: Option<PathBuf>,
     workspace: Option<PathBuf>,
     duckdb: Option<PathBuf>,
     log_dir: Option<PathBuf>,
     name: Option<String>,
+    list_watermarks: bool,
+    // (node, value, sql_type) incremental sets, in order.
+    set_watermarks: Vec<(String, String, String)>,
+    // (node, snapshot_id) CDC sets.
+    set_snapshots: Vec<(String, u64)>,
+    clear_watermarks: Vec<String>,
+}
+
+impl Args {
+    /// True when any backfill flag was given - run() does the state op and exits.
+    fn is_backfill(&self) -> bool {
+        self.list_watermarks
+            || !self.set_watermarks.is_empty()
+            || !self.set_snapshots.is_empty()
+            || !self.clear_watermarks.is_empty()
+    }
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -56,6 +82,12 @@ fn parse_args() -> Result<Args, String> {
     let mut duckdb = None;
     let mut log_dir = None;
     let mut name = None;
+    let mut list_watermarks = false;
+    let mut set_watermarks = Vec::new();
+    let mut set_snapshots = Vec::new();
+    let mut clear_watermarks = Vec::new();
+    // SQL type applied to the NEXT --set-watermark (so it can precede it).
+    let mut pending_type = String::from("VARCHAR");
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
         let mut take = |label: &str| {
@@ -68,6 +100,28 @@ fn parse_args() -> Result<Args, String> {
             "--duckdb" => duckdb = Some(PathBuf::from(take("--duckdb")?)),
             "--log-dir" => log_dir = Some(PathBuf::from(take("--log-dir")?)),
             "--name" => name = Some(take("--name")?),
+            "--list-watermarks" => list_watermarks = true,
+            "--watermark-type" => pending_type = take("--watermark-type")?,
+            "--set-watermark" => {
+                let spec = take("--set-watermark")?;
+                let (node, value) = spec
+                    .split_once('=')
+                    .ok_or_else(|| format!("--set-watermark expects node=value, got '{}'", spec))?;
+                set_watermarks.push((node.to_string(), value.to_string(), pending_type.clone()));
+                pending_type = String::from("VARCHAR");
+            }
+            "--set-snapshot" => {
+                let spec = take("--set-snapshot")?;
+                let (node, id) = spec
+                    .split_once('=')
+                    .ok_or_else(|| format!("--set-snapshot expects node=id, got '{}'", spec))?;
+                let id: u64 = id
+                    .trim()
+                    .parse()
+                    .map_err(|_| format!("--set-snapshot id must be a number, got '{}'", id))?;
+                set_snapshots.push((node.to_string(), id));
+            }
+            "--clear-watermark" => clear_watermarks.push(take("--clear-watermark")?),
             "-h" | "--help" => {
                 println!("{USAGE}");
                 std::process::exit(0);
@@ -79,8 +133,17 @@ fn parse_args() -> Result<Args, String> {
             other => return Err(format!("unknown argument: {}", other)),
         }
     }
-    let pipeline = pipeline.ok_or_else(|| "--pipeline is required".to_string())?;
-    Ok(Args { pipeline, workspace, duckdb, log_dir, name })
+    Ok(Args {
+        pipeline,
+        workspace,
+        duckdb,
+        log_dir,
+        name,
+        list_watermarks,
+        set_watermarks,
+        set_snapshots,
+        clear_watermarks,
+    })
 }
 
 /// Find the DuckDB CLI: explicit flag, then env, then a sibling bin/duckdb
@@ -122,22 +185,93 @@ fn resolve_duckdb(flag: Option<PathBuf>) -> Result<PathBuf, String> {
     Ok(PathBuf::from("duckdb"))
 }
 
+/// Resolve the run/state folder name: --name, else the pipeline file stem.
+fn resolve_name(args: &Args) -> Result<String, String> {
+    if let Some(n) = &args.name {
+        return Ok(n.clone());
+    }
+    args.pipeline
+        .as_ref()
+        .and_then(|p| p.file_stem())
+        .map(|s| s.to_string_lossy().into_owned())
+        .ok_or_else(|| "need --name or --pipeline to resolve the state folder".to_string())
+}
+
+/// Resolve the workspace root: --workspace, else the pipeline file's parent.
+fn resolve_workspace(args: &Args) -> PathBuf {
+    args.workspace
+        .clone()
+        .or_else(|| args.pipeline.as_ref().and_then(|p| p.parent().map(Path::to_path_buf)))
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+/// Apply the backfill flags (set/clear/list watermarks) and return without
+/// running the pipeline. Resolves the state folder from --name / pipeline stem
+/// under the workspace, the same layout a real run reads.
+fn run_backfill(args: &Args) -> Result<bool, String> {
+    use duckle_duckdb_engine::watermark;
+    let workspace = resolve_workspace(args);
+    let name = resolve_name(args)?;
+
+    for (node, value, ty) in &args.set_watermarks {
+        watermark::set_incremental(&workspace, &name, node, value, Some(ty))
+            .map_err(|e| format!("set watermark {}: {}", node, e))?;
+        println!("set watermark  {} = {} ({})", node, value, ty);
+    }
+    for (node, id) in &args.set_snapshots {
+        watermark::set_snapshot(&workspace, &name, node, *id)
+            .map_err(|e| format!("set snapshot {}: {}", node, e))?;
+        println!("set snapshot   {} = {}", node, id);
+    }
+    for node in &args.clear_watermarks {
+        watermark::clear(&workspace, &name, node)
+            .map_err(|e| format!("clear watermark {}: {}", node, e))?;
+        println!("cleared        {}", node);
+    }
+    if args.list_watermarks {
+        let entries = watermark::list(&workspace, &name);
+        if entries.is_empty() {
+            println!("(no saved watermarks for '{}' under {})", name, workspace.display());
+        } else {
+            println!("saved watermarks for '{}':", name);
+            for e in entries {
+                match e.value_type {
+                    Some(t) => println!("  {:24} {} = {} ({})", e.node_id, e.kind, e.value, t),
+                    None => println!("  {:24} {} = {}", e.node_id, e.kind, e.value),
+                }
+            }
+        }
+    }
+    Ok(true)
+}
+
 fn run() -> Result<bool, String> {
     let args = parse_args()?;
-    if !args.pipeline.exists() {
-        return Err(format!("pipeline file not found: {}", args.pipeline.display()));
+
+    // Backfill flags short-circuit: manage saved watermark/snapshot state and
+    // exit without running the pipeline.
+    if args.is_backfill() {
+        return run_backfill(&args);
     }
-    let text = std::fs::read_to_string(&args.pipeline)
-        .map_err(|e| format!("read {}: {}", args.pipeline.display(), e))?;
+
+    let pipeline = args
+        .pipeline
+        .clone()
+        .ok_or_else(|| "--pipeline is required".to_string())?;
+    if !pipeline.exists() {
+        return Err(format!("pipeline file not found: {}", pipeline.display()));
+    }
+    let text = std::fs::read_to_string(&pipeline)
+        .map_err(|e| format!("read {}: {}", pipeline.display(), e))?;
     let mut doc: PipelineDoc = serde_json::from_str(&text)
-        .map_err(|e| format!("parse {}: {}", args.pipeline.display(), e))?;
+        .map_err(|e| format!("parse {}: {}", pipeline.display(), e))?;
 
     // Workspace defaults to the pipeline file's directory. Pre-fetched
     // DuckDB extensions and incremental state live relative to it.
     let workspace = args
         .workspace
         .clone()
-        .or_else(|| args.pipeline.parent().map(Path::to_path_buf))
+        .or_else(|| pipeline.parent().map(Path::to_path_buf))
         .unwrap_or_else(|| PathBuf::from("."));
 
     // Runtime ${ENV:KEY} substitution. A built bundle ships ${ENV:KEY}
@@ -151,13 +285,13 @@ fn run() -> Result<bool, String> {
 
     let duckdb = resolve_duckdb(args.duckdb)?;
     let name = args.name.clone().unwrap_or_else(|| {
-        args.pipeline
+        pipeline
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "pipeline".into())
     });
 
-    eprintln!("duckle-runner: {} (workspace {})", args.pipeline.display(), workspace.display());
+    eprintln!("duckle-runner: {} (workspace {})", pipeline.display(), workspace.display());
     let engine = DuckdbEngine::new(duckdb);
     let result = engine.execute_pipeline_named(&doc, &name);
 
