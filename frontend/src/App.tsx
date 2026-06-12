@@ -1118,7 +1118,8 @@ export default function App() {
                 position: { x: 60 + i * 280, y: 140 },
             })),
         );
-    }, [setNodes]);
+        markDirty();
+    }, [setNodes, markDirty]);
 
     const handleDropComponent = useCallback(
         (component: ComponentDef, position: DropPosition) => {

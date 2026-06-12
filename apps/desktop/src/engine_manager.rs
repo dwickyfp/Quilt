@@ -518,10 +518,13 @@ fn install_llama_model<F: FnMut(InstallProgress)>(
         received += n as u64;
         on_progress(InstallProgress::DownloadingModel { received, total });
     }
-    // Sanity check: GGUF files start with the magic bytes "GGUF".
+    // Sanity check: GGUF files start with the magic bytes "GGUF". Use
+    // read_exact so a short or failed read surfaces as an error instead of
+    // leaving the header zeroed and reporting a false "header mismatch".
     let mut header = [0u8; 4];
     let mut f = std::fs::File::open(&target).map_err(|e| e.to_string())?;
-    let _ = std::io::Read::read(&mut f, &mut header);
+    std::io::Read::read_exact(&mut f, &mut header)
+        .map_err(|e| format!("read model header: {}", e))?;
     if &header != b"GGUF" {
         let _ = std::fs::remove_file(&target);
         return Err("Downloaded model is not a valid GGUF file (header mismatch)".into());

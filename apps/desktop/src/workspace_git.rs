@@ -387,11 +387,13 @@ pub fn load_pat(workspace: &Path) -> GitResult<String> {
     let parsed: StoredPat = serde_json::from_str(&body).map_err(|e| format!("parse PAT: {}", e))?;
     // Decrypt if it was stored encrypted; a legacy plaintext token loads as-is.
     if crate::secrets::is_encrypted(&parsed.pat) {
-        if let Ok(key) = crate::secrets::workspace_key(workspace, false) {
-            if let Ok(plain) = crate::secrets::decrypt_value(&key, &parsed.pat) {
-                return Ok(plain);
-            }
-        }
+        let key = crate::secrets::workspace_key(workspace, false).map_err(|_| {
+            "stored git token is encrypted but the workspace key is missing \
+             (.duckle/keys/secret.key); re-enter the token to re-save it"
+                .to_string()
+        })?;
+        return crate::secrets::decrypt_value(&key, &parsed.pat)
+            .map_err(|e| format!("decrypt git token: {}", e));
     }
     Ok(parsed.pat)
 }

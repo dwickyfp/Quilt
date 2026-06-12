@@ -60,7 +60,7 @@ pub struct LlamaServer {
 impl LlamaServer {
     /// Spawn the server with the Qwen model loaded. Picks a free port
     /// (lets the OS choose by binding to :0 then dropping). Waits up
-    /// to 15s for the /health endpoint to return ready.
+    /// to 30s for the /health endpoint to return ready.
     pub fn spawn(bin: &PathBuf, model: &PathBuf) -> Result<Self, String> {
         if !bin.exists() {
             return Err(format!(
