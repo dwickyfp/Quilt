@@ -444,11 +444,19 @@ fn schedule_set_workspace(path: String) -> Result<(), String> {
     if path.is_empty() {
         std::env::remove_var("QUILT_WORKSPACE");
         std::env::remove_var("QUILT_LOG_DIR");
+        std::env::remove_var("QUILT_STAGE_CACHE_DIR");
     } else {
         std::env::set_var("QUILT_WORKSPACE", &path);
         // Universal, component-level run logging lands in the user's chosen
         // workspace under logs/ (NDJSON) for Splunk / Dynatrace ingestion.
         std::env::set_var("QUILT_LOG_DIR", PathBuf::from(&path).join("logs"));
+        // Smart incremental re-run: content-addressed Parquet stage cache under
+        // the workspace's cache/ dir. Editing one node then re-running serves
+        // unchanged stages from cache instead of recomputing the whole graph.
+        // Scoped to the workspace so it's discoverable + clearable by the user,
+        // and torn down when the workspace is cleared. Cache writes are atomic
+        // and content-addressed, so this is safe to default on.
+        std::env::set_var("QUILT_STAGE_CACHE_DIR", PathBuf::from(&path).join("cache"));
     }
     let p = if path.is_empty() {
         None
