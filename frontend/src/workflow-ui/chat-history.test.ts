@@ -8,6 +8,8 @@ import {
     getSession,
     newSessionId,
     deriveTitle,
+    saveActiveSessionId,
+    loadActiveSessionId,
 } from './chat-history';
 
 const msg = (role: 'user' | 'assistant', content: string): StoredMessage => ({ role, content });
@@ -115,5 +117,20 @@ describe('deleteSession', () => {
         saveSession({ id: 's1', title: 'A', messages: [], createdAt: 1, updatedAt: 1 });
         deleteSession('ghost');
         expect(loadSessions()).toHaveLength(1);
+    });
+});
+
+describe('active session id', () => {
+    it('returns null when nothing is stored', () => {
+        expect(loadActiveSessionId()).toBeNull();
+    });
+    it('persists and reads back the active id', () => {
+        saveActiveSessionId('s42');
+        expect(loadActiveSessionId()).toBe('s42');
+    });
+    it('overwrites a previously stored id', () => {
+        saveActiveSessionId('s1');
+        saveActiveSessionId('s2');
+        expect(loadActiveSessionId()).toBe('s2');
     });
 });

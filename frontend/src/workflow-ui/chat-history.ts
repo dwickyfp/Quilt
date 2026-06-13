@@ -6,6 +6,7 @@
 // the persistence shape used by ai-settings.ts.
 
 const STORAGE_KEY = 'quilt.chat.sessions';
+const ACTIVE_KEY = 'quilt.chat.activeId';
 const TITLE_MAX = 48;
 
 /** A persisted chat message — structurally a subset of the live Bubble. */
@@ -81,4 +82,22 @@ export function saveSession(session: ChatSession): void {
 
 export function deleteSession(id: string): void {
     writeAll(readAll().filter(s => s.id !== id));
+}
+
+/** Persist which session is currently active so it survives close/reopen. */
+export function saveActiveSessionId(id: string): void {
+    try {
+        localStorage.setItem(ACTIVE_KEY, id);
+    } catch {
+        // Best-effort; fall back to a fresh session if it can't be stored.
+    }
+}
+
+/** The last active session id, or null if none was stored. */
+export function loadActiveSessionId(): string | null {
+    try {
+        return localStorage.getItem(ACTIVE_KEY);
+    } catch {
+        return null;
+    }
 }

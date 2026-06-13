@@ -28,6 +28,8 @@ import {
     getSession,
     newSessionId,
     deriveTitle,
+    saveActiveSessionId,
+    loadActiveSessionId,
 } from './chat-history';
 
 type Props = {
@@ -62,10 +64,30 @@ const EXAMPLE_PROMPTS = [
     'Embed the description column with OpenAI and dedupe near-duplicates',
 ];
 
+/**
+ * Restore the last active session on mount so closing and reopening the panel
+ * resumes where the user left off (instead of starting a blank session). Falls
+ * back to a fresh session id with no messages when there's nothing to restore.
+ */
+function restoreActiveSession(): { id: string; messages: Bubble[] } {
+    const id = loadActiveSessionId();
+    if (id) {
+        const s = getSession(id);
+        if (s) {
+            return { id, messages: s.messages.map(m => ({ role: m.role, content: m.content })) };
+        }
+    }
+    return { id: newSessionId(), messages: [] };
+}
+
 export default function ChatPanel({ onClose, onInsertPipeline, onOpenSettings, nodes, edges, onApplyPatch }: Props) {
     const { t } = useTranslation();
     const [settings, setSettings] = useState<AiSettings>(() => loadAiSettings());
-    const [messages, setMessages] = useState<Bubble[]>([]);
+    // Restore the last active session once, before the first render, so both
+    // messages and sessionId init from the same snapshot.
+    const restoredRef = useRef<{ id: string; messages: Bubble[] } | null>(null);
+    if (restoredRef.current === null) restoredRef.current = restoreActiveSession();
+    const [messages, setMessages] = useState<Bubble[]>(() => restoredRef.current!.messages);
     const [draft, setDraft] = useState('');
     const [busy, setBusy] = useState(false);
     const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -78,7 +100,7 @@ export default function ChatPanel({ onClose, onInsertPipeline, onOpenSettings, n
 
     // Chat history: the active session id, whether the history popover is open,
     // and the cached session list (refreshed when the popover opens).
-    const [sessionId, setSessionId] = useState<string>(() => newSessionId());
+    const [sessionId, setSessionId] = useState<string>(() => restoredRef.current!.id);
     const [historyOpen, setHistoryOpen] = useState(false);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const historyRef = useRef<HTMLDivElement | null>(null);
@@ -122,6 +144,11 @@ export default function ChatPanel({ onClose, onInsertPipeline, onOpenSettings, n
             updatedAt: now,
         });
     }, [messages, sessionId]);
+
+    // Remember which session is active so closing/reopening the panel resumes it.
+    useEffect(() => {
+        saveActiveSessionId(sessionId);
+    }, [sessionId]);
 
     // Open the history popover, refreshing the cached session list.
     const openHistory = useCallback(() => {
