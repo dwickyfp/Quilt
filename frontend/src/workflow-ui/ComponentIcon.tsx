@@ -19,6 +19,11 @@ import {
     Radio,
     AlignLeft,
     Database,
+    Brain,
+    Split,
+    Target,
+    Gauge,
+    Cpu,
 } from 'lucide-react';
 import { BRAND_ICONS, type BrandIcon } from './brand-icons.generated';
 import type { NodeKind } from './palette-data';
@@ -63,6 +68,11 @@ const BASE_FALLBACK: Record<string, ComponentType<IconProps>> = {
     weaviate: Boxes,
     chroma: Boxes,
     lancedb: Boxes,
+    partition: Split,
+    learner: Brain,
+    predict: Target,
+    score: Gauge,
+    onnx: Cpu,
 };
 
 // Last-resort fallback by node kind.
@@ -73,6 +83,7 @@ const KIND_FALLBACK: Record<NodeKind, ComponentType<IconProps>> = {
     control: GitFork,
     quality: ShieldCheck,
     custom: Code2,
+    ml: Brain,
 };
 
 type Props = { componentId: string; kind: NodeKind; size?: number; className?: string };

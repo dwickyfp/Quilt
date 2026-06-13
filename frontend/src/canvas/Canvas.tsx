@@ -50,6 +50,7 @@ const nodeTypes = {
     source: QuiltNode,
     transform: QuiltNode,
     sink: QuiltNode,
+    ml: QuiltNode,
 };
 
 const edgeTypes = {

@@ -176,6 +176,8 @@ function paletteKindToFlowType(kind: PaletteKind): string {
             return 'source';
         case 'sink':
             return 'sink';
+        case 'ml':
+            return 'ml';
         case 'transform':
         case 'control':
         case 'quality':
