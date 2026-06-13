@@ -41,7 +41,7 @@
 
 **Use the product**
 
-- [Meet Qunnie (AI)](#meet-qunnie---the-local-ai-pipeline-assistant)
+- [Meet Qunnie (AI)](#meet-qunnie---the-ai-pipeline-assistant)
 - [How to use Quilt](#how-to-use-quilt)
 - [Recipes / examples](#recipes-and-examples)
 - [In-app Git (GitHub/GitLab)](#git-integration-github--gitlab)
@@ -110,19 +110,52 @@ Three things make Quilt different from the heavyweights and the toy ETL tools:
 
 ---
 
-## Meet Qunnie - the local AI pipeline assistant
+## Meet Qunnie - the AI pipeline assistant
 
-> Describe what you need. Qunnie writes the pipeline.
+> Describe what you need. Qunnie builds, inspects, and fixes the pipeline with you.
 
-The sidebar on the right is **Qunnie AI Assistant** - powered by **Qwen 2.5 Coder 1.5B** running through **llama.cpp**, downloaded once (~1.1 GB) and then run entirely on your CPU. Ask in plain English; Qunnie streams back a valid Quilt pipeline definition. One click drops it onto the canvas, ready to inspect, tweak, and run.
+The sidebar on the right is **Qunnie**, Quilt's built-in AI assistant. It ships fully local - powered by **Qwen 2.5 Coder 1.5B** through **llama.cpp**, downloaded once (~1.1 GB) and run entirely on your CPU - and it can also drive any model you point it at. Ask in plain English; Qunnie can answer, generate a pipeline, modify the graph you already have, or work a multi-step task as an agent.
+
+### Multiple providers, multiple models
+
+Qunnie is no longer tied to one model. In **Settings -> AI** you can register several providers at once, each with its own list of models, and switch between them from a **dropdown right above the chat input**.
 
 | | |
 |---|---|
-| **Truly local** | The Qwen model runs as a `llama-server` subprocess on `127.0.0.1`. No API keys. No network calls. Disconnect your wifi and it keeps working. |
-| **Streamed responses** | Tokens arrive as they're generated, with a blinking caret in the bubble. No "wait 20 seconds for the spinner to vanish" UX. |
-| **One-click insert** | When Qunnie produces a JSON pipeline, an **Insert into canvas** button appears. The graph populates with positioned nodes, wired edges, and the props the model chose. |
-| **Bring-your-own-model option** | The chat plumbing is the same OpenAI-compatible HTTP interface used by `xf.ai.llm` / `xf.ai.embed` connectors. Point `baseUrl` at Ollama, llama.cpp, Cohere, OpenAI, Voyage - anything that speaks the OpenAI shape. |
-| **Sandboxed** | The model has no fs / net / tool access. It can only emit text - your pipeline JSON. |
+| **Local by default** | The Qwen model runs as a `llama-server` subprocess on `127.0.0.1`. No API keys, no network calls - disconnect your wifi and it keeps working. |
+| **Bring your own** | Add OpenAI, Claude, or any **OpenAI-compatible** endpoint (Ollama, LM Studio, vLLM, llama.cpp, Cohere, Voyage). OpenAI-compatible endpoints can be saved **without an API key** for keyless local servers. |
+| **Per-model switching** | Configure `gpt-4o`, `claude-sonnet`, and a local model side by side; pick the right one per task from the chat dropdown. |
+
+### Agentic, with a human in the loop
+
+Qunnie runs a bounded **ReAct loop**: think -> optionally call one tool -> read the result -> repeat, then answer. It's a *superset* of plain chat - if it doesn't need a tool, it just replies in one turn (and still offers a one-click pipeline insert or graph patch when relevant).
+
+| | |
+|---|---|
+| **Tool-calling skills** | A registry of skills lets Qunnie inspect nodes, read schemas, propose edits (add/update/delete/connect nodes), suggest fixes for schema mismatches, and build charts. A skill-used trace shows exactly what ran. |
+| **Human-in-the-loop approval** | Any action that *mutates the canvas* pauses for an explicit **Approve / Reject** card. Nothing touches your graph automatically. |
+| **Provider-agnostic protocol** | Tool calls travel as plain JSON blocks in the model's reply - no vendor-specific function-calling API required - so the same loop works across local and hosted models. |
+| **Streamed responses** | Tokens arrive as they're generated, with a blinking caret. A **Stop** button cancels a running loop at any time. |
+
+### Secure by design
+
+Because the assistant can now propose edits, it ships with layered guardrails:
+
+| | |
+|---|---|
+| **Prompt hardening** | The role is locked to the Quilt pipeline domain. The graph and every tool result are treated as **untrusted data, not instructions** (mitigating prompt-injection through node labels, column names, or file paths). Exfiltration, external calls, and fabricated data are forbidden. |
+| **Graph-aware validation** | A proposed tool call must reference nodes that actually exist, use fresh ids, allowlisted chart types, and no self-loops - validated against the live graph before it can run. |
+| **Loop safety** | Identical repeated calls are detected and stopped, with a hard iteration cap so a confused model can't run away. |
+
+### Chat history
+
+| | |
+|---|---|
+| **Saved sessions** | Past conversations are stored locally with auto-generated titles. Open the **history popover** (clock icon) to revisit, reload, or delete any chat. |
+| **New session** | The **plus** button starts a fresh chat; the previous one is saved automatically. |
+| **Resumes where you left off** | Closing and reopening the panel restores your last active session instead of starting blank. |
+
+> **A note on model choice:** the agentic loop, tool-calling, and graph edits shine with a capable model (GPT-4o, Claude Sonnet, or a larger local model). The default 1.5B local model is great for quick pipeline generation and offline use, but small models are less reliable at multi-step tool use - point Qunnie at a bigger model via the provider settings when you want it to act as an agent.
 
 ---
 
@@ -350,7 +383,7 @@ When the installer downloads the DuckDB CLI it also pre-fetches the extensions Q
 
 ## Download / Install
 
-Pick the binary for your OS from the [latest release](https://github.com/dwickyfp/Quilt/releases/tag/v0.3.0):
+Pick the binary for your OS from the [latest release](https://github.com/dwickyfp/Quilt/releases/tag/v0.4.0):
 
 | OS | Asset | How to run |
 |---|---|---|
@@ -443,7 +476,7 @@ A wider tour of the workflow.
 | **3. Data quality** | Drop in a validator (Not-Null, Range, Regex, Uniqueness). Passing rows continue on the main port; failures route to the **reject** port. | [Data quality reference](#data-quality-12-available) |
 | **4. Sinks** | Finish with a sink (file, DB, cloud, vector DB, message bus, email). Set write mode (overwrite, append, truncate, upsert). | [Sinks reference](#sinks-58-available) |
 | **5. Run** | Press **Run** to execute on DuckDB. Nodes light up stage by stage; **Output** + **Console** show row counts, timing, errors. Stop button kills mid-run. | [Run feedback](#orchestration-and-workspace) |
-| **6. Ask Qunnie** | For anything you can describe in English, the AI assistant can sketch a pipeline. Iterate by editing the graph or asking follow-ups. | [Meet Qunnie](#meet-qunnie---the-local-ai-pipeline-assistant) |
+| **6. Ask Qunnie** | For anything you can describe in English, the AI assistant can sketch a pipeline. Iterate by editing the graph or asking follow-ups. | [Meet Qunnie](#meet-qunnie---the-ai-pipeline-assistant) |
 | **7. Reuse** | Save Connections, Context variables, and SQL Routines in the workspace; reference `${context.var}` in any field. Everything persists as plain files. | [Workspace and Git flow](#workspace-and-git-flow) |
 | **8. Schedule** | Attach a cron, interval, or file-watch trigger to run a pipeline automatically. | [Schedules and triggers](#schedules-and-triggers) |
 
@@ -846,7 +879,7 @@ quilt/
 
 - The **frontend** (React with [@xyflow/react](https://reactflow.dev/)) is the visual designer; it talks to the Rust core over Tauri commands.
 - **duckdb-engine** topologically sorts the graph, lowers each node into SQL, and executes by shelling out to the downloaded DuckDB CLI. Non-sink nodes materialize as tables so later stages can reference them; sinks become `COPY ... TO` statements; cancel kills the process. No statically linked database, so the binary stays small.
-- **Qunnie** is a `llama-server` subprocess on `127.0.0.1` exposing an OpenAI-compatible chat-completions API. The chat panel streams from it via SSE. The model is sandboxed: no fs, no net, no tools - it can only emit text.
+- **Qunnie** is the AI assistant: a `llama-server` subprocess on `127.0.0.1` exposing an OpenAI-compatible chat-completions API (or any OpenAI/Claude/OpenAI-compatible endpoint you configure). The chat panel streams from it via SSE and runs a bounded ReAct loop. Tool calls are plain JSON blocks the panel parses; canvas mutations are gated behind explicit human approval, and layered guardrails (prompt hardening, graph-aware validation, loop limits) keep it constrained to the pipeline domain. The model itself has no direct fs/net access - it can only request tools the app chooses to expose.
 - **Everything persists** to the workspace folder you choose, as plain JSON and Markdown files.
 
 ---
@@ -927,9 +960,12 @@ About 55-78 MB depending on platform (macOS ~54-67, Windows ~59-68, Linux ~66-78
 </details>
 
 <details>
-<summary><b>Can I use OpenAI / Cohere / Voyage instead of the local Qunnie?</b></summary>
+<summary><b>Can I use OpenAI / Claude / Cohere instead of the local Qunnie?</b></summary>
 
-Yes. The AI transforms (`xf.ai.embed`, `xf.ai.llm`, `xf.ai.classify`) accept a `baseUrl` prop. Point it at any OpenAI-compatible `/v1/...` endpoint and an `apiKey` and Quilt uses that instead. The local Qunnie chat panel is hardwired to localhost; the pipeline AI transforms are configurable.
+Yes, in two places:
+
+- **The Qunnie chat panel** now supports multiple providers. Open **Settings -> AI**, add an OpenAI, Claude, or any OpenAI-compatible provider (each with its own list of models), and switch between them from the dropdown above the chat input. OpenAI-compatible endpoints can be saved without an API key for keyless local servers. Hosted models are also where the agentic loop performs best.
+- **The AI transforms** (`xf.ai.embed`, `xf.ai.llm`, `xf.ai.classify`) accept a `baseUrl` + `apiKey`. Point them at any OpenAI-compatible `/v1/...` endpoint and Quilt uses that at pipeline runtime.
 
 </details>
 
@@ -957,7 +993,7 @@ Yes. **Build Pipeline** (right-click a pipeline) produces a single self-containe
 <details>
 <summary><b>Is the Qunnie AI assistant any good?</b></summary>
 
-For 90% of common pipelines (read source -> simple transforms -> sink), yes - the Qwen 2.5 Coder model is tuned for structured-JSON generation. For long, complex pipelines you'll likely want to iterate: describe the first half, click insert, then ask for the next half. You can also swap the model: point `xf.ai.llm`'s `baseUrl` at GPT-4 or Claude for more capable pipeline drafting.
+For 90% of common pipelines (read source -> simple transforms -> sink), the default local Qwen 2.5 Coder model handles structured-JSON generation well. For long, complex pipelines you'll likely want to iterate: describe the first half, click insert, then ask for the next half. For agentic work - multi-step tool use, inspecting and editing an existing graph - point Qunnie at a more capable model (GPT-4o, Claude Sonnet, or a larger local model) via **Settings -> AI**; small local models are less reliable at multi-step tool calling.
 
 </details>
 
