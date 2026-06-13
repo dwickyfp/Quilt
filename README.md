@@ -59,7 +59,7 @@
 
 - [Capabilities matrix](#capabilities)
 - [Sources](#sources-74-available)
-- [Transforms](#transforms-126-available)
+- [Transforms](#transforms-127-available)
 - [Sinks](#sinks-58-available)
 - [Data quality](#data-quality-12-available)
 - [Custom code](#custom-code-7-available)
@@ -184,9 +184,9 @@ Quilt is in **public beta**. The visual designer, the DuckDB execution engine, t
 
 **Scope, stated plainly:** Quilt is a single-machine, embedded studio. If you outgrow one box, point Quilt's output at the system that scales (a warehouse, an object store, a lakehouse). It will not pretend to be a cluster.
 
-The component palette ships **313 nodes** so the roadmap is visible in the product itself:
+The component palette ships **314 nodes** so the roadmap is visible in the product itself:
 
-- **292 available** runs on the DuckDB engine today
+- **293 available** runs on the DuckDB engine today
 - **5 preview** is configurable in the designer (drag, wire, set properties); execution is being wired engine-by-engine
 - **16 planned** is reserved in the palette but not yet executable - see [`docs/roadmap.md`](docs/roadmap.md)
 
@@ -224,14 +224,14 @@ Quilt is not a CSV tool with extras. It reads a broad set of formats and sources
 
 For CSV / TSV sources, the **Schema** panel accepts an optional per-column **Format** (a `strptime` token string such as `%d/%m/%Y`) on Date and Timestamp columns. Several date columns can each parse a different layout in one read - the column is read as text and re-parsed with its own format, working around DuckDB's single global date format. A value that does not match its format becomes null rather than failing the run.
 
-### Transforms (126 available)
+### Transforms (127 available)
 
 | Group | Operations |
 |---|---|
 | **Fields** | Map (visual mapper: joins a main input to up to 3 lookup inputs with inner / left joins and per-output expressions + filter), Project / Select, Cast, Rename, Add / Drop / Reorder Column, Coalesce, UUID v4 |
 | **Rows** | Filter (visual or raw SQL, with reject port), Distinct, Sample, Top N / Limit, Sort, Skip, Top N per Group, Forward Fill, Backward Fill, Constant Fill |
 | **Aggregate** | Group By, Rollup, Cube, Count, Window Aggregate, Cumulative, Approx Quantile (t-digest), Approx Count Distinct (HyperLogLog) |
-| **Join** | Inner, Left, Right, Full Outer, Cross, Lookup, Semi, Anti, Spatial Join |
+| **Join** | Inner, Left, Right, Full Outer, Cross, Lookup, Semi, Anti, Spatial Join, **As-Of Join** (time-series merge: match each row to the nearest-prior or nearest-next right-side row by an ordered/time column, optional equality keys — DuckDB `ASOF JOIN`) |
 | **Set operations** | Union, Union All, Intersect, Except / Minus |
 | **Window** | Row Number, Rank, Dense Rank, Lead, Lag, First Value, Last Value, NTile |
 | **Strings** | Regex Replace, Regex Extract, Regex Match, Split, Concat, Trim, Case Change, Length, Substring, Format, Hash (md5 / sha1 / sha256), IP Parse, URL Parse, Text Similarity (Levenshtein / Jaro-Winkler / Jaccard), Base64, Pad, Text Match |
@@ -506,7 +506,7 @@ A wider tour of the workflow.
 | Step | What you do | Where to look |
 |---|---|---|
 | **1. Sources** | Drag a source, point it at a file / DB / cloud URL / SaaS endpoint. Click **Autodetect schema** to read columns + a sample. | [Sources reference](#sources-74-available) |
-| **2. Transforms** | Wire transforms to source output ports. Configure in the Properties panel. **Preview** tab shows live rows; **Plan** tab shows generated SQL. | [Transforms reference](#transforms-126-available) |
+| **2. Transforms** | Wire transforms to source output ports. Configure in the Properties panel. **Preview** tab shows live rows; **Plan** tab shows generated SQL. | [Transforms reference](#transforms-127-available) |
 | **3. Data quality** | Drop in a validator (Not-Null, Range, Regex, Uniqueness). Passing rows continue on the main port; failures route to the **reject** port. | [Data quality reference](#data-quality-12-available) |
 | **4. Sinks** | Finish with a sink (file, DB, cloud, vector DB, message bus, email). Set write mode (overwrite, append, truncate, upsert). | [Sinks reference](#sinks-58-available) |
 | **5. Run** | Press **Run** to execute on DuckDB. Nodes light up stage by stage; **Output** + **Console** show row counts, timing, errors. Stop button kills mid-run. | [Run feedback](#orchestration-and-workspace) |

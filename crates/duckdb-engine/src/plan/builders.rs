@@ -137,6 +137,7 @@ pub(crate) fn build_view_sql(
         "xf.reorder" => build_reorder(inputs, props),
         "xf.count" => build_count(inputs),
         "xf.join.cross" => build_cross_join(inputs),
+        "xf.join.asof" => build_asof_join(inputs, props),
         "xf.join.spatial" => build_spatial_join(inputs, props),
         "xf.regex" | "xf.regex.extract" | "xf.regex.match" | "xf.trim" | "xf.case"
         | "xf.length" | "xf.substring" | "xf.concat" | "xf.split" | "xf.format" => {
@@ -2711,6 +2712,49 @@ pub(crate) fn build_join(inputs: &NodeInputs, props: &JsonValue, kind: &str) -> 
             on = on_clause
         ))
     }
+}
+
+pub(crate) fn build_asof_join(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let left = inputs.main().ok_or_else(|| "asof join: missing main input".to_string())?;
+    let right = inputs
+        .first_lookup()
+        .ok_or_else(|| "asof join: missing lookup input".to_string())?;
+    let left_time = string_prop(props, "leftTime")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "asof join: leftTime property required".to_string())?;
+    let right_time = string_prop(props, "rightTime")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "asof join: rightTime property required".to_string())?;
+    // backward (default) matches the closest prior right row -> m.time >= r.time.
+    // forward matches the closest subsequent right row -> m.time <= r.time.
+    let op = match string_prop(props, "direction").as_deref() {
+        Some("forward") => "<=",
+        _ => ">=",
+    };
+    // ASOF supports only INNER and LEFT; anything else falls back to INNER.
+    let join_kind = match string_prop(props, "joinType").as_deref() {
+        Some("left") => "LEFT ",
+        _ => "",
+    };
+    // Optional equality keys (matchKeys: leftCol -> rightCol) prepended to the
+    // inequality so the ASOF match is scoped per group (e.g., per symbol).
+    let mut clauses: Vec<String> = kv_pairs(props, "matchKeys")
+        .iter()
+        .map(|(lk, rk)| format!("m.{} = r.{}", quote_ident(lk), quote_ident(rk)))
+        .collect();
+    clauses.push(format!(
+        "m.{} {} r.{}",
+        quote_ident(&left_time),
+        op,
+        quote_ident(&right_time)
+    ));
+    Ok(format!(
+        "SELECT * FROM {l} m ASOF {k}JOIN {r} r ON {on}",
+        l = quote_ident(left),
+        k = join_kind,
+        r = quote_ident(right),
+        on = clauses.join(" AND ")
+    ))
 }
 
 pub(crate) fn build_semi(inputs: &NodeInputs, props: &JsonValue, anti: bool) -> Result<String, String> {

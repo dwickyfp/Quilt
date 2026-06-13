@@ -293,6 +293,7 @@ export const PALETTE: Category[] = [
                     xf('join.right', 'Right Join', 'available'),
                     xf('join.full', 'Full Outer Join', 'available'),
                     xf('join.cross', 'Cross Join', 'available'),
+                    xf('join.asof', 'As-Of Join', 'available', 'Time-series merge: match each driving row to the nearest right-side row by an ordered/time column (no exact key needed). Direction backward (nearest prior, default) or forward (nearest next); optional equality keys to match within groups. Compiles to DuckDB ASOF JOIN.'),
                     xf('join.spatial', 'Spatial Join', 'available', 'Two-input join whose predicate is ST_Intersects / Contains / Within / Touches / Crosses / Overlaps / Equals'),
                     xf('lookup', 'Lookup', 'available'),
                     xf('semi', 'Semi Join', 'available'),

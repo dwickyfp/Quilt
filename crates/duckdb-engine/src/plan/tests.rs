@@ -1277,6 +1277,70 @@
         assert!(!join_sql.contains("m.\"customer_id\" = r.\"customer_id\""), "should have used USING not ON: {}", join_sql);
     }
 
+    fn asof_pipeline(props: &str) -> String {
+        let p = pipeline_from_json(&format!(
+            r#"{{
+              "nodes": [
+                {{"id":"l","position":{{"x":0,"y":0}},"data":{{
+                  "label":"CSV L","componentId":"src.csv",
+                  "properties":{{"path":"/tmp/trades.csv","hasHeader":true}}}}}},
+                {{"id":"r","position":{{"x":0,"y":0}},"data":{{
+                  "label":"CSV R","componentId":"src.csv",
+                  "properties":{{"path":"/tmp/quotes.csv","hasHeader":true}}}}}},
+                {{"id":"j","position":{{"x":0,"y":0}},"data":{{
+                  "label":"ASOF","componentId":"xf.join.asof",
+                  "properties":{props}}}}},
+                {{"id":"k","position":{{"x":0,"y":0}},"data":{{
+                  "label":"CSV out","componentId":"snk.csv",
+                  "properties":{{"path":"/tmp/o.csv","hasHeader":true}}}}}}
+              ],
+              "edges": [
+                {{"id":"e1","source":"l","target":"j",
+                  "data":{{"connectionType":"main"}}}},
+                {{"id":"e2","source":"r","target":"j",
+                  "targetHandle":"lookup",
+                  "data":{{"connectionType":"lookup"}}}},
+                {{"id":"e3","source":"j","target":"k",
+                  "data":{{"connectionType":"main"}}}}
+              ]
+            }}"#,
+            props = props
+        ));
+        let compiled = compile(&p).unwrap();
+        compiled.stages.iter().find(|s| s.node_id == "j").unwrap().sql.clone()
+    }
+
+    #[test]
+    fn asof_backward_uses_geq() {
+        let sql = asof_pipeline(r#"{"leftTime":"ts","rightTime":"ts","direction":"backward"}"#);
+        assert!(sql.contains("ASOF JOIN"), "missing ASOF JOIN: {}", sql);
+        assert!(sql.contains("m.\"ts\" >= r.\"ts\""), "missing >= inequality: {}", sql);
+    }
+
+    #[test]
+    fn asof_forward_uses_leq() {
+        let sql = asof_pipeline(r#"{"leftTime":"ts","rightTime":"ts","direction":"forward"}"#);
+        assert!(sql.contains("m.\"ts\" <= r.\"ts\""), "missing <= inequality: {}", sql);
+    }
+
+    #[test]
+    fn asof_left_join_keeps_unmatched() {
+        let sql = asof_pipeline(
+            r#"{"leftTime":"ts","rightTime":"ts","direction":"backward","joinType":"left"}"#,
+        );
+        assert!(sql.contains("ASOF LEFT JOIN"), "missing ASOF LEFT JOIN: {}", sql);
+    }
+
+    #[test]
+    fn asof_with_equality_keys() {
+        let sql = asof_pipeline(
+            r#"{"leftTime":"ts","rightTime":"ts","matchKeys":{"symbol":"sym"}}"#,
+        );
+        assert!(sql.contains("m.\"symbol\" = r.\"sym\""), "missing equality key: {}", sql);
+        assert!(sql.contains("m.\"ts\" >= r.\"ts\""), "missing inequality: {}", sql);
+    }
+
+
     #[test]
     fn join_with_different_key_names_excludes_right_key() {
         // Different key names: ON + EXCLUDE the right-side key so the

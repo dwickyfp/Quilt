@@ -2731,6 +2731,39 @@ function synthJoinTransform(comp: ComponentDef): ComponentManifest {
             },
         ], 'declared');
     }
+    if (comp.id === 'xf.join.asof') {
+        return base(comp, [
+            {
+                label: 'As-of (time-series) join',
+                fields: [
+                    { key: 'leftTime', label: 'Left ordered/time column', kind: 'text', required: true, placeholder: 'trades.ts' },
+                    { key: 'rightTime', label: 'Right ordered/time column', kind: 'text', required: true, placeholder: 'quotes.ts' },
+                    {
+                        key: 'direction',
+                        label: 'Match direction',
+                        kind: 'select',
+                        defaultValue: 'backward',
+                        options: [
+                            { label: 'Backward (nearest prior right row, left.t >= right.t)', value: 'backward' },
+                            { label: 'Forward (nearest next right row, left.t <= right.t)', value: 'forward' },
+                        ],
+                    },
+                    {
+                        key: 'joinType',
+                        label: 'Join type',
+                        kind: 'select',
+                        defaultValue: 'inner',
+                        options: [
+                            { label: 'INNER (drop unmatched left rows)', value: 'inner' },
+                            { label: 'LEFT (keep unmatched left rows, right cols null)', value: 'left' },
+                        ],
+                    },
+                    { key: 'matchKeys', label: 'Equality keys (optional, left,right pairs)', kind: 'key-value' },
+                ],
+            },
+        ], 'declared');
+    }
+
     const joinType = comp.id.split('.').pop() ?? 'inner';
     return base(comp, [
         {

@@ -63,3 +63,35 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+## Project notes — Quilt
+
+Local-first visual ETL: Rust DuckDB engine (`crates/duckdb-engine`, crate `quilt-duckdb-engine`)
+compiles a node graph to staged DuckDB SQL; React 19 + Vite + Tauri 2 frontend (`frontend/`).
+
+**4-place node pattern** (adding/editing a pipeline node — mirror an existing node):
+1. Catalog: `frontend/src/workflow-ui/palette-data.ts`
+2. Form: `frontend/src/workflow-ui/fields/manifest-synth.ts` (ports + field synth)
+3. Builder: `crates/duckdb-engine/src/plan/builders.rs` (`match component_id` dispatch + `build_*` fn)
+4. Runtime: `crates/duckdb-engine/src/lib.rs` (only if a new `RuntimeSpec` variant is needed)
+
+**Verify after every change:**
+- Engine: `cargo test -p quilt-duckdb-engine` (baseline 116 lib + 216 integration, 0 failed)
+- Frontend: `cd frontend && npm run lint && npm run test && npm run build`
+
+**Pure-core + delegated-shell pattern** (proven, low-risk for FE features): extract all logic
+into a DOM-free `.ts` module with vitest tests written FIRST (RED → GREEN), then wire the React
+shell separately. Established cores:
+- `workflow-ui/lineage.ts` — column-level lineage (`buildLineage`, `traceColumn`).
+- `workflow-ui/stage-cache.ts` — incremental re-run keys (`computeCacheKeys`, `invalidatedNodes`, `staleNodes`).
+- `workflow-ui/pipeline-test.ts` — golden-dataset diff (`diffRows`, key + multiset modes).
+- `workflow-ui/component-def.ts` — reusable subgraph (`extractComponent`, `instantiateComponent`).
+
+These four cores are TESTED LOGIC, not yet wired to the engine/UI — do not claim them as
+shipped features in the README until their execution path + React shell land. `xf.join.asof`
+(As-Of Join) IS shipped end-to-end (builder + dispatch + tests + palette/manifest).
+
+**Known trap:** the patch/write_file syntax checker mis-parses `crates/duckdb-engine/src/connectors.rs`
+as edition 2015 and emits a wall of false-positive errors. Ignore them; trust only `cargo` output.
