@@ -375,6 +375,7 @@ Every node has an **Advanced** tab with fields the engine honours at run time:
 | **Schedules** | Cron, fixed-interval, and file-watch triggers, driven by an in-process scheduler. |
 | **Context variables** | Per-environment variables; bind any field to one via a Manual / Context dropdown, or reference `${var}` inline. Resolved at run time. |
 | **Cloud credentials** | Saved S3 / GCS / Azure connections become DuckDB SECRETs; cloud reads / writes go through `httpfs`. S3-compatible endpoints (MinIO / R2 / B2) supported via `ENDPOINT` + `URL_STYLE`. |
+| **Column lineage** | On any node's **Schema** tab, see where each output column originates - traced back through the pipeline to its source node/column, with hop count. Impact analysis without leaving the canvas. |
 | **Workspace** | Pipelines, connections, contexts, documents, and routines persist as plain JSON and Markdown files in a folder you choose. |
 
 ---
