@@ -6543,6 +6543,72 @@ fn assert_fails_when_any_row_violates_predicate() {
 }
 
 #[test]
+fn golden_assert_passes_when_output_matches() {
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let golden = out_path(tmp.path(), "golden.parquet");
+    // Capture the golden snapshot directly with the CLI.
+    duckdb_exec(
+        ":memory:",
+        &format!(
+            "COPY (SELECT * FROM (VALUES (1,'a'),(2,'b')) t(id,name)) TO '{}' (FORMAT parquet)",
+            golden
+        ),
+    );
+    // Source CSV produces the IDENTICAL rows (id,name = 1,a / 2,b).
+    let csv = write_file(tmp.path(), "in.csv", "id,name\n1,a\n2,b\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("s", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("g", "qa.golden", json!({ "goldenPath": golden })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s", "g"), main_edge("e2", "g", "k")]),
+    ));
+    assert_eq!(r.status, "ok", "golden (matching) failed: {:?}", r.error);
+    let n = count(&format!("read_csv_auto('{}')", out));
+    assert_eq!(n, 2, "expected 2 rows through, got {}", n);
+}
+
+#[test]
+fn golden_assert_fails_when_output_drifts() {
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let golden = out_path(tmp.path(), "golden.parquet");
+    // Golden captured from one dataset (1,a / 2,b).
+    duckdb_exec(
+        ":memory:",
+        &format!(
+            "COPY (SELECT * FROM (VALUES (1,'a'),(2,'b')) t(id,name)) TO '{}' (FORMAT parquet)",
+            golden
+        ),
+    );
+    // Source CSV feeds a DIFFERENT dataset (drifted: 1,a / 2,CHANGED / 3,c).
+    let csv = write_file(tmp.path(), "in.csv", "id,name\n1,a\n2,CHANGED\n3,c\n");
+    let out = out_path(tmp.path(), "out.csv");
+    let r = engine.execute_pipeline(&doc(
+        json!([
+            node("s", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("g", "qa.golden", json!({
+                "goldenPath": golden,
+                "message": "output drifted from golden"
+            })),
+            node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([main_edge("e1", "s", "g"), main_edge("e2", "g", "k")]),
+    ));
+    assert_ne!(r.status, "ok", "golden should have failed but pipeline returned ok");
+    let err = format!("{:?}", r.error.unwrap_or_default());
+    assert!(
+        err.contains("output drifted from golden") || err.to_lowercase().contains("drift"),
+        "expected user-facing drift message in error, got: {}",
+        err
+    );
+}
+
+
+#[test]
 fn parquet_sink_writes_hive_partitions() {
     let engine = engine_or_skip!();
     let tmp = tempfile::tempdir().unwrap();

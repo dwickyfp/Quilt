@@ -487,6 +487,12 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // Golden Assert: hard-fails the run on drift; rows pass through unchanged
+    // (no reject port - it's an inline regression gate, not a row router).
+    if (comp.id === 'qa.golden') {
+        return { inputs: [MAIN_IN], outputs: [{ id: 'main', label: 'pass', type: 'main' }] };
+    }
+
     // Quality validators - pass + reject
     if (comp.kind === 'quality') {
         return {
@@ -3831,6 +3837,17 @@ function synthQualityValidation(comp: ComponentDef): ComponentManifest {
                 fields: [
                     { key: 'columns', label: 'Uniqueness key', kind: 'columns', required: true },
                     onFail,
+                ],
+            },
+        ], 'upstream');
+    }
+    if (id === 'qa.golden') {
+        return base(comp, [
+            {
+                label: 'Golden snapshot',
+                fields: [
+                    { key: 'goldenPath', label: 'Golden file (.parquet)', kind: 'text', required: true, placeholder: 'tests/orders.golden.parquet' },
+                    { key: 'message', label: 'Failure message (optional)', kind: 'text', placeholder: 'Output drifted from golden snapshot' },
                 ],
             },
         ], 'upstream');

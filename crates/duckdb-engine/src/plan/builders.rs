@@ -128,6 +128,7 @@ pub(crate) fn build_view_sql(
         "qa.notnull" | "qa.range" | "qa.regex" | "qa.unique" | "qa.schemavalidate" => {
             build_quality(inputs, props, component_id, false)
         }
+        "qa.golden" => build_golden_assert(inputs, props),
         "qa.profile" => build_profile(inputs, props),
         "qa.describe" => build_describe(inputs),
         "qa.histogram" => build_histogram(inputs, props),
@@ -4802,6 +4803,35 @@ pub(crate) fn build_assert(inputs: &NodeInputs, props: &JsonValue) -> Result<Str
         pred = predicate,
         msg = msg,
         up = quote_ident(upstream)
+    ))
+}
+
+/// Golden Assert: pipeline regression test. Hard-fails the run when
+/// the input no longer multiset-matches a saved golden Parquet
+/// snapshot; passing rows flow through unchanged. The comparison is
+/// EXCEPT ALL both ways (symmetric difference must be empty) so row
+/// counts matter. Same MATERIALIZED-CTE + error() shape as build_assert
+/// so the optimizer can't prune the assertion away.
+pub(crate) fn build_golden_assert(
+    inputs: &NodeInputs,
+    props: &JsonValue,
+) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("qa.golden"))?;
+    let golden_path = string_prop(props, "goldenPath")
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Golden Assert needs a golden file path (.parquet)".to_string())?;
+    let raw_msg = string_prop(props, "message")
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| format!("Output does not match golden snapshot: {}", golden_path));
+    let msg = sql_escape(&raw_msg);
+    let path_esc = sql_escape(&golden_path);
+    Ok(format!(
+        "WITH _quilt_golden AS MATERIALIZED (SELECT CASE WHEN (SELECT count(*) FROM ((SELECT * FROM {up} EXCEPT ALL SELECT * FROM read_parquet('{path}')) UNION ALL (SELECT * FROM read_parquet('{path}') EXCEPT ALL SELECT * FROM {up}))) = 0 THEN 'ok' ELSE error('{msg}') END AS result) SELECT u.* FROM {up} u WHERE (SELECT result FROM _quilt_golden) IS NOT NULL",
+        up = quote_ident(upstream),
+        path = path_esc,
+        msg = msg
     ))
 }
 

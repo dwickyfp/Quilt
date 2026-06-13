@@ -1342,6 +1342,41 @@
 
 
     #[test]
+    fn golden_assert_compiles_except_both_ways() {
+        let p = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{
+                  "label":"CSV in","componentId":"src.csv",
+                  "properties":{"path":"/tmp/in.csv","hasHeader":true}}},
+                {"id":"g","position":{"x":0,"y":0},"data":{
+                  "label":"Golden","componentId":"qa.golden",
+                  "properties":{"goldenPath":"/tmp/g.parquet"}}},
+                {"id":"k","position":{"x":0,"y":0},"data":{
+                  "label":"CSV out","componentId":"snk.csv",
+                  "properties":{"path":"/tmp/o.csv","hasHeader":true}}}
+              ],
+              "edges": [
+                {"id":"e1","source":"s","target":"g",
+                  "data":{"connectionType":"main"}},
+                {"id":"e2","source":"g","target":"k",
+                  "data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let compiled = compile(&p).unwrap();
+        let sql = compiled.stages.iter().find(|s| s.node_id == "g").unwrap().sql.as_str();
+        assert!(sql.contains("EXCEPT ALL"), "missing EXCEPT ALL: {}", sql);
+        assert!(
+            sql.contains("read_parquet('/tmp/g.parquet')"),
+            "missing read_parquet: {}",
+            sql
+        );
+        assert!(sql.contains("error("), "missing error(): {}", sql);
+    }
+
+
+    #[test]
     fn join_with_different_key_names_excludes_right_key() {
         // Different key names: ON + EXCLUDE the right-side key so the
         // join column isn't duplicated in the output.

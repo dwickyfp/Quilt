@@ -658,6 +658,7 @@ export const PALETTE: Category[] = [
                     qa('range', 'Range Check', 'available', 'Pass in-range rows; rest to reject'),
                     qa('notnull', 'Not-Null Check', 'available', 'Pass rows with no nulls; rest to reject'),
                     qa('unique', 'Uniqueness Check', 'available', 'Pass first per key; duplicates to reject'),
+                    qa('golden', 'Golden Assert', 'available', 'Pipeline regression test: hard-fail the run if the input no longer matches a saved golden snapshot (Parquet). Compares both ways with DuckDB EXCEPT (order-insensitive); optional key columns surface row-level changes. Capture the golden once by pointing a Parquet sink at the same path. Passing rows flow through unchanged so it can sit inline.'),
                 ],
             },
             {
