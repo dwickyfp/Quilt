@@ -63,32 +63,42 @@ Menambah node ML & DL ala **KNIME** ke Quilt: alur *Partition → Learner → Pr
 
 ## ⏳ BELUM SELESAI
 
-### 1. Implementasi eksekusi ML — `crates/duckdb-engine/src/ml.rs` (file kosong, BLOCKER utama)
-- [ ] `mod ml;` di `lib.rs`
-- [ ] Helper baca tabel → matrix fitur `Vec<Vec<f64>>` + target (numeric encode utk klasifikasi)
-- [ ] `run_ml_learner`: match algorithm → fit smartcore → serialize (bincode+base64) → simpan tabel model 1-baris
-  - linreg (LinearRegression), logreg (LogisticRegression), tree (DecisionTreeClassifier), forest (RandomForestClassifier), knn (KNNClassifier+Euclidian), kmeans (KMeans)
-- [ ] `run_ml_predict`: load model dari `model_node_id` → predict → append `output_column` → materialize
-- [ ] `run_ml_score`: hitung accuracy/precision/recall + confusion (classification) atau RMSE/MAE/R² (regression) → emit tabel metrik
-- [ ] Dispatch 3 arm (`RuntimeSpec::MlLearner/MlPredict/MlScore`) di loop `execute_pipeline_with_events` — `lib.rs`
+### 1. Implementasi eksekusi ML — `crates/duckdb-engine/src/ml.rs` ✅ SELESAI
+- [x] `mod ml;` di `lib.rs`
+- [x] Helper baca tabel → matrix fitur `Vec<Vec<f64>>` + target (numeric encode utk klasifikasi)
+- [x] `run_ml_learner`: match algorithm → fit smartcore → serialize (bincode+base64) → simpan tabel model 1-baris
+  - linreg, logreg, tree, forest, knn (+Euclidian), kmeans — semua terpasang
+- [x] `run_ml_predict`: load model dari `model_node_id` → predict → append `output_column` → materialize
+- [x] `run_ml_score`: accuracy + confusion matrix (classification) / RMSE/MAE/R² (regression) → tabel metrik
+- [x] Dispatch 3 arm (`RuntimeSpec::MlLearner/MlPredict/MlScore`) di `lib.rs`
 
-### 2. Implementasi ONNX DL (feature `onnx`)
-- [ ] `run_onnx_reader`: simpan path model (validasi file ada) — non-feature: error jelas "install ONNX runtime"
-- [ ] `run_onnx_predict`: load ONNX via `ort`, susun input tensor dari feature columns, jalankan, append output
-- [ ] Dispatch 2 arm (OnnxReader/OnnxPredict) — `lib.rs` (cfg feature)
-- [ ] On-demand install ONNX runtime — `apps/desktop/src/engine_manager.rs` (ikut pola dbt/DuckDB)
+### 2. Implementasi ONNX DL (feature `onnx`) — sebagian
+- [x] `run_onnx_reader`: simpan path model (validasi file ada); stub non-feature → error jelas
+- [x] `run_onnx_predict`: load ONNX via `ort`, susun input tensor f32, jalankan, append output (feature-gated)
+- [x] Dispatch 2 arm (OnnxReader/OnnxPredict) — `lib.rs`, dengan stub `#[cfg(not(feature="onnx"))]`
+- [x] **Build `--features onnx` OK** (load-dynamic, native lib hanya saat runtime)
+- [ ] **FOLLOW-UP**: on-demand install ONNX runtime native lib — `apps/desktop/src/engine_manager.rs` (ikut pola dbt/DuckDB). Belum dikerjakan; tanpa ini node dl.onnx.* hanya jalan bila libonnxruntime tersedia di PATH + binary di-build dengan `--features onnx`.
 
-### 3. Frontend polish
-- [ ] i18n label `node.ml` + label kategori — `frontend/src/i18n/locales`
-- [ ] Update Duckie `SYSTEM_PROMPT` agar tahu komponen ml.*/dl.* — `apps/desktop/src/ai_chat.rs`
+### 3. Frontend polish ✅ SELESAI
+- [x] i18n `node.ml` (en.json + id.json)
+- [x] Duckie `SYSTEM_PROMPT` tahu komponen ml.*/dl.* + cara wiring model port — `ai_chat.rs`
 
-### 4. Verifikasi
-- [ ] Unit test engine: pipeline CSV → partition → learner.tree → predict → score, assert metrik deterministik (seed) — pola `plan/tests.rs` / `tests/execution.rs`
-- [ ] Test ordering: model edge → Learner sebelum Predictor di `compile()`
-- [ ] `cargo test -p quilt-duckdb-engine` + `cargo build` workspace
-- [ ] End-to-end manual: jalankan app, rangkai pipeline ML dari palette, Run, cek tabel metrik Scorer di Output panel
+### 4. Verifikasi ✅
+- [x] Unit test planner: `model_edge_orders_learner_before_predictor`, `partition_emits_train_and_test_relations` — **63 passed, 0 failed**
+- [x] Integration test ML (`ml_decision_tree_end_to_end_classifies_perfectly`, `ml_partition_splits_train_and_test_complementary`) ditulis di `tests/execution.rs` — **soft-skip** di mesin ini (hanya ada duckdb.exe Windows; set `QUILT_DUCKDB_BIN` ke duckdb CLI macOS untuk menjalankan)
+- [x] `cargo build --workspace` **OK**
+- [x] `cargo check -p quilt-duckdb-engine --features onnx` **OK**
+- [x] `npm run lint` (tsc) **OK**
+- [ ] **MANUAL** (perlu kamu): jalankan app, rangkai src → ml.partition → learner → (model) predict → score, Run, cek tabel metrik Scorer di Output panel
 
 ---
+
+## Sisa pekerjaan (ringkas)
+1. **ONNX on-demand install** di `engine_manager.rs` — agar dl.onnx.* siap pakai tanpa setup manual.
+2. **Verifikasi end-to-end manual** di app (butuh duckdb CLI + jalankan UI).
+3. (Opsional) duckdb CLI macOS utk menjalankan integration test ML yang sekarang soft-skip.
+
+
 
 ## Catatan teknis ml.rs (referensi API smartcore 0.3.2)
 - `DenseMatrix::from_2d_vec(&Vec<Vec<f64>>)` → `Self` (panik jika kosong → guard dulu)

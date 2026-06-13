@@ -9785,3 +9785,130 @@ fn src_rest_single_object_response_yields_one_row() {
     assert!(Path::new(&out).exists(), "sink file missing (issue #13)");
     assert_eq!(count(&format!("read_json_auto('{}')", out)), 1);
 }
+
+/// Edge that carries a trained model from a Learner's `model` output port to a
+/// Predictor's `model` input port. KNIME-style model wire.
+fn model_edge(id: &str, source: &str, target: &str) -> Value {
+    json!({
+        "id": id,
+        "source": source,
+        "sourceHandle": "model",
+        "target": target,
+        "targetHandle": "model",
+        "data": { "connectionType": "model" }
+    })
+}
+
+/// Edge leaving a Partition node's `test` output port.
+fn test_edge(id: &str, source: &str, target: &str) -> Value {
+    json!({
+        "id": id,
+        "source": source,
+        "sourceHandle": "test",
+        "target": target,
+        "data": { "connectionType": "main" }
+    })
+}
+
+#[test]
+fn ml_decision_tree_end_to_end_classifies_perfectly() {
+    // A linearly separable dataset: label is 'hi' when x >= 100, else 'lo'.
+    // A decision tree must reach 100% accuracy on held-out rows.
+    let tmp = tempfile::tempdir().unwrap();
+    let mut csv = String::from("x,y,label\n");
+    for i in 0..40 {
+        // 20 low rows (x in 0..20), 20 high rows (x in 100..120).
+        let (x, label) = if i < 20 { (i, "lo") } else { (i + 80, "hi") };
+        csv.push_str(&format!("{},{},{}\n", x, x * 2, label));
+    }
+    let path = write_file(tmp.path(), "data.csv", &csv);
+    let out = out_path(tmp.path(), "metrics.parquet");
+
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": path, "hasHeader": true })),
+            node("p1", "ml.partition", json!({ "ratio": 0.7, "seed": 7 })),
+            node("l1", "ml.learner.tree", json!({
+                "targetColumn": "label",
+                "featureColumns": ["x", "y"],
+                "maxDepth": 5
+            })),
+            node("pr1", "ml.predict", json!({ "outputColumn": "prediction" })),
+            node("sc1", "ml.score", json!({
+                "actualColumn": "label",
+                "predictedColumn": "prediction",
+                "task": "classification"
+            })),
+            node("k1", "snk.parquet", json!({ "path": out })),
+        ]),
+        json!([
+            main_edge("e1", "s1", "p1"),
+            main_edge("e2", "p1", "l1"),       // train -> learner
+            test_edge("e3", "p1", "pr1"),       // test -> predictor data
+            model_edge("e4", "l1", "pr1"),      // model -> predictor
+            main_edge("e5", "pr1", "sc1"),
+            main_edge("e6", "sc1", "k1"),
+        ]),
+    );
+
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "ml run failed: {:?}", result.error);
+
+    // The scorer emits an accuracy row; on a separable set it must be 1.0.
+    let acc = duckdb_json(&format!(
+        "SELECT value FROM read_parquet('{}') WHERE metric = 'accuracy'",
+        out
+    ));
+    let v = acc
+        .first()
+        .and_then(|r| r.get("value"))
+        .and_then(|v| v.as_f64())
+        .expect("accuracy metric present");
+    assert!((v - 1.0).abs() < 1e-9, "expected perfect accuracy, got {}", v);
+}
+
+#[test]
+fn ml_partition_splits_train_and_test_complementary() {
+    // Partition must split rows into two non-overlapping sets that together
+    // cover the input exactly once (no dropped or duplicated rows).
+    let tmp = tempfile::tempdir().unwrap();
+    let mut csv = String::from("id\n");
+    for i in 0..100 {
+        csv.push_str(&format!("{}\n", i));
+    }
+    let path = write_file(tmp.path(), "ids.csv", &csv);
+    let train_out = out_path(tmp.path(), "train.parquet");
+    let test_out = out_path(tmp.path(), "test.parquet");
+
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": path, "hasHeader": true })),
+            node("p1", "ml.partition", json!({ "ratio": 0.7, "seed": 11 })),
+            node("kt", "snk.parquet", json!({ "path": train_out })),
+            node("kv", "snk.parquet", json!({ "path": test_out })),
+        ]),
+        json!([
+            main_edge("e1", "s1", "p1"),
+            main_edge("e2", "p1", "kt"),    // train output
+            test_edge("e3", "p1", "kv"),    // test output
+        ]),
+    );
+
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "partition run failed: {:?}", result.error);
+
+    let train_n = count(&format!("read_parquet('{}')", train_out));
+    let test_n = count(&format!("read_parquet('{}')", test_out));
+    // Together they cover all 100 rows exactly once.
+    assert_eq!(train_n + test_n, 100, "train+test must equal input");
+    // Roughly a 70/30 split; allow slack for the hash-based assignment.
+    assert!(train_n > 50 && train_n < 90, "train share off: {}", train_n);
+    // No id appears in both sides.
+    let overlap = count(&format!(
+        "(SELECT id FROM read_parquet('{}') INTERSECT SELECT id FROM read_parquet('{}'))",
+        train_out, test_out
+    ));
+    assert_eq!(overlap, 0, "train and test must not overlap");
+}

@@ -195,6 +195,7 @@
     "control": "Control",
     "quality": "Quality",
     "custom": "Custom",
+    "ml": "Machine Learning",
     "needsConfig": "Required fields missing - open the Basic tab to configure",
     "disabled": "disabled",
     "running": "Running",

@@ -35,6 +35,10 @@ Common component IDs (use exactly these strings):
 - Transforms: xf.filter, xf.select, xf.rename, xf.aggregate, xf.join, xf.lookup, xf.sort, xf.distinct, xf.union, xf.cast, xf.derive, xf.ai.embed, xf.ai.llm, xf.ai.classify, xf.ai.chunk, xf.ai.pii, xf.ai.dedupe
 - Sinks: snk.csv, snk.json, snk.parquet, snk.postgres, snk.mysql, snk.s3, snk.email, snk.rest, snk.webhook
 - Code: code.sql, code.shell, code.javascript, code.wasm
+- Machine Learning: ml.partition (train/test split; main output = train, test output = test), ml.learner.linreg, ml.learner.logreg, ml.learner.tree, ml.learner.forest, ml.learner.knn, ml.learner.kmeans (Learners output a model on the `model` port), ml.predict (data on main + model on the model port -> appends prediction), ml.score (actualColumn + predictedColumn -> metrics table)
+- Deep Learning: dl.onnx.reader (path to .onnx -> model port), dl.onnx.predict (data on main + model on model port -> appends prediction)
+
+ML wiring: connect the training data into a Learner's main input; connect the Learner's `model` output port to a Predictor's `model` input port (use sourceHandle "model" / targetHandle "model"). A typical flow: src -> ml.partition; partition main -> learner -> (model) predict; partition test -> predict main; predict -> ml.score.
 
 Connect sources to transforms to sinks via main edges. Keep IDs short (s1, t1, k1). Props are component-specific; for files use {"path": "..."}, for filters use {"predicate": "col > 5"}, for SQL use {"sql": "SELECT ..."}.
 

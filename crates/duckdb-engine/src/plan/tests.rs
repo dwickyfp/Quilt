@@ -2011,3 +2011,60 @@
             other => panic!("expected a Dbt runtime spec, got {:?}", other),
         }
     }
+
+    #[test]
+    fn model_edge_orders_learner_before_predictor() {
+        // The model edge carries no data, but the Learner must still be
+        // scheduled before the Predictor that consumes its model. Without the
+        // model edge in the topological sort the Predictor could come first.
+        let doc = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/d.csv","hasHeader":true}}},
+                {"id":"l","position":{"x":0,"y":0},"data":{"label":"learn","componentId":"ml.learner.tree","properties":{"targetColumn":"label","featureColumns":["x"]}}},
+                {"id":"p","position":{"x":0,"y":0},"data":{"label":"predict","componentId":"ml.predict","properties":{"outputColumn":"prediction"}}}
+              ],
+              "edges":[
+                {"id":"e1","source":"s","target":"l","data":{"connectionType":"main"}},
+                {"id":"e2","source":"s","target":"p","data":{"connectionType":"main"}},
+                {"id":"e3","source":"l","sourceHandle":"model","target":"p","targetHandle":"model","data":{"connectionType":"model"}}
+              ]
+            }"#,
+        );
+        let compiled = compile(&doc).expect("compile ok");
+        let pos = |id: &str| compiled.stages.iter().position(|s| s.node_id == id).unwrap();
+        assert!(pos("l") < pos("p"), "learner must be scheduled before predictor");
+
+        // The predictor's runtime spec must point back at the learner as its
+        // model source (resolved from the model edge, not a data edge).
+        let pred = compiled.stages.iter().find(|s| s.node_id == "p").unwrap();
+        match pred.runtime.as_ref() {
+            Some(RuntimeSpec::MlPredict(spec)) => {
+                assert_eq!(spec.model_node_id, "l", "predictor must read learner 'l' model");
+                assert_eq!(spec.from_view, "s", "predictor data comes from source 's'");
+            }
+            other => panic!("expected MlPredict runtime, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn partition_emits_train_and_test_relations() {
+        // ml.partition is pure SQL: the stage must create the train relation
+        // (named after the node) and a complementary `<node>__test` relation.
+        let doc = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/d.csv","hasHeader":true}}},
+                {"id":"p","position":{"x":0,"y":0},"data":{"label":"part","componentId":"ml.partition","properties":{"ratio":0.7,"seed":1}}}
+              ],
+              "edges":[
+                {"id":"e1","source":"s","target":"p","data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let compiled = compile(&doc).expect("compile ok");
+        let stage = compiled.stages.iter().find(|s| s.node_id == "p").unwrap();
+        assert!(stage.sql.contains("\"p\""), "train relation present: {}", stage.sql);
+        assert!(stage.sql.contains("\"p__test\""), "test relation present: {}", stage.sql);
+        assert!(stage.sql.contains("__quilt_split"), "split key used: {}", stage.sql);
+    }

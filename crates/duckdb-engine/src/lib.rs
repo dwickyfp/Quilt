@@ -29,6 +29,7 @@ pub mod plan;
 pub mod tls;
 pub mod watermark;
 mod connectors;
+mod ml;
 mod run_log;
 mod util;
 pub(crate) use util::*;
@@ -862,6 +863,11 @@ impl DuckdbEngine {
                     Some(RuntimeSpec::AiLlm(spec)) => self.run_ai_llm(&db_path, spec),
                     Some(RuntimeSpec::AiClassify(spec)) => self.run_ai_classify(&db_path, spec),
                     Some(RuntimeSpec::AiDedupe(spec)) => self.run_ai_dedupe(&db_path, spec),
+                    Some(RuntimeSpec::MlLearner(spec)) => self.run_ml_learner(&db_path, spec),
+                    Some(RuntimeSpec::MlPredict(spec)) => self.run_ml_predict(&db_path, spec),
+                    Some(RuntimeSpec::MlScore(spec)) => self.run_ml_score(&db_path, spec),
+                    Some(RuntimeSpec::OnnxReader(spec)) => self.run_onnx_reader(&db_path, spec),
+                    Some(RuntimeSpec::OnnxPredict(spec)) => self.run_onnx_predict(&db_path, spec),
                     Some(RuntimeSpec::EmailSource(spec)) => self.run_email_source(&db_path, spec),
                     Some(RuntimeSpec::WebhookSource(spec)) => {
                         self.run_webhook_source(&db_path, spec)
