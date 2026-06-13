@@ -1127,6 +1127,52 @@ fn two_duckdb_sources_same_database() {
 }
 
 #[test]
+fn asof_join_matches_nearest_prior_quote() {
+    // As-of (time-series) merge: each trade matches the nearest-prior quote on
+    // ts (backward). Exercises real DuckDB ASOF JOIN execution end-to-end.
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let srcdb = out_path(tmp.path(), "src.duckdb");
+    duckdb_exec(
+        &srcdb,
+        "CREATE TABLE trades AS SELECT * FROM (VALUES (105, 'A'), (250, 'B')) t(ts, trade); \
+         CREATE TABLE quotes AS SELECT * FROM (VALUES (100, 10), (200, 20), (300, 30)) q(ts, bid)",
+    );
+    let out = out_path(tmp.path(), "out.csv");
+    let d = doc(
+        json!([
+            node("t", "src.duckdb", json!({ "database": srcdb, "tableName": "trades" })),
+            node("q", "src.duckdb", json!({ "database": srcdb, "tableName": "quotes" })),
+            node("j", "xf.join.asof", json!({
+                "leftTime": "ts", "rightTime": "ts", "direction": "backward", "joinType": "inner"
+            })),
+            node("k1", "snk.csv", json!({ "path": out, "hasHeader": true })),
+        ]),
+        json!([
+            main_edge("e1", "t", "j"),
+            lookup_edge("e2", "q", "j"),
+            main_edge("e3", "j", "k1"),
+        ]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    // Both trades match a prior quote -> 2 rows.
+    assert_eq!(count(&format!("read_csv_auto('{}')", out)), 2);
+    // trade A @ ts=105 -> nearest prior quote @ ts=100 -> bid 10.
+    let bid_a = scalar_string(&format!(
+        "SELECT CAST(bid AS VARCHAR) FROM read_csv_auto('{}') WHERE trade = 'A'",
+        out
+    ));
+    assert_eq!(bid_a, "10");
+    // trade B @ ts=250 -> nearest prior quote @ ts=200 -> bid 20.
+    let bid_b = scalar_string(&format!(
+        "SELECT CAST(bid AS VARCHAR) FROM read_csv_auto('{}') WHERE trade = 'B'",
+        out
+    ));
+    assert_eq!(bid_b, "20");
+}
+
+#[test]
 fn window_aggregate_keeps_rows() {
     let tmp = tempfile::tempdir().unwrap();
     let csv = write_file(tmp.path(), "in.csv", "g,amt\na,10\na,20\nb,5\n");
