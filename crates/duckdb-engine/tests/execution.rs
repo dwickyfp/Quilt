@@ -10355,3 +10355,68 @@ fn cache_disabled_unaffected() {
     assert_eq!(count(&format!("read_csv_auto('{}')", out1)), 2);
     assert_csv_same(&out1, &out2);
 }
+
+// Reusable component (#2): the frontend expands a `cmp.*` instance into
+// namespaced inner nodes (`<instanceId>__<innerId>`) BEFORE the graph reaches
+// the engine, so the engine only ever sees a flat graph. This test feeds that
+// exact post-expansion shape - namespaced ids + boundary edges rewired to the
+// inner input/output ports - and proves it runs on real DuckDB, i.e. that
+// quote_ident handles `__` ids and the expanded graph is equivalent to the
+// hand-written flat graph.
+#[test]
+fn expanded_component_namespaced_ids_run_correctly() {
+    let _g = env_guard();
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(
+        tmp.path(),
+        "orders.csv",
+        "order_id,status,amount\n1,paid,10\n2,pending,20\n3,paid,30\n4,refunded,5\n",
+    );
+    let expanded_out = out_path(tmp.path(), "expanded.csv");
+    let flat_out = out_path(tmp.path(), "flat.csv");
+
+    // Component "clean": filter(status='paid') -> filter(amount >= 10),
+    // collapsed as instance "c1". Post-expansion the inner nodes are c1__f1
+    // and c1__f2, and the host edges are rewired src -> c1__f1 (input port)
+    // and c1__f2 -> sink (output port). Both inner nodes are executable
+    // transforms so the test isolates the namespaced-id question.
+    let expanded = doc(
+        json!([
+            node("s", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("c1__f1", "xf.filter", json!({ "predicate": "status = 'paid'" })),
+            node("c1__f2", "xf.filter", json!({ "predicate": "amount >= 10" })),
+            node("k", "snk.csv", json!({ "path": expanded_out })),
+        ]),
+        json!([
+            main_edge("e1", "s", "c1__f1"),
+            main_edge("e2", "c1__f1", "c1__f2"),
+            main_edge("e3", "c1__f2", "k"),
+        ]),
+    );
+    let re = engine.execute_pipeline(&expanded);
+    assert_eq!(re.status, "ok", "expanded run failed: {:?}", re.error);
+
+    // The same pipeline written with plain (non-namespaced) ids.
+    let flat = doc(
+        json!([
+            node("s", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("f1", "xf.filter", json!({ "predicate": "status = 'paid'" })),
+            node("f2", "xf.filter", json!({ "predicate": "amount >= 10" })),
+            node("k", "snk.csv", json!({ "path": flat_out })),
+        ]),
+        json!([
+            main_edge("e1", "s", "f1"),
+            main_edge("e2", "f1", "f2"),
+            main_edge("e3", "f2", "k"),
+        ]),
+    );
+    let rf = engine.execute_pipeline(&flat);
+    assert_eq!(rf.status, "ok", "flat run failed: {:?}", rf.error);
+
+    // 2 paid rows have amount >= 10 (10 and 30); the namespaced graph produces
+    // identical output to the plain one.
+    assert_eq!(count(&format!("read_csv_auto('{}')", expanded_out)), 2);
+    assert_csv_same(&expanded_out, &flat_out);
+}
+
