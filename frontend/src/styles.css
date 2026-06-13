@@ -17,32 +17,32 @@
     --text-3: #6d7585;
     --text-4: #4a5163;
 
-    /* Primary accent - DuckDB lemon yellow, used for primary actions, the
+    /* Primary accent - Quilt amber/gold, used for primary actions, the
        brand mark and headlines. (Buttons pair it with dark text.) */
-    --accent-cyan: #fff100;
-    --accent-cyan-strong: #ffd400;
+    --accent-cyan: #f5a21e;
+    --accent-cyan-strong: #e08e0b;
 
-    /* Primary CTA buttons (Run / Open visual mapper / btn-primary): DuckDB
-       lemon-yellow fill with dark text in dark mode. */
-    --btn-primary-bg: #fff100;
-    --btn-primary-bg-strong: #ffd400;
+    /* Primary CTA buttons (Run / Open visual mapper / btn-primary): Quilt
+       amber fill with dark text in dark mode. */
+    --btn-primary-bg: #f5a21e;
+    --btn-primary-bg-strong: #e08e0b;
     --btn-primary-fg: #07090f;
 
-    /* Interactive accent - the DuckDB lemon brand, used for selection /
-       focus / links so highlights read yellow in dark mode. */
-    --accent: #fff100;
-    --accent-strong: #ffd400;
-    --accent-soft: rgba(255, 241, 0, 0.16);
-    --accent-glow: rgba(255, 241, 0, 0.35);
+    /* Interactive accent - the Quilt amber brand, used for selection /
+       focus / links so highlights read amber in dark mode. */
+    --accent: #f5a21e;
+    --accent-strong: #e08e0b;
+    --accent-soft: rgba(245, 162, 30, 0.16);
+    --accent-glow: rgba(245, 162, 30, 0.35);
 
     /* The brand gradient - used on the wordmark, primary CTAs, and the
-       visual mapper button. DuckDB lemon -> hot orange ("duck"). */
-    --gradient-brand: linear-gradient(135deg, #fff100, #ff6900);
+       visual mapper button. Quilt amber -> hot orange. */
+    --gradient-brand: linear-gradient(135deg, #f5a21e, #ff6900);
 
-    /* The "D." brand mark (QuiltLogo). Dark theme: yellow glyph on a slate
+    /* The brand mark (QuiltLogo). Dark theme: amber glyph on a slate
        disc. Light theme overrides these to an orange glyph on a pale disc. */
     --logo-disc: #1b1f2a;
-    --logo-glyph: #ffd000;
+    --logo-glyph: #f5a21e;
     --logo-ring: rgba(255, 255, 255, 0.08);
 
     /* Component-kind hues - drawn from the DuckDB secondary palette
@@ -63,8 +63,8 @@
         0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 18px rgba(0, 0, 0, 0.45);
     --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.04) inset,
         0 4px 12px rgba(0, 0, 0, 0.4), 0 20px 50px rgba(0, 0, 0, 0.6);
-    --shadow-glow: 0 0 24px rgba(255, 241, 0, 0.2);
-    --focus-ring: 0 0 0 3px rgba(255, 241, 0, 0.25);
+    --shadow-glow: 0 0 24px rgba(245, 162, 30, 0.2);
+    --focus-ring: 0 0 0 3px rgba(245, 162, 30, 0.25);
 
     --radius-sm: 6px;
     --radius: 8px;
@@ -105,12 +105,12 @@ body,
     background:
         radial-gradient(
             ellipse 800px 400px at 0% 0%,
-            rgba(255, 241, 0, 0.04),
+            rgba(245, 162, 30, 0.04),
             transparent 70%
         ),
         radial-gradient(
             ellipse 1000px 500px at 100% 100%,
-            rgba(255, 241, 0, 0.04),
+            rgba(245, 162, 30, 0.04),
             transparent 70%
         ),
         var(--bg-0);
@@ -204,7 +204,7 @@ textarea:focus-visible {
     height: var(--topbar-h);
     padding: 0 0 0 20px;
     background:
-        linear-gradient(180deg, rgba(255, 241, 0, 0.025), transparent 60%),
+        linear-gradient(180deg, rgba(245, 162, 30, 0.025), transparent 60%),
         var(--bg-1);
     border-bottom: 1px solid var(--border);
     position: relative;
@@ -280,8 +280,8 @@ textarea:focus-visible {
     background: linear-gradient(
         90deg,
         transparent,
-        rgba(255, 241, 0, 0.25),
-        rgba(255, 241, 0, 0.18),
+        rgba(245, 162, 30, 0.25),
+        rgba(245, 162, 30, 0.18),
         transparent
     );
     pointer-events: none;
@@ -2660,8 +2660,8 @@ html[dir='rtl'] .topbar-lang {
     gap: 8px;
     padding: 7px 9px;
     border-radius: 7px;
-    background: rgba(255, 241, 0, 0.1);
-    border: 1px solid rgba(255, 241, 0, 0.35);
+    background: rgba(245, 162, 30, 0.1);
+    border: 1px solid rgba(245, 162, 30, 0.35);
 }
 
 .ctx-bound-token {
@@ -4722,22 +4722,21 @@ html[dir='rtl'] .topbar-lang {
     --text-3: #6d7585;
     --text-4: #a3acbd;
 
-    /* Light theme: deep orange interactive accent so selection / focus read
-       orange in light mode (matches the primary buttons). */
-    --accent: #e8590c;
-    --accent-strong: #d24f09;
-    /* DuckDB lemon is unreadable as text on light surfaces, so the light
-       theme uses a deep gold for the primary accent (brand identity stays
-       yellow; the in-app logo/gradient still use pure lemon). */
+    /* Light theme: deep amber interactive accent so selection / focus read
+       amber in light mode (matches the Quilt brand). */
+    --accent: #b06d08;
+    --accent-strong: #945a06;
+    /* Amber as text on light surfaces needs deepening for contrast; the
+       brand identity stays amber (the in-app logo/gradient use full amber). */
     --accent-cyan: #b8860b;
     --accent-cyan-strong: #946f00;
-    /* Primary CTA buttons: hot orange fill with white text in light mode
-       (deepened from the brand #ff6900 so white label text stays readable). */
-    --btn-primary-bg: #e8590c;
-    --btn-primary-bg-strong: #d24f09;
-    --btn-primary-fg: #ffffff;
-    --accent-soft: rgba(232, 89, 12, 0.1);
-    --accent-glow: rgba(232, 89, 12, 0.22);
+    /* Primary CTA buttons: full Quilt amber fill with dark text in light
+       mode (matches dark theme; white text fails contrast on amber). */
+    --btn-primary-bg: #f5a21e;
+    --btn-primary-bg-strong: #e08e0b;
+    --btn-primary-fg: #07090f;
+    --accent-soft: rgba(245, 162, 30, 0.12);
+    --accent-glow: rgba(245, 162, 30, 0.22);
 
     --kind-source: #1f8fd0;
     --kind-transform: #4a5160;
@@ -4754,8 +4753,8 @@ html[dir='rtl'] .topbar-lang {
         0 1px 2px rgba(11, 15, 26, 0.05), 0 6px 16px rgba(11, 15, 26, 0.06);
     --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.7) inset,
         0 4px 12px rgba(11, 15, 26, 0.08), 0 16px 40px rgba(11, 15, 26, 0.1);
-    --shadow-glow: 0 0 16px rgba(232, 89, 12, 0.18);
-    --focus-ring: 0 0 0 3px rgba(232, 89, 12, 0.22);
+    --shadow-glow: 0 0 16px rgba(245, 162, 30, 0.18);
+    --focus-ring: 0 0 0 3px rgba(245, 162, 30, 0.22);
 
     color-scheme: light;
 }
@@ -4771,7 +4770,7 @@ html[dir='rtl'] .topbar-lang {
         ),
         radial-gradient(
             ellipse 1000px 500px at 100% 100%,
-            rgba(232, 89, 12, 0.05),
+            rgba(245, 162, 30, 0.05),
             transparent 70%
         ),
         var(--bg-0);
@@ -4787,7 +4786,7 @@ html[dir='rtl'] .topbar-lang {
 :root[data-theme='light'] .node.is-selected {
     box-shadow:
         0 0 0 1px var(--accent),
-        0 0 20px rgba(232, 89, 12, 0.18),
+        0 0 20px rgba(245, 162, 30, 0.18),
         var(--shadow-1);
 }
 
@@ -4795,7 +4794,7 @@ html[dir='rtl'] .topbar-lang {
     background: linear-gradient(
         90deg,
         transparent,
-        rgba(232, 89, 12, 0.35),
+        rgba(245, 162, 30, 0.35),
         rgba(184, 134, 11, 0.28),
         transparent
     );
@@ -4803,16 +4802,16 @@ html[dir='rtl'] .topbar-lang {
 
 :root[data-theme='light'] {
     --logo-disc: #ffffff;
-    --logo-glyph: #ff6900;
+    --logo-glyph: #f5a21e;
     --logo-ring: rgba(20, 24, 40, 0.1);
 }
 
 :root[data-theme='light'] .properties-mapper-button {
-    box-shadow: 0 4px 12px rgba(232, 89, 12, 0.25);
+    box-shadow: 0 4px 12px rgba(245, 162, 30, 0.25);
 }
 
 :root[data-theme='light'] .btn-primary {
-    color: white;
+    color: var(--btn-primary-fg);
 }
 
 :root[data-theme='light'] .react-flow__background {
@@ -4842,9 +4841,9 @@ html[dir='rtl'] .topbar-lang {
 }
 
 :root[data-theme='light'] .schema-source-banner {
-    background: rgba(232, 89, 12, 0.08);
+    background: rgba(245, 162, 30, 0.08);
     color: var(--accent);
-    border-color: rgba(232, 89, 12, 0.25);
+    border-color: rgba(245, 162, 30, 0.25);
 }
 
 :root[data-theme='light'] .schema-source-banner-declared {
@@ -4867,7 +4866,7 @@ html[dir='rtl'] .topbar-lang {
 }
 
 :root[data-theme='light'] .mapper-input-port-name {
-    background: rgba(232, 89, 12, 0.1);
+    background: rgba(245, 162, 30, 0.1);
 }
 
 :root[data-theme='light'] .edge-label-reject .edge-label-badge {
@@ -4899,12 +4898,12 @@ html[dir='rtl'] .topbar-lang {
 }
 
 :root[data-theme='light'] .mapper-input-col.is-used {
-    background: rgba(232, 89, 12, 0.08);
+    background: rgba(245, 162, 30, 0.08);
 }
 
 :root[data-theme='light'] .modal-tip {
-    background: rgba(232, 89, 12, 0.06);
-    border-color: rgba(232, 89, 12, 0.2);
+    background: rgba(245, 162, 30, 0.06);
+    border-color: rgba(245, 162, 30, 0.2);
 }
 
 :root[data-theme='light'] .markdown-body code {
@@ -4913,7 +4912,7 @@ html[dir='rtl'] .topbar-lang {
 }
 
 :root[data-theme='light'] .markdown-body blockquote {
-    background: rgba(232, 89, 12, 0.06);
+    background: rgba(245, 162, 30, 0.06);
 }
 
 :root[data-theme='light'] .markdown-body img {
@@ -4921,7 +4920,7 @@ html[dir='rtl'] .topbar-lang {
 }
 
 :root[data-theme='light'] .repo-node.is-active {
-    background: rgba(232, 89, 12, 0.1);
+    background: rgba(245, 162, 30, 0.1);
     color: var(--accent);
 }
 
@@ -4973,9 +4972,9 @@ html[dir='rtl'] .topbar-lang {
     background: var(--gradient-brand);
     color: var(--bg-0);
     box-shadow:
-        0 0 0 1px rgba(255, 241, 0, 0.32) inset,
-        0 8px 32px rgba(255, 241, 0, 0.32),
-        0 0 32px rgba(255, 241, 0, 0.3);
+        0 0 0 1px rgba(245, 162, 30, 0.32) inset,
+        0 8px 32px rgba(245, 162, 30, 0.32),
+        0 0 32px rgba(245, 162, 30, 0.3);
     flex-shrink: 0;
 }
 
@@ -5338,9 +5337,9 @@ html[dir='rtl'] .topbar-lang {
 }
 
 .node-run-badge-running {
-    background: rgba(255, 241, 0, 0.15);
+    background: rgba(245, 162, 30, 0.15);
     color: var(--accent);
-    border: 1px solid rgba(255, 241, 0, 0.4);
+    border: 1px solid rgba(245, 162, 30, 0.4);
 }
 
 .node-run-badge-running svg {
@@ -5368,7 +5367,7 @@ html[dir='rtl'] .topbar-lang {
 .node.is-run-running {
     box-shadow:
         0 0 0 1px var(--accent),
-        0 0 0 4px rgba(255, 241, 0, 0.18),
+        0 0 0 4px rgba(245, 162, 30, 0.18),
         var(--shadow-1);
 }
 
@@ -6885,7 +6884,7 @@ html[dir='rtl'] .topbar-lang {
 }
 .ci-badge-busy {
     color: var(--accent-strong);
-    border-color: rgba(255, 241, 0, 0.4);
+    border-color: rgba(245, 162, 30, 0.4);
 }
 .ci-badge-mute {
     color: var(--text-3);
