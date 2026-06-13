@@ -46,7 +46,8 @@ import { copyText, saveTextFile } from './tauri-io';
 import { writeClipboard, readClipboard, instantiateClipboard } from './clipboard';
 import { RunStatusContext, ProfileContext } from './canvas/run-status-context';
 import { validatePipeline } from './validation';
-import { resolveForRun } from './run-resolve';
+import { expandComponentsForRun, resolveForRun } from './run-resolve';
+import type { SavedComponent } from './workflow-ui/component-expand';
 import WorkspacePickerModal from './workflow-ui/WorkspacePickerModal';
 import {
     deleteItemPayload,
@@ -216,6 +217,11 @@ export default function App() {
     const [isRunning, setIsRunning] = useState<boolean>(false);
     const [renameRequest, setRenameRequest] = useState<number>(0);
     const [repo, setRepo] = useState<RepoItem[]>(() => loadPersisted('repo', INITIAL_REPO));
+    // Saved reusable components (a collapsed subgraph turned into one cmp.* node).
+    // Persisted in localStorage like the rest of the workspace UI state.
+    const [savedComponents, setSavedComponents] = useState<SavedComponent[]>(() =>
+        loadPersisted<SavedComponent[]>('components', []),
+    );
     const [activeContextId, setActiveContextId] = useState<string | null>(() =>
         loadPersisted<string | null>('active-context', null),
     );
@@ -366,6 +372,7 @@ export default function App() {
             savePersisted('pipelines', pipelineData);
             savePersisted('repo', repo);
             savePersisted('jobs', jobs);
+            savePersisted('components', savedComponents);
             savePersisted('active-job', activeJobId);
             savePersisted('active-context', activeContextId);
         }, 250);
@@ -376,6 +383,7 @@ export default function App() {
         pipelineData,
         repo,
         jobs,
+        savedComponents,
         activeJobId,
         activeContextId,
     ]);
@@ -895,14 +903,16 @@ export default function App() {
         setIsRunning(true);
         setRunResult(null);
         const start = performance.now();
-        // Inline SQL routines + substitute ${context.var} before running;
-        // the canvas keeps the editable, un-substituted values.
-        const runNodes = resolveForRun(nodes, repo, workspacePathState);
+        // Expand saved reusable-component instances into their inner nodes
+        // first, then inline SQL routines + substitute ${context.var}; the
+        // canvas keeps the editable, un-substituted, un-expanded values.
+        const runGraph = expandComponentsForRun(nodes, edges, savedComponents);
+        const runNodes = resolveForRun(runGraph.nodes, repo, workspacePathState);
         const pipelineName = repo.find(r => r.id === activeJobId)?.name ?? activeJobId;
-        void runPipeline(runNodes, edges, handleEvent, activeJobId, workspacePathState, pipelineName)
+        void runPipeline(runNodes, runGraph.edges, handleEvent, activeJobId, workspacePathState, pipelineName)
             .then(result => finishRun(start, result))
             .finally(() => setIsRunning(false));
-    }, [nodes, edges, repo, handleEvent, finishRun, activeJobId, workspacePathState, validation.errorCount]);
+    }, [nodes, edges, repo, savedComponents, handleEvent, finishRun, activeJobId, workspacePathState, validation.errorCount]);
 
     const handleRunFromHere = useCallback(
         (nodeId: string) => {
@@ -913,12 +923,24 @@ export default function App() {
             setIsRunning(true);
             setRunResult(null);
             const start = performance.now();
-            const runNodes = resolveForRun(nodes, repo, workspacePathState);
+            const runGraph = expandComponentsForRun(nodes, edges, savedComponents);
+            const runNodes = resolveForRun(runGraph.nodes, repo, workspacePathState);
             const pipelineName = repo.find(r => r.id === activeJobId)?.name ?? activeJobId;
+            // If "run from here" targets a collapsed component instance, the
+            // instance id no longer exists after expansion - remap it to the
+            // component's output port (its last inner node) so the partial run
+            // still terminates at the right place.
+            const targetComp = savedComponents.find(
+                c => c.id === nodes.find(n => n.id === nodeId)?.data.componentId,
+            );
+            const runTarget =
+                targetComp && targetComp.def.outputs[0]
+                    ? `${nodeId}__${targetComp.def.outputs[0].node}`
+                    : nodeId;
             void runPipelinePartial(
                 runNodes,
-                edges,
-                nodeId,
+                runGraph.edges,
+                runTarget,
                 handleEvent,
                 activeJobId,
                 workspacePathState,
@@ -931,6 +953,7 @@ export default function App() {
             nodes,
             edges,
             repo,
+            savedComponents,
             handleEvent,
             finishRun,
             activeJobId,

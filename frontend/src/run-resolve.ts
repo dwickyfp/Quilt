@@ -1,7 +1,8 @@
-import type { Node } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import type { QuiltNodeData } from './pipeline-types';
 import type { ConnectionPayload, ContextPayload, RepoItem, RoutinePayload } from './repo-types';
 import { SECRET_CONNECTION_KEYS } from './repo-types';
+import { expandComponents, type HostEdge, type HostNode, type SavedComponent } from './workflow-ui/component-expand';
 
 /**
  * Resolve a pipeline's nodes for execution:
@@ -146,4 +147,95 @@ export function resolveForRun(
 
         return { ...node, data: { ...node.data, properties: resolved } };
     });
+}
+
+/** Map a componentId to the React Flow node `type` the engine/canvas expect,
+ *  from the id prefix. Defaults to `transform` (the engine only really cares
+ *  about `source`/`sink` for port shape; everything else runs as a transform). */
+function flowTypeForComponentId(componentId: string | undefined): string {
+    if (componentId == null) return 'transform';
+    if (componentId.startsWith('src.')) return 'source';
+    if (componentId.startsWith('snk.')) return 'sink';
+    if (componentId.startsWith('ml.')) return 'ml';
+    if (componentId.startsWith('viz.')) return 'viz';
+    return 'transform';
+}
+
+/**
+ * Expand every saved-component instance in a React Flow graph into its inner
+ * nodes/edges BEFORE the graph is resolved + sent to the engine. The engine
+ * only ever sees a flat graph, so reusable components need no engine support.
+ *
+ * Inner nodes inherit their parent instance's canvas position (run-only graph,
+ * so exact layout is irrelevant - this just keeps every node's `position`
+ * defined) and get a `type` derived from their componentId. Returns the
+ * expanded nodes + edges; pass the nodes on to `resolveForRun` so inner nodes
+ * still get context-var / connection / routine resolution.
+ */
+export function expandComponentsForRun(
+    nodes: Node<QuiltNodeData>[],
+    edges: Edge[],
+    components: SavedComponent[],
+): { nodes: Node<QuiltNodeData>[]; edges: Edge[] } {
+    if (components.length === 0) {
+        return { nodes, edges };
+    }
+    const hostNodes: HostNode[] = nodes.map(n => ({
+        id: n.id,
+        data: { componentId: n.data.componentId, properties: n.data.properties },
+    }));
+    const hostEdges: HostEdge[] = edges.map(e => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        targetHandle: e.targetHandle ?? undefined,
+    }));
+
+    const expanded = expandComponents(hostNodes, hostEdges, components);
+
+    // Nothing expanded: hand back the originals untouched (preserves all RF
+    // node/edge fields, no needless reconstruction).
+    if (expanded.nodes.length === nodes.length && expanded.edges.length === edges.length) {
+        const sameNodes = expanded.nodes.every((n, i) => n.id === nodes[i]?.id);
+        if (sameNodes) return { nodes, edges };
+    }
+
+    const NS = '__';
+    const byId = new Map(nodes.map(n => [n.id, n]));
+    const outNodes: Node<QuiltNodeData>[] = expanded.nodes.map(hn => {
+        // An untouched original node: reuse it verbatim.
+        const original = byId.get(hn.id);
+        if (original) return original;
+        // A synthesized inner node `<instanceId>__<innerId>`: inherit the
+        // instance's position + label, derive type from componentId.
+        const instanceId = hn.id.split(NS)[0]!;
+        const parent = byId.get(instanceId);
+        const position = parent?.position ?? { x: 0, y: 0 };
+        return {
+            id: hn.id,
+            type: flowTypeForComponentId(hn.data.componentId),
+            position,
+            data: {
+                label: hn.data.componentId ?? hn.id,
+                componentId: hn.data.componentId,
+                properties: hn.data.properties,
+            },
+        } as Node<QuiltNodeData>;
+    });
+
+    const origEdgeById = new Map(edges.map(e => [e.id, e]));
+    const outEdges: Edge[] = expanded.edges.map(he => {
+        const original = origEdgeById.get(he.id);
+        if (original && original.source === he.source && original.target === he.target) {
+            return original;
+        }
+        return {
+            id: he.id,
+            source: he.source,
+            target: he.target,
+            ...(he.targetHandle ? { targetHandle: he.targetHandle } : {}),
+        } as Edge;
+    });
+
+    return { nodes: outNodes, edges: outEdges };
 }
