@@ -1,6 +1,6 @@
 export type Availability = 'available' | 'planned' | 'preview';
 
-export type NodeKind = 'source' | 'transform' | 'sink' | 'control' | 'quality' | 'custom';
+export type NodeKind = 'source' | 'transform' | 'sink' | 'control' | 'quality' | 'custom' | 'ml';
 
 export type ComponentDef = {
     id: string;
@@ -68,6 +68,14 @@ const code = (id: string, label: string, availability: Availability, summary?: s
     id: 'code.' + id,
     label,
     kind: 'custom',
+    availability,
+    summary,
+});
+
+const ml = (id: string, label: string, availability: Availability, summary?: string): ComponentDef => ({
+    id,
+    label,
+    kind: 'ml',
     availability,
     summary,
 });
@@ -766,6 +774,57 @@ export const PALETTE: Category[] = [
                     src('discord', 'Discord', 'available', 'Discord REST. Bot token in Authorization header (prefix `Bot `). No native pagination on most endpoints; use `?limit=N&before=ID` patterns. responsePath empty (responses are top-level arrays). Base URL https://discord.com/api/v10.'),
                     src('telegram', 'Telegram Bot', 'available', 'Telegram Bot API. Token in URL path (https://api.telegram.org/bot{token}/getUpdates). Offset pagination via `?offset=N`. responsePath /result. No auth header needed - token is in the URL.'),
                     src('twilio', 'Twilio', 'available', 'Twilio REST. Basic auth (Account SID + Auth Token). Page-cursor pagination via `next_page_uri`. responsePath depends on resource (e.g. /messages, /calls). Base URL https://api.twilio.com/2010-04-01/Accounts/{AccountSid}.'),
+                ],
+            },
+        ],
+    },
+    {
+        id: 'ml',
+        label: 'Machine Learning',
+        icon: '🧠',
+        accent: '#a855f7',
+        groups: [
+            {
+                id: 'ml.prep',
+                label: 'Preparation',
+                components: [
+                    ml('ml.partition', 'Partition', 'available', 'Split rows into a train set (main output) and a test set (test output). Props: ratio (0-1, fraction going to train; default 0.7), method (`random` or `stratified`), stratifyColumn (for stratified), seed (deterministic split). Pure SQL - uses a hashed/random row ordering. Feed train into a Learner and test into Predict + Score.'),
+                ],
+            },
+            {
+                id: 'ml.learners',
+                label: 'Learners (Train)',
+                components: [
+                    ml('ml.learner.linreg', 'Linear Regression Learner', 'available', 'Train an ordinary least-squares linear regression. Props: targetColumn (numeric target), featureColumns (comma-separated; blank = all other numeric columns). Outputs a model on the model port. Pair with ml.predict for inference.'),
+                    ml('ml.learner.logreg', 'Logistic Regression Learner', 'available', 'Train a logistic regression classifier. Props: targetColumn (categorical/binary), featureColumns. Outputs a model on the model port.'),
+                    ml('ml.learner.tree', 'Decision Tree Learner', 'available', 'Train a decision tree classifier. Props: targetColumn, featureColumns, maxDepth (default 10). Outputs a model on the model port.'),
+                    ml('ml.learner.forest', 'Random Forest Learner', 'available', 'Train a random forest classifier. Props: targetColumn, featureColumns, nTrees (default 100), maxDepth. Outputs a model on the model port.'),
+                    ml('ml.learner.knn', 'k-NN Learner', 'available', 'Train a k-nearest-neighbors classifier. Props: targetColumn, featureColumns, k (neighbors, default 5). Outputs a model on the model port.'),
+                    ml('ml.learner.kmeans', 'k-Means Learner', 'available', 'Fit a k-means clustering model (unsupervised). Props: featureColumns, k (clusters, default 3), maxIter. Outputs a model on the model port; predict appends a cluster id.'),
+                ],
+            },
+            {
+                id: 'ml.apply',
+                label: 'Apply & Evaluate',
+                components: [
+                    ml('ml.predict', 'Predictor', 'available', 'Apply a trained model (model port) to incoming rows. Appends a prediction column (default `prediction`). Props: outputColumn. Wire the data into main and the Learner into the model port.'),
+                    ml('ml.score', 'Scorer', 'available', 'Evaluate predictions against ground truth. Props: actualColumn, predictedColumn, task (`classification` or `regression`). Emits a metrics table: accuracy/precision/recall + confusion matrix for classification, RMSE/MAE/R² for regression.'),
+                ],
+            },
+        ],
+    },
+    {
+        id: 'dl',
+        label: 'Deep Learning',
+        icon: '🤖',
+        accent: '#f97316',
+        groups: [
+            {
+                id: 'dl.onnx',
+                label: 'ONNX',
+                components: [
+                    ml('dl.onnx.reader', 'ONNX Model Reader', 'available', 'Load a pre-trained ONNX model file from disk. Props: path (.onnx file). Outputs a model on the model port. Runs locally via the ONNX Runtime (installed on first use); no Python required.'),
+                    ml('dl.onnx.predict', 'ONNX Predictor', 'available', 'Run inference with a loaded ONNX model (model port) over incoming rows. Props: featureColumns (model inputs, in order), outputColumn (default `prediction`). Appends the model output to each row.'),
                 ],
             },
         ],

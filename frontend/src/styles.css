@@ -53,6 +53,7 @@
     --kind-control: #5b8def;
     --kind-quality: #f5c518;
     --kind-custom: #e08a8a;
+    --kind-ml: #a855f7;
 
     --danger: #ff4d6d;
     --success: #2eafff;
@@ -769,6 +770,10 @@ textarea:focus-visible {
 
 .node-sink {
     border-left: 3px solid var(--accent-sink);
+}
+
+.node-ml {
+    border-left: 3px solid var(--kind-ml);
 }
 
 .node.is-selected {

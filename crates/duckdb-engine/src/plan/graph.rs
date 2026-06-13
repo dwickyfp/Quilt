@@ -373,6 +373,9 @@ pub(crate) const REJECT_SUFFIX: &str = "__reject";
 pub(crate) fn output_table_ref(source_id: &str, source_handle: Option<&str>) -> String {
     match source_handle.map(canonical_port) {
         Some("reject") | Some("filter") => format!("{}{}", source_id, REJECT_SUFFIX),
+        // ml.partition exposes its hold-out rows on a `test` port, read from
+        // the `<node>__test` relation it materializes alongside the train set.
+        Some("test") => format!("{}__test", source_id),
         // Switch / conditional split: each case + default port reads
         // from its own `<node>__<handle>` table that build_switch
         // materializes.
@@ -609,6 +612,17 @@ pub(crate) fn is_data_edge(edge: &PipelineEdge) -> bool {
         ),
         None => true,
     }
+}
+
+/// Model edges carry a trained model from a Learner to a Predictor/Scorer.
+/// They are NOT data edges (no table flows along them), so they're excluded
+/// from input resolution and schema propagation - but they DO impose an
+/// execution order (the Learner must run before its consumer), so the
+/// topological sort includes them alongside data edges.
+pub(crate) fn is_model_edge(edge: &PipelineEdge) -> bool {
+    edge.data
+        .as_ref()
+        .is_some_and(|d| d.connection_type.as_str() == "model")
 }
 
 pub(crate) fn topological_sort(

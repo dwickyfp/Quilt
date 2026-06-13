@@ -3,6 +3,7 @@ export type ConnectionType =
     | 'lookup'
     | 'reject'
     | 'filter'
+    | 'model'
     | 'iterate'
     | 'on-subjob-ok'
     | 'on-subjob-error'
@@ -11,7 +12,7 @@ export type ConnectionType =
     | 'if'
     | 'run-if';
 
-export type ConnectionGroup = 'row' | 'trigger';
+export type ConnectionGroup = 'row' | 'model' | 'trigger';
 
 export type ConnectionTypeMeta = {
     id: ConnectionType;
@@ -65,6 +66,16 @@ export const CONNECTION_TYPES: ConnectionTypeMeta[] = [
         dash: '6 4',
         width: 1.6,
         badge: 'filter',
+    },
+    {
+        id: 'model',
+        label: 'Model',
+        group: 'model',
+        description: 'A trained model. Flows from a Learner to a Predictor or Scorer.',
+        color: 'var(--accent)',
+        dash: null,
+        width: 2,
+        badge: 'model',
     },
     {
         id: 'iterate',

@@ -159,6 +159,11 @@ pub enum RuntimeSpec {
     AiLlm(AiLlmSpec),
     AiClassify(AiClassifySpec),
     AiDedupe(AiDedupeSpec),
+    MlLearner(MlLearnerSpec),
+    MlPredict(MlPredictSpec),
+    MlScore(MlScoreSpec),
+    OnnxReader(OnnxReaderSpec),
+    OnnxPredict(OnnxPredictSpec),
 }
 
 // Connector / transform spec type definitions live in plan/specs.rs and
@@ -239,7 +244,24 @@ pub fn compile(pipeline: &PipelineDoc) -> Result<CompiledPipeline, EngineError> 
         .filter(|e| is_data_edge(e))
         .collect();
 
-    let order = topological_sort(&pipeline.nodes, &data_edges)?;
+    // Model edges (Learner -> Predictor/Scorer) carry no table, so they're
+    // excluded from data-input resolution. But the producer must still run
+    // before the consumer, so the topological sort orders over data + model
+    // edges together. A separate map lets a consumer find its model source.
+    let model_edges: Vec<&PipelineEdge> = pipeline
+        .edges
+        .iter()
+        .filter(|e| is_model_edge(e))
+        .collect();
+    let mut model_inputs: HashMap<&str, String> = HashMap::new();
+    for edge in &model_edges {
+        // Last writer wins; a node reads a single model (guarded in build_stage).
+        model_inputs.insert(edge.target.as_str(), edge.source.clone());
+    }
+
+    let mut order_edges: Vec<&PipelineEdge> = data_edges.clone();
+    order_edges.extend(model_edges.iter().copied());
+    let order = topological_sort(&pipeline.nodes, &order_edges)?;
 
     // Build inputs map: node_id -> port_id -> Vec<source_node_id>
     let mut inputs: HashMap<&str, NodeInputs> = HashMap::new();
@@ -407,7 +429,8 @@ pub fn compile(pipeline: &PipelineDoc) -> Result<CompiledPipeline, EngineError> 
                 )));
             }
         }
-        let mut stage = build_stage(node, component_id, node_inputs, &consumer_count)?;
+        let model_input = model_inputs.get(node_id.as_str()).map(|s| s.as_str());
+        let mut stage = build_stage(node, component_id, node_inputs, model_input, &consumer_count)?;
         if let Some(spec) = parallelize_specs.remove(node_id) {
             stage.runtime = Some(RuntimeSpec::Parallelize(spec));
         }
@@ -470,6 +493,7 @@ fn build_stage(
     node: &PipelineNode,
     component_id: &str,
     inputs: &NodeInputs,
+    model_input: Option<&str>,
     consumer_count: &HashMap<String, usize>,
 ) -> Result<Stage, EngineError> {
     let props = node
@@ -551,6 +575,11 @@ fn build_stage(
     let mut ai_llm: Option<AiLlmSpec> = None;
     let mut ai_classify: Option<AiClassifySpec> = None;
     let mut ai_dedupe: Option<AiDedupeSpec> = None;
+    let mut ml_learner: Option<MlLearnerSpec> = None;
+    let mut ml_predict: Option<MlPredictSpec> = None;
+    let mut ml_score: Option<MlScoreSpec> = None;
+    let mut onnx_reader: Option<OnnxReaderSpec> = None;
+    let mut onnx_predict: Option<OnnxPredictSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -2955,8 +2984,174 @@ fn build_stage(
                 .unwrap_or(100) as usize,
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "ml.partition" {
+        // Pure-SQL train/test split. Materialize the upstream once with a
+        // deterministic pseudo-random key, then expose two complementary
+        // views: the train set on the node's main relation and the hold-out
+        // on `<node>__test`. Folding the seed into the hash makes the split
+        // reproducible without relying on DuckDB's RNG state, and computing
+        // the key in one materialized table (not re-drawing random() per
+        // view) guarantees train and test are exactly complementary.
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let ratio = props
+            .get("ratio")
+            .and_then(|v| v.as_f64())
+            .filter(|r| *r > 0.0 && *r < 1.0)
+            .unwrap_or(0.7);
+        let seed = props.get("seed").and_then(|v| v.as_i64()).unwrap_or(42);
+        let method = string_prop(&props, "method").unwrap_or_else(|| "random".into());
+        let split_table = format!("{}__split", node.id);
+        // A value in [0,1) derived from the row's position + seed, stable
+        // across runs. `% 100000 / 100000.0` keeps it a clean fraction.
+        let rnd_expr = format!(
+            "(hash(CAST(row_number() OVER () AS VARCHAR) || '#{}') % 100000) / 100000.0",
+            seed
+        );
+        let split_sql = if method == "stratified" {
+            let strat = string_prop(&props, "stratifyColumn")
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| EngineError::Config(format!(
+                    "{}: stratifyColumn required for stratified split",
+                    component_id
+                )))?;
+            // Per-class ordering by the same deterministic key, then a
+            // within-group fractional rank so each class keeps ~ratio in train.
+            format!(
+                "CREATE OR REPLACE TABLE {split} AS SELECT *, \
+                 (CAST(row_number() OVER (PARTITION BY {col} ORDER BY {rnd}) AS DOUBLE) \
+                 / count(*) OVER (PARTITION BY {col})) AS __quilt_split \
+                 FROM {src}",
+                split = quote_ident(&split_table),
+                col = quote_ident(&strat),
+                rnd = rnd_expr,
+                src = quote_ident(from_view),
+            )
+        } else {
+            format!(
+                "CREATE OR REPLACE TABLE {split} AS SELECT *, {rnd} AS __quilt_split FROM {src}",
+                split = quote_ident(&split_table),
+                rnd = rnd_expr,
+                src = quote_ident(from_view),
+            )
+        };
+        let sql = format!(
+            "{split_sql}; \
+             CREATE OR REPLACE VIEW {train} AS SELECT * EXCLUDE(__quilt_split) FROM {split} WHERE __quilt_split < {ratio}; \
+             CREATE OR REPLACE VIEW {test} AS SELECT * EXCLUDE(__quilt_split) FROM {split} WHERE __quilt_split >= {ratio}",
+            split_sql = split_sql,
+            train = quote_ident(&node.id),
+            test = quote_ident(&format!("{}__test", node.id)),
+            split = quote_ident(&split_table),
+            ratio = ratio,
+        );
+        (sql, StageKind::View, None)
+    } else if component_id.starts_with("ml.learner.") {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let algorithm = component_id
+            .strip_prefix("ml.learner.")
+            .unwrap_or("")
+            .to_string();
+        let target_column = string_prop(&props, "targetColumn")
+            .filter(|s| !s.is_empty())
+            .unwrap_or_default();
+        // Supervised learners require a target; k-means is unsupervised.
+        if algorithm != "kmeans" && target_column.is_empty() {
+            return Err(EngineError::Config(format!(
+                "{}: targetColumn required",
+                component_id
+            )));
+        }
+        ml_learner = Some(MlLearnerSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            algorithm,
+            target_column,
+            feature_columns: columns_list(&props, "featureColumns"),
+            max_depth: props.get("maxDepth").and_then(|v| v.as_u64()).unwrap_or(10) as usize,
+            n_trees: props.get("nTrees").and_then(|v| v.as_u64()).unwrap_or(100) as usize,
+            k: props.get("k").and_then(|v| v.as_u64()).unwrap_or(5) as usize,
+            max_iter: props.get("maxIter").and_then(|v| v.as_u64()).unwrap_or(100) as usize,
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "ml.predict" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let model_node_id = model_input
+            .ok_or_else(|| EngineError::Config(format!(
+                "{}: connect a trained Learner to the model port",
+                component_id
+            )))?
+            .to_string();
+        ml_predict = Some(MlPredictSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            model_node_id,
+            output_column: string_prop(&props, "outputColumn")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "prediction".into()),
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "ml.score" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let actual_column = string_prop(&props, "actualColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: actualColumn required", component_id)))?;
+        ml_score = Some(MlScoreSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            actual_column,
+            predicted_column: string_prop(&props, "predictedColumn")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "prediction".into()),
+            task: string_prop(&props, "task")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "classification".into()),
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "dl.onnx.reader" {
+        let path = string_prop(&props, "path")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: path required (.onnx file)", component_id)))?;
+        onnx_reader = Some(OnnxReaderSpec {
+            node_id: node.id.clone(),
+            path,
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "dl.onnx.predict" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let model_node_id = model_input
+            .ok_or_else(|| EngineError::Config(format!(
+                "{}: connect an ONNX Model Reader to the model port",
+                component_id
+            )))?
+            .to_string();
+        let feature_columns = columns_list(&props, "featureColumns");
+        if feature_columns.is_empty() {
+            return Err(EngineError::Config(format!(
+                "{}: featureColumns required (model inputs, in order)",
+                component_id
+            )));
+        }
+        onnx_predict = Some(OnnxPredictSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            model_node_id,
+            feature_columns,
+            output_column: string_prop(&props, "outputColumn")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "prediction".into()),
+        });
+        (String::new(), StageKind::View, None)
     } else {
-        // Is the node's reject port actually read downstream? Computed before
         // the body so CSV/TSV sources can switch to the tolerant pass/reject
         // split when (and only when) the reject port is wired (issue #15).
         let reject_ref = output_table_ref(&node.id, Some("reject"));
@@ -3186,6 +3381,11 @@ fn build_stage(
         .or_else(|| ai_llm.map(RuntimeSpec::AiLlm))
         .or_else(|| ai_classify.map(RuntimeSpec::AiClassify))
         .or_else(|| ai_dedupe.map(RuntimeSpec::AiDedupe))
+        .or_else(|| ml_learner.map(RuntimeSpec::MlLearner))
+        .or_else(|| ml_predict.map(RuntimeSpec::MlPredict))
+        .or_else(|| ml_score.map(RuntimeSpec::MlScore))
+        .or_else(|| onnx_reader.map(RuntimeSpec::OnnxReader))
+        .or_else(|| onnx_predict.map(RuntimeSpec::OnnxPredict))
         ;
     // Free the ATTACH alias so the next batched stage can re-ATTACH it (see
     // attach_alias above). Only stages that embed the ATTACH in their own SQL

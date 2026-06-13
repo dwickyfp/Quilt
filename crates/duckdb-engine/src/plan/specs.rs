@@ -1190,3 +1190,66 @@ pub enum UpsertFamily {
     /// `ON DUPLICATE KEY UPDATE col = VALUES(col)` (MySQL, MariaDB).
     MySql,
 }
+
+// === Machine Learning / Deep Learning ============================
+
+/// ml.learner.*: train a classic ML model from the upstream table and
+/// serialize it to a model artifact for a downstream Predictor/Scorer.
+/// `algorithm` is the suffix after `ml.learner.` (linreg / logreg / tree /
+/// forest / knn / kmeans). The model file is keyed by this node's id; the
+/// Predictor finds it via the model edge.
+#[derive(Debug, Clone)]
+pub struct MlLearnerSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub algorithm: String,
+    /// Target column (empty for unsupervised k-means).
+    pub target_column: String,
+    /// Feature columns; empty = all other numeric columns.
+    pub feature_columns: Vec<String>,
+    pub max_depth: usize,
+    pub n_trees: usize,
+    pub k: usize,
+    pub max_iter: usize,
+}
+
+/// ml.predict: apply a model trained by an upstream Learner (located via
+/// `model_node_id`) to each row, appending `output_column`.
+#[derive(Debug, Clone)]
+pub struct MlPredictSpec {
+    pub node_id: String,
+    pub from_view: String,
+    /// The Learner node whose model artifact we load.
+    pub model_node_id: String,
+    pub output_column: String,
+}
+
+/// ml.score: compare actual vs predicted columns and emit a metrics table.
+#[derive(Debug, Clone)]
+pub struct MlScoreSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub actual_column: String,
+    pub predicted_column: String,
+    /// "classification" or "regression".
+    pub task: String,
+}
+
+/// dl.onnx.reader: register an on-disk ONNX model file as a model artifact
+/// keyed by this node's id, for a downstream ONNX Predictor.
+#[derive(Debug, Clone)]
+pub struct OnnxReaderSpec {
+    pub node_id: String,
+    pub path: String,
+}
+
+/// dl.onnx.predict: run inference with the ONNX model from an upstream
+/// reader (located via `model_node_id`) over the named feature columns.
+#[derive(Debug, Clone)]
+pub struct OnnxPredictSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub model_node_id: String,
+    pub feature_columns: Vec<String>,
+    pub output_column: String,
+}

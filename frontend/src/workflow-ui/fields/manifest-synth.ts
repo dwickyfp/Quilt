@@ -305,7 +305,9 @@ function base(
     schemaSource: SchemaSource = 'autodetect',
 ): ComponentManifest {
     const kind: ComponentManifest['kind'] =
-        comp.kind === 'source' || comp.kind === 'sink' ? comp.kind : 'transform';
+        comp.kind === 'source' || comp.kind === 'sink' || comp.kind === 'ml'
+            ? comp.kind
+            : 'transform';
     return {
         id: comp.id,
         kind,
@@ -345,6 +347,9 @@ const REJECT_IN: NodePorts['inputs'][number] = {
     type: 'reject',
     optional: true,
 };
+
+const MODEL_OUT: NodePorts['outputs'][number] = { id: 'model', label: 'model', type: 'model' };
+const MODEL_IN: NodePorts['inputs'][number] = { id: 'model', label: 'model', type: 'model' };
 
 export function portsForComponent(comp: ComponentDef): NodePorts {
     const id = comp.id;
@@ -510,6 +515,49 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
                 { id: 'filter', label: 'unchanged', type: 'filter', optional: true },
                 REJECT_OUT,
             ],
+        };
+    }
+
+    // Partition - one input, two outputs: train + test split.
+    if (id === 'ml.partition') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [
+                { id: 'main', label: 'train', type: 'main' },
+                { id: 'test', label: 'test', type: 'main' },
+            ],
+        };
+    }
+
+    // Learner - data in, trained model out (KNIME-style model port).
+    if (id.startsWith('ml.learner.')) {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [MODEL_OUT],
+        };
+    }
+
+    // ONNX reader - no data input, emits a model port only.
+    if (id === 'dl.onnx.reader') {
+        return {
+            inputs: [],
+            outputs: [MODEL_OUT],
+        };
+    }
+
+    // Predictor - data in + model in, predictions out.
+    if (id === 'ml.predict' || id === 'dl.onnx.predict') {
+        return {
+            inputs: [MAIN_IN, MODEL_IN],
+            outputs: [MAIN_OUT],
+        };
+    }
+
+    // Scorer - labeled data in, metrics table out.
+    if (id === 'ml.score') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [MAIN_OUT],
         };
     }
 
@@ -4582,6 +4630,191 @@ function synthDbt(comp: ComponentDef): ComponentManifest {
 
 // Main entry ------------------------------------------------------------
 
+// Machine Learning / Deep Learning node config forms. Schema flows from the
+// upstream data port; target/feature pickers resolve against it.
+function synthMl(comp: ComponentDef): ComponentManifest {
+    const id = comp.id;
+
+    if (id === 'ml.partition') {
+        return base(comp, [
+            {
+                label: 'Split',
+                fields: [
+                    {
+                        key: 'ratio',
+                        label: 'Train ratio',
+                        kind: 'number',
+                        defaultValue: 0.7,
+                        description: 'Fraction of rows in the train set (main output). The rest go to the test output. 0-1.',
+                    },
+                    {
+                        key: 'method',
+                        label: 'Method',
+                        kind: 'select',
+                        defaultValue: 'random',
+                        options: [
+                            { label: 'Random', value: 'random' },
+                            { label: 'Stratified', value: 'stratified' },
+                        ],
+                    },
+                    {
+                        key: 'stratifyColumn',
+                        label: 'Stratify by column',
+                        kind: 'column',
+                        description: 'For stratified splits: preserve this column\'s class distribution across train/test.',
+                    },
+                    {
+                        key: 'seed',
+                        label: 'Seed',
+                        kind: 'integer',
+                        defaultValue: 42,
+                        description: 'Deterministic split seed.',
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
+
+    if (id.startsWith('ml.learner.')) {
+        const fields: Field[] = [];
+        // k-means is unsupervised - no target column.
+        if (id !== 'ml.learner.kmeans') {
+            fields.push({
+                key: 'targetColumn',
+                label: 'Target column',
+                kind: 'column',
+                required: true,
+                description: 'The column the model learns to predict.',
+            });
+        }
+        fields.push({
+            key: 'featureColumns',
+            label: 'Feature columns',
+            kind: 'columns',
+            description: 'Predictor columns. Leave empty to use all other numeric columns.',
+        });
+        if (id === 'ml.learner.tree' || id === 'ml.learner.forest') {
+            fields.push({
+                key: 'maxDepth',
+                label: 'Max depth',
+                kind: 'integer',
+                defaultValue: 10,
+            });
+        }
+        if (id === 'ml.learner.forest') {
+            fields.push({
+                key: 'nTrees',
+                label: 'Number of trees',
+                kind: 'integer',
+                defaultValue: 100,
+            });
+        }
+        if (id === 'ml.learner.knn') {
+            fields.push({
+                key: 'k',
+                label: 'Neighbors (k)',
+                kind: 'integer',
+                defaultValue: 5,
+            });
+        }
+        if (id === 'ml.learner.kmeans') {
+            fields.push(
+                {
+                    key: 'k',
+                    label: 'Clusters (k)',
+                    kind: 'integer',
+                    defaultValue: 3,
+                },
+                {
+                    key: 'maxIter',
+                    label: 'Max iterations',
+                    kind: 'integer',
+                    defaultValue: 100,
+                },
+            );
+        }
+        return base(comp, [{ label: 'Training', fields }], 'upstream');
+    }
+
+    if (id === 'dl.onnx.reader') {
+        return base(comp, [
+            {
+                label: 'Model',
+                fields: [
+                    {
+                        key: 'path',
+                        label: 'ONNX model path',
+                        kind: 'file-path',
+                        required: true,
+                        filters: [
+                            { name: 'ONNX model', extensions: ['onnx'] },
+                            { name: 'All files', extensions: ['*'] },
+                        ],
+                    },
+                ],
+            },
+        ], 'declared');
+    }
+
+    if (id === 'ml.predict' || id === 'dl.onnx.predict') {
+        const fields: Field[] = [];
+        if (id === 'dl.onnx.predict') {
+            fields.push({
+                key: 'featureColumns',
+                label: 'Feature columns',
+                kind: 'columns',
+                required: true,
+                description: 'Columns fed to the model inputs, in order.',
+            });
+        }
+        fields.push({
+            key: 'outputColumn',
+            label: 'Output column',
+            kind: 'text',
+            defaultValue: 'prediction',
+            description: 'Name of the appended prediction column.',
+        });
+        return base(comp, [{ label: 'Prediction', fields }], 'upstream');
+    }
+
+    if (id === 'ml.score') {
+        return base(comp, [
+            {
+                label: 'Evaluation',
+                fields: [
+                    {
+                        key: 'actualColumn',
+                        label: 'Actual column',
+                        kind: 'column',
+                        required: true,
+                        description: 'Ground-truth label/value column.',
+                    },
+                    {
+                        key: 'predictedColumn',
+                        label: 'Predicted column',
+                        kind: 'column',
+                        required: true,
+                        defaultValue: 'prediction',
+                        description: 'Column holding the model prediction.',
+                    },
+                    {
+                        key: 'task',
+                        label: 'Task',
+                        kind: 'select',
+                        defaultValue: 'classification',
+                        options: [
+                            { label: 'Classification', value: 'classification' },
+                            { label: 'Regression', value: 'regression' },
+                        ],
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
+
+    return base(comp, [], 'upstream');
+}
+
 export function synthesizeManifest(componentId: string): ComponentManifest | undefined {
     const entry = findPaletteEntry(componentId);
     if (!entry) return undefined;
@@ -4647,6 +4880,11 @@ export function synthesizeManifest(componentId: string): ComponentManifest | und
     // Custom code
     if (groupId === 'code.sql') return synthCustomCode(comp);
     if (groupId === 'code.scripts') return synthCustomCode(comp);
+
+    // Machine Learning / Deep Learning
+    if (groupId === 'ml.prep' || groupId === 'ml.learners' || groupId === 'ml.apply' || groupId === 'dl.onnx') {
+        return synthMl(comp);
+    }
 
     // SaaS - treat as API sources for now
     if (groupId.startsWith('saas.')) return synthApiSource(comp);

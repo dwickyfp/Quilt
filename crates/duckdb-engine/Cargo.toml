@@ -155,10 +155,28 @@ adbc_core = { version = "0.16", features = ["driver_manager"] }
 arrow-array = { workspace = true }
 arrow-schema = { workspace = true }
 parquet = { workspace = true }
+# Classic machine learning (ml.learner.*, ml.predict). smartcore is
+# pure-Rust - linear/logistic regression, decision tree, random forest,
+# KNN, k-means - and its models are serde-serializable, so a Learner can
+# persist a trained model to disk (bincode) for a downstream Predictor to
+# load. No native deps, fits the single-binary promise.
+smartcore = { version = "0.3", features = ["serde"] }
+bincode = "1.3"
+rand = "0.8"
+# Deep-learning inference (dl.onnx.*) via the ONNX Runtime. Gated behind
+# the `onnx` feature: `ort` links the ONNX Runtime native library, which we
+# install on first use (engine_manager) rather than bundling. load-dynamic
+# resolves libonnxruntime at runtime so a default build stays self-contained.
+ort = { version = "2.0.0-rc.9", default-features = false, features = ["load-dynamic", "ndarray"], optional = true }
+ndarray = { version = "0.16", optional = true }
 
 [features]
 default = ["oracle"]
 oracle = ["dep:oracle"]
+# Deep-learning inference via ONNX Runtime. Off by default (needs the
+# native libonnxruntime, installed on first use). The dl.onnx.* nodes
+# return a clear "install the ONNX runtime" error when this is compiled out.
+onnx = ["dep:ort", "dep:ndarray"]
 
 # Issue #4 repro harness: connects to a live Oracle, replays
 # run_oracle_source faithfully, and times each phase. Gated so a

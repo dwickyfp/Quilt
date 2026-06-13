@@ -58,12 +58,14 @@ const KIND_LABEL: Record<string, string> = {
     source: 'Source',
     transform: 'Transform',
     sink: 'Sink',
+    ml: 'Machine Learning',
 };
 
 const KIND_COLOR: Record<string, string> = {
     source: '#2eafff',
     transform: '#3d8bff',
     sink: '#ff6900',
+    ml: '#a855f7',
 };
 
 type Props = {
