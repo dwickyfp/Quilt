@@ -1639,6 +1639,7 @@ export default function App() {
                 className="topbar"
                 data-tauri-drag-region
             >
+                <WindowControls side="left" />
                 <div className="brand" data-tauri-drag-region>
                     <QuiltLogo size={24} className="brand-logo" />
                     Quilt
@@ -1729,7 +1730,7 @@ export default function App() {
                 <div className="status" data-state={runtime}>
                     <span className="status-dot" /> {t('topbar.runtime', { name: runtime })}
                 </div>
-                <WindowControls />
+                <WindowControls side="right" />
             </header>
 
             <UpdateBanner />

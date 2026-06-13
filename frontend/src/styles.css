@@ -202,7 +202,7 @@ textarea:focus-visible {
     align-items: center;
     gap: 16px;
     height: var(--topbar-h);
-    padding: 0 0 0 20px;
+    padding: 0 16px 0 20px;
     background:
         linear-gradient(180deg, rgba(245, 162, 30, 0.025), transparent 60%),
         var(--bg-1);
@@ -218,6 +218,7 @@ textarea:focus-visible {
     display: flex;
     align-self: stretch;
     margin-left: 6px;
+    margin-right: -16px;
 }
 
 .win-ctl {
@@ -246,6 +247,50 @@ textarea:focus-visible {
 .win-ctl:active {
     background: var(--bg-4);
 }
+
+/* macOS traffic-light controls (left side) ----------------------------- */
+.win-controls-mac {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 8px;
+    -webkit-app-region: no-drag;
+}
+
+.win-mac {
+    width: 12px;
+    height: 12px;
+    padding: 0;
+    border-radius: 50%;
+    border: none;
+    cursor: default;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.win-mac-close {
+    background: #ff5f57;
+}
+
+.win-mac-min {
+    background: #febc2e;
+}
+
+.win-mac-zoom {
+    background: #28c840;
+}
+
+.win-mac-glyph {
+    color: rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    transition: opacity 90ms ease;
+}
+
+.win-controls-mac:hover .win-mac-glyph {
+    opacity: 1;
+}
+
 
 /* Engine option: coming-soon (disabled) -------------------------------- */
 .engine-option.is-coming-soon {
