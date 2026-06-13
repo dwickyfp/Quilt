@@ -263,5 +263,11 @@
     "modelPlaceholder": "e.g. gpt-4o-mini",
     "providerLabel": "Label",
     "noModels": "No models yet"
+  },
+  "lineage": {
+    "empty": "No columns to trace yet.",
+    "hint": "Where each output column originates, traced back through the pipeline.",
+    "createdHere": "created here",
+    "hops": "hops"
   }
 }

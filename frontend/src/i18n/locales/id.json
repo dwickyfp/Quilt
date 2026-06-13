@@ -244,5 +244,11 @@
     "modelPlaceholder": "mis. gpt-4o-mini",
     "providerLabel": "Label",
     "noModels": "Belum ada model"
+  },
+  "lineage": {
+    "empty": "Belum ada kolom untuk ditelusuri.",
+    "hint": "Asal setiap kolom output, ditelusuri balik melalui pipeline.",
+    "createdHere": "dibuat di sini",
+    "hops": "lompatan"
   }
 }

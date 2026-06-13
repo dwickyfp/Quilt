@@ -3,6 +3,7 @@ import { useTranslation, Trans } from 'react-i18next';
 import type { Edge, Node } from '@xyflow/react';
 import { CheckCircle2, ChevronLeft, ChevronRight, MousePointer2, Workflow } from 'lucide-react';
 import { resolveUpstreamSchema, resolveUpstreamSampleRows } from '../schema-resolve';
+import LineagePanel from './LineagePanel';
 import type { Column, QuiltNodeData } from '../pipeline-types';
 import type {
     ConnectionPayload,
@@ -403,6 +404,16 @@ export default function PropertiesPanel({
                                 }
                                 onChange={setSchema}
                                 readOnly={manifest?.schemaSource === 'upstream'}
+                            />
+                            <LineagePanel
+                                selected={selected}
+                                allNodes={allNodes}
+                                edges={edges}
+                                columns={
+                                    manifest?.schemaSource === 'upstream'
+                                        ? upstreamSchema
+                                        : declaredSchema
+                                }
                             />
                         </div>
                     ) : null}
