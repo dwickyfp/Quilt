@@ -1287,12 +1287,33 @@ impl DuckdbEngine {
             if pq.exists() {
                 continue;
             }
+            // Write to a unique temp file then atomically rename into place.
+            // Two concurrent runs sharing one cache dir (scheduler + interactive,
+            // or two scheduled pipelines) could otherwise let one read a
+            // half-written <key>.parquet as a "hit". Rename is atomic on the
+            // same filesystem, so a reader sees either no file or the complete
+            // one - never a torn parquet. Content-addressed, so racing writers
+            // produce identical bytes; last rename wins harmlessly.
+            let tmp = dir.join(format!(
+                "{}.tmp-{}-{}.parquet",
+                key,
+                std::process::id(),
+                now_nanos()
+            ));
             let sql = format!(
                 "COPY (SELECT * FROM {}) TO '{}' (FORMAT parquet)",
                 plan::quote_ident(node_id),
-                sql_escape(&pq.to_string_lossy()),
+                sql_escape(&tmp.to_string_lossy()),
             );
-            let _ = self.run(Some(db_path), &sql, false);
+            if self.run(Some(db_path), &sql, false).is_ok() {
+                // Best-effort: a failed rename just leaves a future cache miss
+                // (and a stray tmp file the LRU sweep will eventually evict).
+                if std::fs::rename(&tmp, &pq).is_err() {
+                    let _ = std::fs::remove_file(&tmp);
+                }
+            } else {
+                let _ = std::fs::remove_file(&tmp);
+            }
         }
         Self::stage_cache_evict(dir, budget_mb);
     }
