@@ -14,7 +14,6 @@ import {
 import type { ConnectionType } from './canvas/connection-types';
 import { Braces, FolderOpen, GitBranch, Moon, Settings, Sparkles, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import LanguageSelector from './i18n/LanguageSelector';
 import { UpdateBanner } from './UpdateBanner';
 import EditorTabs from './workflow-ui/EditorTabs';
 import EditorHeader, { type Job } from './workflow-ui/EditorHeader';
@@ -1723,7 +1722,6 @@ export default function App() {
                 >
                     <Sparkles size={14} />
                 </button>
-                <LanguageSelector />
                 <button
                     type="button"
                     className="topbar-theme-toggle"

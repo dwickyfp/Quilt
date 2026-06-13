@@ -12,6 +12,7 @@ import {
     type ProviderEntry,
 } from '../ai-settings';
 import { aiTestConnection } from '../tauri-bridge';
+import { LANGUAGES } from '../i18n/languages';
 
 type Props = {
     onClose: () => void;
@@ -26,7 +27,8 @@ type TestState =
 const PROVIDERS: AiProvider[] = ['openai', 'claude', 'openai-compatible'];
 
 export default function SettingsPage({ onClose }: Props) {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const [section, setSection] = useState<'general' | 'ai'>('general');
     const [settings, setSettings] = useState<AiSettings>(() => loadAiSettings());
     const [draftModel, setDraftModel] = useState<Record<string, string>>({});
     const [test, setTest] = useState<TestState>({ phase: 'idle' });
@@ -167,12 +169,56 @@ export default function SettingsPage({ onClose }: Props) {
 
                 <div className="settings-main">
                     <nav className="settings-sidebar" aria-label={t('settings.title')}>
-                        <button type="button" className="settings-nav-item is-active">
+                        <button
+                            type="button"
+                            className={`settings-nav-item${section === 'general' ? ' is-active' : ''}`}
+                            onClick={() => setSection('general')}
+                        >
+                            {t('settings.navGeneral')}
+                        </button>
+                        <button
+                            type="button"
+                            className={`settings-nav-item${section === 'ai' ? ' is-active' : ''}`}
+                            onClick={() => setSection('ai')}
+                        >
                             {t('settings.navAiProvider')}
                         </button>
                     </nav>
 
                     <div className="settings-content">
+                        {section === 'general' ? (
+                            <section className="settings-section">
+                                <div className="settings-section-title">
+                                    {t('settings.general')}
+                                </div>
+                                <div className="modal-field">
+                                    <label className="modal-field-label" htmlFor="settings-language">
+                                        {t('settings.language')}
+                                    </label>
+                                    <select
+                                        id="settings-language"
+                                        className="modal-input modal-select"
+                                        value={
+                                            LANGUAGES.find(l => l.code === i18n.language)?.code ??
+                                            LANGUAGES.find(l => i18n.language?.startsWith(l.code))?.code ??
+                                            'en'
+                                        }
+                                        onChange={e => void i18n.changeLanguage(e.target.value)}
+                                    >
+                                        {LANGUAGES.map(l => (
+                                            <option key={l.code} value={l.code}>
+                                                {l.nativeName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="modal-field-hint">
+                                        {t('settings.languageHint')}
+                                    </div>
+                                </div>
+                            </section>
+                        ) : null}
+
+                        {section === 'ai' ? (
                         <section className="settings-section">
                             <div className="settings-section-title">
                                 {t('settings.aiProvider')}
@@ -388,6 +434,7 @@ export default function SettingsPage({ onClose }: Props) {
                                 </div>
                             ) : null}
                         </section>
+                        ) : null}
                     </div>
                 </div>
 

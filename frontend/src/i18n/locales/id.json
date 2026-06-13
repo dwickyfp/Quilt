@@ -243,7 +243,11 @@
     "addModel": "Tambah model",
     "modelPlaceholder": "mis. gpt-4o-mini",
     "providerLabel": "Label",
-    "noModels": "Belum ada model"
+    "noModels": "Belum ada model",
+    "navGeneral": "Umum",
+    "general": "Umum",
+    "language": "Bahasa",
+    "languageHint": "Mengubah bahasa antarmuka secara langsung."
   },
   "lineage": {
     "empty": "Belum ada kolom untuk ditelusuri.",

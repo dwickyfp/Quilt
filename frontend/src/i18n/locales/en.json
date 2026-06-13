@@ -262,7 +262,11 @@
     "addModel": "Add model",
     "modelPlaceholder": "e.g. gpt-4o-mini",
     "providerLabel": "Label",
-    "noModels": "No models yet"
+    "noModels": "No models yet",
+    "navGeneral": "General",
+    "general": "General",
+    "language": "Language",
+    "languageHint": "Changes the interface language immediately."
   },
   "lineage": {
     "empty": "No columns to trace yet.",

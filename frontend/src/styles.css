@@ -2657,35 +2657,11 @@ select.schema-input {
     max-width: 140px;
 }
 
-.topbar-lang {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: 26px;
-    padding: 0 4px 0 7px;
-    border-radius: 7px;
-    background: var(--bg-2);
-    border: 1px solid var(--border);
-    color: var(--text-2);
-    -webkit-app-region: no-drag;
-}
-
-.topbar-lang-select {
-    background: transparent;
-    border: none;
-    color: var(--text-1);
-    font-size: 12px;
-    font-family: inherit;
-    cursor: pointer;
-    max-width: 130px;
-}
-
 /* RTL: flip layout direction for Arabic / Hebrew / Persian / Urdu so
    the visual order matches reading order. document.dir is set by i18n
    bootstrap based on the active language. */
 html[dir='rtl'] .topbar-workspace,
-html[dir='rtl'] .topbar-context,
-html[dir='rtl'] .topbar-lang {
+html[dir='rtl'] .topbar-context {
     flex-direction: row-reverse;
 }
 
