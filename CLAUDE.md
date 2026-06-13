@@ -102,10 +102,16 @@ compiles a node graph to staged DuckDB SQL; React 19 + Vite + Tauri 2 frontend (
 - `workflow-ui/lineage.ts` + `LineagePanel.tsx` — column lineage in the Schema tab.
 - `qa.golden` — Golden Assert regression-test node (EXCEPT-both-ways vs a golden Parquet).
 - `plan/stage_cache.rs` + executor wiring — incremental re-run (opt-in, see env var above).
-- STILL FOUNDATIONAL (tested core, NOT wired): `workflow-ui/component-def.ts` (#2 reusable
-  subgraph) and `workflow-ui/pipeline-test.ts` (FE golden-diff core; the engine-side
-  regression test shipped instead as `qa.golden`). Don't claim #2 as shipped until its
-  engine inline + create-from-selection UI land.
+- `workflow-ui/component-def.ts` + `component-expand.ts` + `run-resolve.ts` — #2 reusable
+  components. Create-from-selection (node context menu, 2+ nodes) collapses a subgraph into a
+  saved `cmp.*` instance; the run path (`expandComponentsForRun`) inlines instances back into a
+  flat graph BEFORE the engine sees them (zero engine changes — verified by
+  `expanded_component_namespaced_ids_run_correctly` exec test). Saved components show in the
+  palette's "My Components" group, draggable as new instances. PARTIAL: per-instance param
+  override has a tested core + run-path substitution, but `extractComponent` returns `params: []`
+  and there's no UI yet to expose a param — so today's components are fixed subgraphs.
+- STILL FOUNDATIONAL (tested core, NOT wired): `workflow-ui/pipeline-test.ts` (FE golden-diff
+  core; the engine-side regression test shipped instead as `qa.golden`).
 
 **Known trap:** the patch/write_file syntax checker mis-parses `crates/duckdb-engine/src/connectors.rs`
 as edition 2015 and emits a wall of false-positive errors. Ignore them; trust only `cargo` output.

@@ -378,6 +378,7 @@ Every node has an **Advanced** tab with fields the engine honours at run time:
 | **Cloud credentials** | Saved S3 / GCS / Azure connections become DuckDB SECRETs; cloud reads / writes go through `httpfs`. S3-compatible endpoints (MinIO / R2 / B2) supported via `ENDPOINT` + `URL_STYLE`. |
 | **Column lineage** | On any node's **Schema** tab, see where each output column originates - traced back through the pipeline to its source node/column, with hop count. Impact analysis without leaving the canvas. |
 | **Incremental re-run** | Opt-in content-addressed stage cache (`QUILT_STAGE_CACHE_DIR`). Each stage's output is checkpointed to Parquet keyed by a content hash (component + config + source-file fingerprint + upstream chain). Editing one node re-executes only that node and its downstream; unchanged stages are served from cache and their dead upstreams pruned. Off by default - zero behavior change when unset. |
+| **Reusable components** | Select 2+ connected nodes → right-click → **Create component from selection** to collapse them into one saved node. It shows in the palette's **My Components** group, draggable as new instances. At run time each instance inlines back into a flat graph, so the engine runs it like any other pipeline. Single-input / single-output selections for now. |
 | **Workspace** | Pipelines, connections, contexts, documents, and routines persist as plain JSON and Markdown files in a folder you choose. |
 
 ---
