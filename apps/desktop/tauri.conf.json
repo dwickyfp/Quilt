@@ -38,7 +38,7 @@
     "category": "DeveloperTool",
     "shortDescription": "Embedded, ultra-fast data engineering platform.",
     "longDescription": "Quilt is an open-source, local-first ETL/ELT/streaming platform with a drag-and-drop UI and native execution speed.",
-    "copyright": "Copyright 2026 Sourav Roy",
+    "copyright": "Copyright 2026 Dwicky Feri",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

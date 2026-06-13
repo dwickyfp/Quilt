@@ -16,7 +16,7 @@ cd "$(dirname "$0")"
 
 ROOT="$(cd ../.. && pwd)"
 SHOTS="$ROOT/docs/assets/real-life-screenshot"
-EXTRA="C:/Users/Sourav Roy/Documents/New folder (2)"
+EXTRA="C:/Users/Dwicky Feri/Documents/New folder (2)"
 LOGO="$ROOT/apps/desktop/icons/icon-source.png"
 OUTDIR="out"
 SCENES="scenes-v02"

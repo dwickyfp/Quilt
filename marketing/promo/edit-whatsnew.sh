@@ -12,10 +12,10 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 ROOT="$(cd ../.. && pwd)"
-SRC="C:/Users/Sourav Roy/Downloads/Quack+LOC60.mp4"
-OUT="C:/Users/Sourav Roy/Downloads/Quack+LOC60-marketed.mp4"
+SRC="C:/Users/Dwicky Feri/Downloads/Quack+LOC60.mp4"
+OUT="C:/Users/Dwicky Feri/Downloads/Quack+LOC60-marketed.mp4"
 LOGO="$ROOT/apps/desktop/icons/icon-source.png"
-TMP="C:/Users/SOURAV~1/AppData/Local/Temp/quilt-vid"
+TMP="C:/Users/DWICKY~1/AppData/Local/Temp/quilt-vid"
 mkdir -p "$TMP"
 
 W=1920

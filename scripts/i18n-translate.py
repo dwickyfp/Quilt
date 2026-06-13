@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 EN_PATH = ROOT / 'frontend' / 'src' / 'i18n' / 'locales' / 'en.json'
 LOCALES_DIR = EN_PATH.parent
-EMAIL = 'souravroy7864@gmail.com'  # higher daily char limit
+EMAIL = ''  # set for higher daily char limit
 
 # Order matters: same as LANGUAGES in languages.ts for predictable runs.
 TARGETS = [

@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 /// Default DuckDB binary location used when neither --duckdb nor
 /// QUILT_DUCKDB_BIN is given.
 const DEFAULT_DUCKDB: &str =
-    "C:/Users/Sourav Roy/AppData/Roaming/io.quilt.app/engines/duckdb/duckdb.exe";
+    "C:/Users/Dwicky Feri/AppData/Roaming/io.quilt.app/engines/duckdb/duckdb.exe";
 
 /// Minimum length for a string to be treated as a secret. Below this we
 /// risk corrupting structural tokens (a 1-3 char "secret" could be a

@@ -1124,7 +1124,7 @@ Licensed under either of **MIT** or **Apache-2.0** at your option.
 ---
 
 <div align="center">
-<sub>Built with Rust, Tauri, React, and DuckDB by <a href="https://github.com/dwickyfp">Sourav Roy</a></sub>
+<sub>Built with Rust, Tauri, React, and DuckDB by <a href="https://github.com/dwickyfp">Dwicky Feri</a></sub>
 </div>
 
 <!-- Suggested GitHub topics: etl, elt, data-engineering, data-pipeline, duckdb, rust, tauri, react, typescript, local-first, embedded, drag-and-drop, data-cleaning, vector-database, ai, ai-assistant, llm, llama-cpp, qwen, desktop-app, no-code, low-code, sql, pipeline-builder -->
