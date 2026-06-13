@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import {
     ArrowDownToLine,
     ArrowUpFromLine,
+    Brain,
+    BrainCircuit,
     Check,
     ChevronDown,
     ChevronRight,
@@ -30,6 +32,8 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
     quality: <ShieldCheck size={13} />,
     code: <Code2 size={13} />,
     saas: <Cloud size={13} />,
+    ml: <Brain size={13} />,
+    dl: <BrainCircuit size={13} />,
 };
 
 const DEFAULT_EXPANDED = new Set<string>();

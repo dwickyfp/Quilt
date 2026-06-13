@@ -400,7 +400,7 @@ impl DuckdbEngine {
             // space so integer-coded metrics line up, then add a confusion
             // matrix as one row per non-empty (actual, predicted) cell.
             let mut labels: Vec<String> = Vec::new();
-            let mut encode = |row: &JsonValue, col: &str, labels: &mut Vec<String>| -> usize {
+            let encode = |row: &JsonValue, col: &str, labels: &mut Vec<String>| -> usize {
                 let raw = label_of(row.get(col));
                 match labels.iter().position(|l| l == &raw) {
                     Some(i) => i,
