@@ -64,6 +64,9 @@
 - [Data quality](#data-quality-12-available)
 - [Custom code](#custom-code-7-available)
 - [Control flow](#control-flow-19-available)
+- [Machine learning](#machine-learning-10-available)
+- [Deep learning](#deep-learning-2-available)
+- [Visualization](#visualization-4-available)
 - [Advanced settings](#advanced-settings-per-node)
 - [Engines](#engines)
 - [Configuration](#configuration)
@@ -191,7 +194,7 @@ The component palette ships **313 nodes** so the roadmap is visible in the produ
 
 ## Capabilities
 
-Quilt is not a CSV tool with extras. It reads a broad set of formats and sources, ships a deep transform library, and writes to files, databases, object storage, vector DBs, message buses, and email.
+Quilt is not a CSV tool with extras. It reads a broad set of formats and sources, ships a deep transform library, trains and applies ML / deep-learning models, renders charts inline, and writes to files, databases, object storage, vector DBs, message buses, and email.
 
 ### Sources (74 available)
 
@@ -320,6 +323,37 @@ Validators split their input: passing rows continue on the main port, failures r
 | **Warn** | Emit a warning log line, pass rows through (`ctl.warn`) |
 | **Die / Fail** | Stop the run with a message: always, only when the input has rows, or only when empty (`ctl.die`) |
 | **Schedule** | Cron / interval / file-watch triggers via the orchestration crate |
+
+### Machine learning (10 available)
+
+Train, apply, and evaluate classic ML models directly on the canvas - in-engine, no Python runtime. Learners emit a model on a dedicated **model** port; wire it into a Predictor (and feed a held-out set into a Scorer) to close the loop.
+
+| Group | Components |
+|---|---|
+| **Preparation** | Partition (train / test split: `random` or `stratified`, seeded for reproducibility) |
+| **Learners (train)** | Linear Regression, Logistic Regression, Decision Tree, Random Forest, k-NN, k-Means (unsupervised clustering) |
+| **Apply & evaluate** | Predictor (append a prediction column from a trained model), Scorer (accuracy / precision / recall + confusion matrix for classification; RMSE / MAE / R² for regression) |
+| **Export** | Model Writer (classic ML → portable JSON params + features + labels; ONNX → copies the `.onnx` file) |
+
+### Deep learning (2 available)
+
+Run pre-trained neural networks locally via the ONNX Runtime (fetched on first use, no Python).
+
+| Component | What it does |
+|---|---|
+| **ONNX Model Reader** | Load a pre-trained `.onnx` model file from disk; outputs a model on the model port |
+| **ONNX Predictor** | Run inference with a loaded ONNX model over incoming rows; maps `featureColumns` (in order) to the model inputs and appends the output column |
+
+### Visualization (4 available)
+
+Terminal chart nodes that aggregate upstream data and render it inline - inspect results without leaving the canvas or exporting to a BI tool.
+
+| Component | What it does |
+|---|---|
+| **Bar Chart** | Aggregate a measure by a dimension and render bars |
+| **Line Chart** | Aggregate a measure by a dimension and render a line |
+| **Scatter Plot** | Plot raw x vs y points to inspect correlation |
+| **Histogram** | Count rows per dimension value |
 
 ### Advanced settings (per-node)
 
