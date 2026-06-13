@@ -3895,6 +3895,15 @@ impl DuckdbEngine {
                     return Err(EngineError::Query(format!("webhook accept: {}", e)));
                 }
             };
+            // The listener is non-blocking so we can poll cancel + deadline,
+            // but on macOS/BSD the accepted stream INHERITS O_NONBLOCK from the
+            // listener. A non-blocking read returns EAGAIN ("Resource
+            // temporarily unavailable") the instant the body hasn't arrived
+            // yet, which read_http_request would treat as a malformed request
+            // and drop - the source of the flaky "got 1, expected 2" on
+            // macos-14 CI. Put the stream back into blocking mode so the
+            // read_timeout below actually governs the read.
+            stream.set_nonblocking(false).ok();
             stream
                 .set_read_timeout(Some(Duration::from_millis(1000)))
                 .ok();
