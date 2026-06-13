@@ -15,7 +15,8 @@ import { getManifest } from '../../workflow-ui/fields/component-manifests';
 import { metaFor } from '../connection-types';
 import type { PortDef } from '../../workflow-ui/fields/types';
 import { resolveOutputSchema } from '../../schema-resolve';
-import { useRunStatus } from '../run-status-context';
+import { useRunStatus, useProfile } from '../run-status-context';
+import { heatColor, formatBytes } from '../profile-overlay';
 import { deriveNodeSubtitle } from '../../node-subtitle';
 import ComponentIcon from '../../workflow-ui/ComponentIcon';
 import type { NodeKind } from '../../workflow-ui/palette-data';
@@ -85,15 +86,28 @@ export default function QuiltNode({ id, data, selected, type }: NodeProps<QuiltF
     }, [manifest, data.properties]);
 
     const runStatus = useRunStatus(id);
+    const profile = useProfile();
+
+    // Profiler overlay (A3): when on, tint the node by execution-duration heat
+    // and show a metric badge. Off => existing rendering unchanged.
+    const profileActive = profile.enabled && !!runStatus;
+    const profileStyle = profileActive
+        ? {
+              boxShadow:
+                  '0 0 0 2px ' +
+                  heatColor(runStatus?.duration_ms ?? 0, profile.maxDuration),
+          }
+        : undefined;
 
     const classes =
         'node node-' + kind +
         (selected ? ' is-selected' : '') +
         (data.disabled ? ' is-disabled' : '') +
-        (runStatus ? ' is-run-' + runStatus.status : '');
+        (runStatus ? ' is-run-' + runStatus.status : '') +
+        (profileActive ? ' is-profile' : '');
 
     return (
-        <div className={classes}>
+        <div className={classes} style={profileStyle}>
             <div className="node-header">
                 <div className="node-header-row">
                     <div className="node-kind">{t(`node.${kind}`, { defaultValue: kind })}</div>
@@ -134,6 +148,15 @@ export default function QuiltNode({ id, data, selected, type }: NodeProps<QuiltF
                     </div>
                 ) : null}
                 {data.disabled ? <div className="node-disabled-badge">{t('node.disabled')}</div> : null}
+                {profileActive ? (
+                    <div className="node-profile-badge">
+                        {(runStatus?.duration_ms ?? 0)}ms
+                        {runStatus?.rows != null ? ` · ${runStatus.rows} rows` : null}
+                        {runStatus?.peak_memory_bytes != null
+                            ? ` · ${formatBytes(runStatus.peak_memory_bytes)}`
+                            : null}
+                    </div>
+                ) : null}
             </div>
             {portCount > 0 ? (
                 <div className="node-ports">

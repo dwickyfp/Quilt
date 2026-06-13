@@ -5,8 +5,8 @@
     "noContext": "Inget sammanhang",
     "git": "Git (arbetsyta)",
     "gitAriaToggle": "Växla Git-panel",
-    "duckieAssistant": "Duckie AI-assistent",
-    "duckieAssistantAriaToggle": "Växla Duckie AI-assistent",
+    "duckieAssistant": "Qunnie AI-assistent",
+    "duckieAssistantAriaToggle": "Växla Qunnie AI-assistent",
     "switchLight": "Växla till ljusläge",
     "switchDark": "Byt till läge:",
     "themeAriaToggle": "Byt tema",
@@ -74,10 +74,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI-assistent",
+    "title": "Qunnie AI-assistent",
     "localTag": "lokal",
     "checking": "Kontrollerar AI-motor...",
-    "installTitle": "Installera Duckie AI-assistenten",
+    "installTitle": "Installera Qunnie AI-assistenten",
     "installBody": "Quilt laddar ner en liten lokal modell (~ 1,1 GB) så att assistenten körs helt på din dator - inga API-nycklar, inga molnanrop.",
     "installCta": "Installera (~ 1,1 GB)",
     "installFailedTitle": "Installation av %s misslyckades",

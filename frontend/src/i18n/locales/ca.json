@@ -5,8 +5,8 @@
     "noContext": "Sense context",
     "git": "Git (espai de treball)",
     "gitAriaToggle": "Commuta el panell Git",
-    "duckieAssistant": "Duckie AI Assistant",
-    "duckieAssistantAriaToggle": "Commuta l'Assistent d'IA de Duckie",
+    "duckieAssistant": "Qunnie AI Assistant",
+    "duckieAssistantAriaToggle": "Commuta l'Assistent d'IA de Qunnie",
     "switchLight": "Canvia al mode de llum",
     "switchDark": "Canvia al mode fosc",
     "themeAriaToggle": "Canvia el tema",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI Assistant",
+    "title": "Qunnie AI Assistant",
     "localTag": "locals",
     "checking": "S'està comprovant el motor d'IA...",
-    "installTitle": "Instal·leu el Duckie AI Assistant",
+    "installTitle": "Instal·leu el Qunnie AI Assistant",
     "installBody": "Quilt baixa un petit model local (~1,1 GB) perquè l'assistent s'executi completament a la vostra màquina: sense claus API, sense trucades al núvol.",
     "installCta": "Instal·lació (~1,1 GB)",
     "installFailedTitle": "La instal·lació ha fallat",

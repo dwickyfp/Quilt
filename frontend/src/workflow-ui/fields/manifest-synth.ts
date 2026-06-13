@@ -305,7 +305,7 @@ function base(
     schemaSource: SchemaSource = 'autodetect',
 ): ComponentManifest {
     const kind: ComponentManifest['kind'] =
-        comp.kind === 'source' || comp.kind === 'sink' || comp.kind === 'ml'
+        comp.kind === 'source' || comp.kind === 'sink' || comp.kind === 'ml' || comp.kind === 'viz'
             ? comp.kind
             : 'transform';
     return {
@@ -566,6 +566,14 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         return {
             inputs: [MAIN_IN],
             outputs: [MAIN_OUT],
+        };
+    }
+
+    // Viz charts - terminal: one main input, no output (renders a chart).
+    if (comp.kind === 'viz') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [],
         };
     }
 
@@ -4536,6 +4544,32 @@ function synthDebugTransform(comp: ComponentDef): ComponentManifest {
     return synthGeneric(comp, 'upstream');
 }
 
+function synthViz(comp: ComponentDef): ComponentManifest {
+    const isHistogram = comp.id === 'viz.histogram';
+    const fields: Field[] = [
+        { key: 'x', label: 'X (dimension)', kind: 'column', required: true },
+    ];
+    if (!isHistogram) {
+        fields.push({ key: 'y', label: 'Y (measure)', kind: 'column', required: true });
+        fields.push({
+            key: 'agg',
+            label: 'Aggregation',
+            kind: 'select',
+            defaultValue: 'sum',
+            options: ['sum', 'avg', 'count', 'min', 'max'].map(f => ({ label: f.toUpperCase(), value: f })),
+        });
+        fields.push({ key: 'series', label: 'Series (optional group-by)', kind: 'column' });
+    }
+    fields.push({
+        key: 'limit',
+        label: 'Row limit',
+        kind: 'integer',
+        defaultValue: 1000,
+        description: 'Maximum number of aggregated rows to plot.',
+    });
+    return base(comp, [{ label: 'Chart', fields }], 'upstream');
+}
+
 function synthGeneric(comp: ComponentDef, schemaSource: SchemaSource = 'upstream'): ComponentManifest {
     return base(comp, [
         {
@@ -4915,6 +4949,9 @@ export function synthesizeManifest(componentId: string): ComponentManifest | und
     if (groupId === 'ml.prep' || groupId === 'ml.learners' || groupId === 'ml.apply' || groupId === 'ml.export' || groupId === 'dl.onnx') {
         return synthMl(comp);
     }
+
+    // Visualize
+    if (groupId === 'viz.charts') return synthViz(comp);
 
     // SaaS - treat as API sources for now
     if (groupId.startsWith('saas.')) return synthApiSource(comp);

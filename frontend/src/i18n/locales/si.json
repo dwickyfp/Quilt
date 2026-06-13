@@ -5,8 +5,8 @@
     "noContext": "සන්දර්භය නැත",
     "git": "Git (වැඩ අවකාශය)",
     "gitAriaToggle": "Git පැනලය ටොගල් කරන්න",
-    "duckieAssistant": "Duckie AI සහකාර",
-    "duckieAssistantAriaToggle": "Duckie AI සහකරු ටොගල් කරන්න",
+    "duckieAssistant": "Qunnie AI සහකාර",
+    "duckieAssistantAriaToggle": "Qunnie AI සහකරු ටොගල් කරන්න",
     "switchLight": "ආලෝක මාදිලියට මාරු වන්න",
     "switchDark": "අඳුරු මාදිලියට මාරු වන්න",
     "themeAriaToggle": "තේමාව ටොගල් කරන්න",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI සහකාර",
+    "title": "Qunnie AI සහකාර",
     "localTag": "දේශීය",
     "checking": "AI එන්ජිම පරීක්ෂා කරමින්...",
-    "installTitle": "Duckie AI සහකාර ස්ථාපනය කරන්න",
+    "installTitle": "Qunnie AI සහකාර ස්ථාපනය කරන්න",
     "installBody": "Quilt කුඩා දේශීය ආකෘතියක් (~1.1 GB) බාගන්නා නිසා සහකරු සම්පූර්ණයෙන්ම ඔබේ යන්ත්‍රය මත ධාවනය වේ - API යතුරු නැත, වලාකුළු ඇමතුම් නැත.",
     "installCta": "ස්ථාපනය කරන්න (~1.1 GB)",
     "installFailedTitle": "ස්ථාපනය අසාර්ථක විය",

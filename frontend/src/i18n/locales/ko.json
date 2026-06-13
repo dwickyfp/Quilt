@@ -5,8 +5,8 @@
     "noContext": "맥락 없음",
     "git": "Git (작업 공간)",
     "gitAriaToggle": "Git 패널 토글",
-    "duckieAssistant": "Duckie AI Assistant",
-    "duckieAssistantAriaToggle": "Duckie AI Assistant 토글",
+    "duckieAssistant": "Qunnie AI Assistant",
+    "duckieAssistantAriaToggle": "Qunnie AI Assistant 토글",
     "switchLight": "라이트 모드로 전환",
     "switchDark": "다크 모드로 전환",
     "themeAriaToggle": "테마 토글",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI Assistant",
+    "title": "Qunnie AI Assistant",
     "localTag": "local",
     "checking": "Checking AI engine...",
-    "installTitle": "Install the Duckie AI Assistant",
+    "installTitle": "Install the Qunnie AI Assistant",
     "installBody": "Quilt downloads a small local model (~1.1 GB) so the assistant runs entirely on your machine - no API keys, no cloud calls.",
     "installCta": "Install (~1.1 GB)",
     "installFailedTitle": "Install failed",

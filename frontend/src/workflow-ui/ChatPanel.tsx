@@ -7,11 +7,16 @@ import {
     type ChatMessage,
 } from '../tauri-bridge';
 import { isAiConfigured, loadAiProviderConfig, type AiProviderConfig } from '../ai-provider';
+import { serializeGraph, type GraphNodeInput, type GraphEdgeInput } from './graph-context';
+import { extractGraphPatch, summarizePatch, type GraphPatchOp } from './graph-patch';
 
 type Props = {
     onClose: () => void;
     onInsertPipeline: (pipeline: unknown) => void;
     onOpenSettings: () => void;
+    nodes: GraphNodeInput[];
+    edges: GraphEdgeInput[];
+    onApplyPatch: (ops: GraphPatchOp[]) => void;
 };
 
 type Bubble = ChatMessage & {
@@ -19,6 +24,10 @@ type Bubble = ChatMessage & {
     streaming?: boolean;
     /** Cached extracted pipeline, computed after the stream finishes. */
     pipeline?: unknown;
+    /** Proposed graph patch detected in the reply (C4). */
+    patch?: GraphPatchOp[];
+    /** True once the user has applied the proposed patch. */
+    patchApplied?: boolean;
 };
 
 const PROVIDER_LABELS: Record<AiProviderConfig['provider'], string> = {
@@ -33,7 +42,27 @@ const EXAMPLE_PROMPTS = [
     'Embed the description column with OpenAI and dedupe near-duplicates',
 ];
 
-export default function ChatPanel({ onClose, onInsertPipeline, onOpenSettings }: Props) {
+/**
+ * Build the graph-aware context prompt (C3 + C5). Embeds the serialized live
+ * graph and instructs the model to emit a fenced ```json {"ops":[...]} patch
+ * when the user wants to MODIFY the existing pipeline. Provider-agnostic: the
+ * patch travels as plain text in the stream, parsed by extractGraphPatch.
+ */
+function buildContextPrompt(nodes: GraphNodeInput[], edges: GraphEdgeInput[]): string {
+    const graph = JSON.stringify(serializeGraph(nodes, edges));
+    return [
+        "You are Qunnie, an assistant embedded in the Quilt pipeline editor.",
+        "The user's CURRENT pipeline graph (JSON) is:",
+        graph,
+        "",
+        "When the user asks to MODIFY the existing pipeline (add/remove/reconfigure/connect nodes), respond with a brief explanation AND a fenced ```json code block of shape {\"ops\":[...]} where each op is one of:",
+        "{op:'add_node', node:{id, data:{label, componentId, kind}}}, {op:'update_node', id, properties:{...}}, {op:'delete_node', id}, {op:'connect', source, target}, {op:'disconnect', source, target}.",
+        "Use the node ids shown in the graph. For new nodes invent a short unique id.",
+        "The graph includes each node's `columns` when known — use real column names from upstream when configuring filters/aggregations, and if you detect a schema mismatch (e.g. a sink expects a column the upstream doesn't produce) point it out and propose an update_node or a new cast/rename node to fix it.",
+    ].join('\n');
+}
+
+export default function ChatPanel({ onClose, onInsertPipeline, onOpenSettings, nodes, edges, onApplyPatch }: Props) {
     const { t } = useTranslation();
     const [config, setConfig] = useState<AiProviderConfig>(() => loadAiProviderConfig());
     const [messages, setMessages] = useState<Bubble[]>([]);
@@ -58,7 +87,13 @@ export default function ChatPanel({ onClose, onInsertPipeline, onOpenSettings }:
         const userMsg: Bubble = { role: 'user', content: body };
         setMessages(prev => [...prev, userMsg, { role: 'assistant', content: '', streaming: true }]);
         setBusy(true);
+        // Prepend the live-graph context as a LEADING USER message (not a
+        // system role): the Claude backend path drops system-role turns
+        // (only user/assistant survive), so a user message is the only
+        // provider-agnostic way to inject context across all providers.
+        const contextMsg: ChatMessage = { role: 'user', content: buildContextPrompt(nodes, edges) };
         const history: ChatMessage[] = [
+            contextMsg,
             ...messages.map(m => ({ role: m.role, content: m.content })),
             { role: 'user', content: body },
         ];
@@ -78,19 +113,25 @@ export default function ChatPanel({ onClose, onInsertPipeline, onOpenSettings }:
                     const last = out[out.length - 1];
                     if (last && last.role === 'assistant' && last.streaming) {
                         out[out.length - 1] = { ...last, streaming: false };
-                        // Try to extract a pipeline once streaming finishes.
-                        void chatExtractPipeline(last.content).then(pipe => {
-                            if (pipe) {
-                                setMessages(c => {
-                                    const o2 = c.slice();
-                                    const t = o2[o2.length - 1];
-                                    if (t && t.role === 'assistant') {
-                                        o2[o2.length - 1] = { ...t, pipeline: pipe };
-                                    }
-                                    return o2;
-                                });
-                            }
-                        });
+                        // Try a graph patch first (modify existing pipeline);
+                        // fall back to full-pipeline extraction as before.
+                        const ops = extractGraphPatch(last.content);
+                        if (ops && ops.length > 0) {
+                            out[out.length - 1] = { ...out[out.length - 1], patch: ops };
+                        } else {
+                            void chatExtractPipeline(last.content).then(pipe => {
+                                if (pipe) {
+                                    setMessages(c => {
+                                        const o2 = c.slice();
+                                        const t = o2[o2.length - 1];
+                                        if (t && t.role === 'assistant') {
+                                            o2[o2.length - 1] = { ...t, pipeline: pipe };
+                                        }
+                                        return o2;
+                                    });
+                                }
+                            });
+                        }
                     }
                     return out;
                 });
@@ -127,6 +168,32 @@ export default function ChatPanel({ onClose, onInsertPipeline, onOpenSettings }:
         const el = scrollRef.current;
         if (el) el.scrollTop = el.scrollHeight;
     }, [messages]);
+
+    // Apply a proposed patch to the canvas, then mark the bubble applied so
+    // the buttons collapse to an "Applied" badge. Gated behind the explicit
+    // Apply button — patches are NEVER applied automatically (key safety).
+    const applyPatch = useCallback((index: number, ops: GraphPatchOp[]) => {
+        onApplyPatch(ops);
+        setMessages(prev => {
+            const out = prev.slice();
+            const b = out[index];
+            if (b) out[index] = { ...b, patchApplied: true };
+            return out;
+        });
+    }, [onApplyPatch]);
+
+    // Dismiss a proposed patch without touching the canvas.
+    const dismissPatch = useCallback((index: number) => {
+        setMessages(prev => {
+            const out = prev.slice();
+            const b = out[index];
+            if (b) {
+                const { patch: _patch, ...rest } = b;
+                out[index] = rest;
+            }
+            return out;
+        });
+    }, []);
 
     return (
         <aside className="chat-panel" role="complementary" aria-label={t('chat.title')}>
@@ -209,6 +276,38 @@ export default function ChatPanel({ onClose, onInsertPipeline, onOpenSettings }:
                                         >
                                             <Workflow size={12} /> {t('chat.insertIntoCanvas')}
                                         </button>
+                                    ) : null}
+                                    {m.patch ? (
+                                        <div className="chat-patch-card" role="group" aria-label={t('chat.proposedChanges')}>
+                                            <div className="chat-patch-head">{t('chat.proposedChanges')}</div>
+                                            <ul className="chat-patch-ops">
+                                                {summarizePatch(m.patch).map((line, j) => (
+                                                    <li key={j}>{line}</li>
+                                                ))}
+                                            </ul>
+                                            {m.patchApplied ? (
+                                                <div className="chat-patch-applied">{t('chat.applied')}</div>
+                                            ) : (
+                                                <div className="chat-patch-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="chat-patch-apply"
+                                                        onClick={() => applyPatch(i, m.patch!)}
+                                                        aria-label={t('chat.applyChanges')}
+                                                    >
+                                                        {t('chat.apply')}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className="chat-patch-dismiss"
+                                                        onClick={() => dismissPatch(i)}
+                                                        aria-label={t('chat.dismissChanges')}
+                                                    >
+                                                        {t('chat.dismiss')}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     ) : null}
                                 </div>
                             ))

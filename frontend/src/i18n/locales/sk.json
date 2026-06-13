@@ -5,8 +5,8 @@
     "noContext": "Bez kontextu",
     "git": "Git (pracovný priestor)",
     "gitAriaToggle": "Prepnúť panel Git",
-    "duckieAssistant": "Asistent AI Duckie",
-    "duckieAssistantAriaToggle": "Prepnúť asistenta AI Duckie",
+    "duckieAssistant": "Asistent AI Qunnie",
+    "duckieAssistantAriaToggle": "Prepnúť asistenta AI Qunnie",
     "switchLight": "Prepnite do svetelného režimu",
     "switchDark": "Prepnite do tmavého režimu",
     "themeAriaToggle": "Prepnúť tému",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Asistent AI Duckie",
+    "title": "Asistent AI Qunnie",
     "localTag": "miestne",
     "checking": "Kontrola motora AI...",
-    "installTitle": "Nainštalujte Duckie AI Assistant",
+    "installTitle": "Nainštalujte Qunnie AI Assistant",
     "installBody": "Quilt si stiahne malý lokálny model (~1,1 GB), takže asistent beží výhradne na vašom počítači – žiadne kľúče API, žiadne cloudové volania.",
     "installCta": "Inštalovať (~1,1 GB)",
     "installFailedTitle": "Inštalácia zlyhala",

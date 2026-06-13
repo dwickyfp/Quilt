@@ -37,7 +37,7 @@ export type Column = {
     format?: string;
 };
 
-export type NodeKind = 'source' | 'transform' | 'sink';
+export type NodeKind = 'source' | 'transform' | 'sink' | 'ml' | 'viz';
 
 export type QuiltNodeData = {
     label: string;

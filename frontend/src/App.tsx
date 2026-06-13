@@ -45,7 +45,7 @@ import WindowControls from './workflow-ui/WindowControls';
 import { engineStatus } from './tauri-bridge';
 import { copyText, saveTextFile } from './tauri-io';
 import { writeClipboard, readClipboard, instantiateClipboard } from './clipboard';
-import { RunStatusContext } from './canvas/run-status-context';
+import { RunStatusContext, ProfileContext } from './canvas/run-status-context';
 import { validatePipeline } from './validation';
 import { resolveForRun } from './run-resolve';
 import WorkspacePickerModal from './workflow-ui/WorkspacePickerModal';
@@ -86,6 +86,7 @@ import type {
 } from './repo-types';
 import { getDefaults, getManifest } from './workflow-ui/fields/component-manifests';
 import type { QuiltNodeData } from './pipeline-types';
+import { applyGraphPatch, type GraphPatchOp, type PatchNode, type PatchEdge } from './workflow-ui/graph-patch';
 import type { DropPosition, NodeAction, PaneAction } from './canvas/Canvas';
 import { useUndoRedo, type CanvasSnapshot } from './useUndoRedo';
 import type { RepoItem } from './repo-types';
@@ -178,6 +179,8 @@ function paletteKindToFlowType(kind: PaletteKind): string {
             return 'sink';
         case 'ml':
             return 'ml';
+        case 'viz':
+            return 'viz';
         case 'transform':
         case 'control':
         case 'quality':
@@ -759,6 +762,17 @@ export default function App() {
     );
 
     const [runResult, setRunResult] = useState<RunResult | null>(null);
+    const [profileMode, setProfileMode] = useState<boolean>(false);
+    // Heat scale: max execution duration across nodes in the current run.
+    const profileMaxDuration = useMemo(() => {
+        const nodes = runResult?.nodes;
+        if (!nodes) return 0;
+        let max = 0;
+        for (const ns of Object.values(nodes)) {
+            if (ns.duration_ms != null && ns.duration_ms > max) max = ns.duration_ms;
+        }
+        return max;
+    }, [runResult]);
 
     const handleEvent = useCallback(
         (evt: PipelineEvent) => {
@@ -1634,6 +1648,7 @@ export default function App() {
 
     return (
         <RunStatusContext.Provider value={runResult?.nodes ?? {}}>
+        <ProfileContext.Provider value={{ enabled: profileMode, maxDuration: profileMaxDuration }}>
         <div className="app">
             <header
                 className="topbar"
@@ -1772,6 +1787,8 @@ export default function App() {
                         onExportJson={handleExportJson}
                         onExportSqlFile={handleExportSql}
                         onImportJson={handleImportJson}
+                        profileMode={profileMode}
+                        onToggleProfile={() => setProfileMode(m => !m)}
                     />
                     <EditorTabs
                         nodes={nodes}
@@ -1843,6 +1860,33 @@ export default function App() {
                 <ChatPanel
                     onClose={() => setShowChatPanel(false)}
                     onInsertPipeline={handleInsertAiPipeline}
+                    nodes={nodes}
+                    edges={edges}
+                    onApplyPatch={(ops: GraphPatchOp[]) => {
+                        const next = applyGraphPatch(
+                            nodes as unknown as PatchNode[],
+                            edges as unknown as PatchEdge[],
+                            ops,
+                        );
+                        // applyGraphPatch spreads `...n` so existing nodes keep
+                        // their position; nodes ADDED by the LLM have none, so
+                        // give them a staggered default so they're visible.
+                        let added = 0;
+                        const placed = next.nodes.map(n => {
+                            const node = n as unknown as Node<QuiltNodeData>;
+                            if (!node.position) {
+                                const offset = added++;
+                                return {
+                                    ...node,
+                                    type: node.type ?? 'quilt',
+                                    position: { x: 100 + offset * 60, y: 100 + offset * 60 },
+                                };
+                            }
+                            return node;
+                        });
+                        setNodes(placed);
+                        setEdges(next.edges as unknown as Edge[]);
+                    }}
                     onOpenSettings={() => {
                         setShowChatPanel(false);
                         setShowSettings(true);
@@ -1960,6 +2004,7 @@ export default function App() {
                 />
             ) : null}
         </div>
+        </ProfileContext.Provider>
         </RunStatusContext.Provider>
     );
 }

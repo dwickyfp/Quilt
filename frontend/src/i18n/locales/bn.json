@@ -5,8 +5,8 @@
     "noContext": "কোন প্রসঙ্গ নেই",
     "git": "গিট (কর্মক্ষেত্র)",
     "gitAriaToggle": "গিট প্যানেল টগল করুন",
-    "duckieAssistant": "Duckie AI অ্যাসিস্ট্যান্ট",
-    "duckieAssistantAriaToggle": "Duckie AI অ্যাসিস্ট্যান্ট টগল করুন",
+    "duckieAssistant": "Qunnie AI অ্যাসিস্ট্যান্ট",
+    "duckieAssistantAriaToggle": "Qunnie AI অ্যাসিস্ট্যান্ট টগল করুন",
     "switchLight": "লাইট মোডে স্যুইচ করুন",
     "switchDark": "ডার্ক মোডে স্যুইচ করুন",
     "themeAriaToggle": "থিম টগল করুন",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI Assistant",
+    "title": "Qunnie AI Assistant",
     "localTag": "local",
     "checking": "Checking AI engine...",
-    "installTitle": "Install the Duckie AI Assistant",
+    "installTitle": "Install the Qunnie AI Assistant",
     "installBody": "Quilt downloads a small local model (~1.1 GB) so the assistant runs entirely on your machine - no API keys, no cloud calls.",
     "installCta": "Install (~1.1 GB)",
     "installFailedTitle": "Install failed",

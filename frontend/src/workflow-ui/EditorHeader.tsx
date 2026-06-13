@@ -5,6 +5,7 @@ import {
     Clipboard,
     Download,
     FileCode,
+    Gauge,
     LayoutGrid,
     MoreHorizontal,
     Play,
@@ -38,6 +39,8 @@ type Props = {
     onExportJson: () => void;
     onExportSqlFile: () => void;
     onImportJson: () => void;
+    profileMode: boolean;
+    onToggleProfile: () => void;
 };
 
 export default function EditorHeader({
@@ -56,6 +59,8 @@ export default function EditorHeader({
     onExportJson,
     onExportSqlFile,
     onImportJson,
+    profileMode,
+    onToggleProfile,
 }: Props) {
     const { t } = useTranslation();
     const [moreOpen, setMoreOpen] = useState(false);
@@ -185,6 +190,17 @@ export default function EditorHeader({
                     aria-label={t('header.autoLayout')}
                 >
                     <LayoutGrid size={14} />
+                </button>
+
+                <button
+                    type="button"
+                    className={'toolbar-icon-button' + (profileMode ? ' is-active' : '')}
+                    onClick={onToggleProfile}
+                    title={t('header.profileTooltip')}
+                    aria-label={t('header.profile')}
+                    aria-pressed={profileMode}
+                >
+                    <Gauge size={14} />
                 </button>
 
                 <div className="toolbar-more" ref={moreRef}>

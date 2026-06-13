@@ -5,8 +5,8 @@
     "noContext": "Без контексту",
     "git": "Git (робочий простір)",
     "gitAriaToggle": "Перемкнути панель Git",
-    "duckieAssistant": "Duckie AI Assistant",
-    "duckieAssistantAriaToggle": "Увімкнути або вимкнути Duckie AI Assistant",
+    "duckieAssistant": "Qunnie AI Assistant",
+    "duckieAssistantAriaToggle": "Увімкнути або вимкнути Qunnie AI Assistant",
     "switchLight": "Перемкнутися в світлий режим",
     "switchDark": "Перейти в темний режим",
     "themeAriaToggle": "Перемкнути тему",
@@ -74,10 +74,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI Assistant",
+    "title": "Qunnie AI Assistant",
     "localTag": "місцева",
     "checking": "Перевірка рушія штучного інтелекту...",
-    "installTitle": "Встановіть Duckie AI Assistant",
+    "installTitle": "Встановіть Qunnie AI Assistant",
     "installBody": "Quilt завантажує невелику локальну модель (~ 1,1 ГБ), тому асистент повністю працює на вашому комп 'ютері - без ключів API, без хмарних викликів.",
     "installCta": "Встановити (~ 1,1 ГБ)",
     "installFailedTitle": "Не вдалося встановити",

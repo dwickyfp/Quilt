@@ -5,8 +5,8 @@
     "noContext": "Hakuna muktadha",
     "git": "Git (nafasi ya kazi)",
     "gitAriaToggle": "Geuza paneli ya Git",
-    "duckieAssistant": "Msaidizi wa Duckie AI",
-    "duckieAssistantAriaToggle": "Geuza Msaidizi wa Duckie AI",
+    "duckieAssistant": "Msaidizi wa Qunnie AI",
+    "duckieAssistantAriaToggle": "Geuza Msaidizi wa Qunnie AI",
     "switchLight": "Badilisha kwa hali ya mwanga",
     "switchDark": "Badili hadi hali ya giza",
     "themeAriaToggle": "Geuza mandhari",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Msaidizi wa Duckie AI",
+    "title": "Msaidizi wa Qunnie AI",
     "localTag": "mtaa",
     "checking": "Inakagua injini ya AI...",
-    "installTitle": "Sakinisha Msaidizi wa Duckie AI",
+    "installTitle": "Sakinisha Msaidizi wa Qunnie AI",
     "installBody": "Quilt hupakua muundo mdogo wa ndani (~GB 1.1) kwa hivyo programu ya mratibu hutumika kabisa kwenye mashine yako - hakuna vitufe vya API, hakuna simu za wingu.",
     "installCta": "Sakinisha (~GB 1.1)",
     "installFailedTitle": "Imeshindwa kusakinisha",

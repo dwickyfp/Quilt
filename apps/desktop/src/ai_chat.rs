@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 /// System prompt that teaches the model to emit Quilt pipeline JSON when
 /// the user asks for one. Lists the most common component IDs.
-pub const SYSTEM_PROMPT: &str = r#"You are Duckie, the AI assistant inside Quilt (a local-first ETL/ELT studio). When the user asks for a pipeline, output ONE valid JSON pipeline definition inside a ```json fenced code block, then a one-sentence summary.
+pub const SYSTEM_PROMPT: &str = r#"You are Qunnie, the AI assistant inside Quilt (a local-first ETL/ELT studio). When the user asks for a pipeline, output ONE valid JSON pipeline definition inside a ```json fenced code block, then a one-sentence summary.
 
 Pipeline schema:
 {
@@ -130,10 +130,16 @@ fn openai_stream<F: FnMut(ChatEvent)>(
         "top_p": 0.9,
     });
     let url = format!("{}/v1/chat/completions", trim_base(base_url));
-    let resp = ureq::post(&url)
+    let mut req = ureq::post(&url)
         .set("Content-Type", "application/json")
-        .set("Authorization", &format!("Bearer {}", api_key))
-        .timeout(Duration::from_secs(300))
+        .timeout(Duration::from_secs(300));
+    // Only send Authorization when a key is set. OpenAI-compatible local
+    // servers (Ollama, LM Studio, llama.cpp) often need no key and some
+    // reject a malformed `Bearer ` with an empty token.
+    if !api_key.trim().is_empty() {
+        req = req.set("Authorization", &format!("Bearer {}", api_key));
+    }
+    let resp = req
         .send_string(&body.to_string())
         .map_err(format_ureq_err)?;
     let reader = BufReader::new(resp.into_reader());
@@ -266,8 +272,12 @@ pub fn test_connection(
                 "stream": false,
             });
             let b = ureq::post(&url)
-                .set("Content-Type", "application/json")
-                .set("Authorization", &format!("Bearer {}", api_key));
+                .set("Content-Type", "application/json");
+            let b = if api_key.trim().is_empty() {
+                b
+            } else {
+                b.set("Authorization", &format!("Bearer {}", api_key))
+            };
             (url, b, body)
         }
         Provider::Claude => {

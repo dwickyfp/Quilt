@@ -5,8 +5,8 @@
     "noContext": "کوئی سیاق و سباق نہیں",
     "git": "Git (کام کرنے کی جگہ)",
     "gitAriaToggle": "Git پینل ٹوگل کریں",
-    "duckieAssistant": "Duckie AI اسسٹنٹ",
-    "duckieAssistantAriaToggle": "Duckie AI اسسٹنٹ کو ٹوگل کریں",
+    "duckieAssistant": "Qunnie AI اسسٹنٹ",
+    "duckieAssistantAriaToggle": "Qunnie AI اسسٹنٹ کو ٹوگل کریں",
     "switchLight": "لائٹ موڈ پر سوئچ کریں",
     "switchDark": "ڈارک موڈ پر سوئچ کریں",
     "themeAriaToggle": "تھیم ٹوگل کریں",
@@ -74,10 +74,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI اسسٹنٹ",
+    "title": "Qunnie AI اسسٹنٹ",
     "localTag": "مقامی ",
     "checking": "AI انجن چیک کیا جا رہا ہے...",
-    "installTitle": "Duckie AI اسسٹنٹ انسٹال کریں",
+    "installTitle": "Qunnie AI اسسٹنٹ انسٹال کریں",
     "installBody": "بتھ ایک چھوٹا مقامی ماڈل (~ 1.1 GB) ڈاؤن لوڈ کرتا ہے لہذا اسسٹنٹ مکمل طور پر آپ کی مشین پر چلتا ہے - کوئی API کیز نہیں، کوئی کلاؤڈ کال نہیں ۔",
     "installCta": "انسٹال کریں (~ 1.1 GB)",
     "installFailedTitle": "تنصیب ناکام ہو گئی",

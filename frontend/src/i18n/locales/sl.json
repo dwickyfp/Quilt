@@ -5,8 +5,8 @@
     "noContext": "Brez konteksta",
     "git": "Git (delovni prostor)",
     "gitAriaToggle": "Preklop plošče Git",
-    "duckieAssistant": "Pomočnik Duckie AI",
-    "duckieAssistantAriaToggle": "Preklop Duckie AI Assistant",
+    "duckieAssistant": "Pomočnik Qunnie AI",
+    "duckieAssistantAriaToggle": "Preklop Qunnie AI Assistant",
     "switchLight": "Preklopite v svetlobni način",
     "switchDark": "Preklopite v temni način",
     "themeAriaToggle": "Preklopi temo",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Pomočnik Duckie AI",
+    "title": "Pomočnik Qunnie AI",
     "localTag": "lokalni",
     "checking": "Preverjanje motorja AI ...",
-    "installTitle": "Namestite Duckie AI Assistant",
+    "installTitle": "Namestite Qunnie AI Assistant",
     "installBody": "Quilt prenese majhen lokalni model (~1,1 GB), tako da pomočnik v celoti deluje na vašem računalniku – brez ključev API, brez klicev v oblaku.",
     "installCta": "Namesti (~1,1 GB)",
     "installFailedTitle": "Namestitev ni uspela",

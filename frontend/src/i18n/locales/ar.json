@@ -5,8 +5,8 @@
     "noContext": "لا يوجد سياق",
     "git": "بوابة (مساحة عمل)",
     "gitAriaToggle": "تبديل لوحة Git",
-    "duckieAssistant": "مساعد Duckie AI",
-    "duckieAssistantAriaToggle": "تبديل مساعد الذكاء الاصطناعي Duckie",
+    "duckieAssistant": "مساعد Qunnie AI",
+    "duckieAssistantAriaToggle": "تبديل مساعد الذكاء الاصطناعي Qunnie",
     "switchLight": "التبديل إلى وضع الإضاءة",
     "switchDark": "التبديل إلى الوضع المظلم",
     "themeAriaToggle": "تبديل القالب",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "مساعد Duckie AI",
+    "title": "مساعد Qunnie AI",
     "localTag": "محلي",
     "checking": "جارٍ التحقق من محرك الذكاء الاصطناعي...",
-    "installTitle": "تثبيت مساعد الذكاء الاصطناعي Duckie",
+    "installTitle": "تثبيت مساعد الذكاء الاصطناعي Qunnie",
     "installBody": "يقوم Quilt بتنزيل نموذج محلي صغير (~ 1.1 جيجابايت) بحيث يعمل المساعد بالكامل على جهازك - لا توجد مفاتيح API، ولا مكالمات سحابية.",
     "installCta": "التثبيت (حوالي 1.1 جيجابايت)",
     "installFailedTitle": "فشل التثبيت!",

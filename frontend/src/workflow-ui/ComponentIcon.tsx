@@ -20,6 +20,7 @@ import {
     AlignLeft,
     Database,
     Brain,
+    BarChart3,
     Split,
     Target,
     Gauge,
@@ -86,6 +87,7 @@ const KIND_FALLBACK: Record<NodeKind, ComponentType<IconProps>> = {
     quality: ShieldCheck,
     custom: Code2,
     ml: Brain,
+    viz: BarChart3,
 };
 
 type Props = { componentId: string; kind: NodeKind; size?: number; className?: string };

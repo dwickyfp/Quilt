@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI Assistant",
+    "title": "Qunnie AI Assistant",
     "localTag": "local",
     "checking": "Checking AI engine...",
-    "installTitle": "Install the Duckie AI Assistant",
+    "installTitle": "Install the Qunnie AI Assistant",
     "installBody": "Quilt downloads a small local model (~1.1 GB) so the assistant runs entirely on your machine - no API keys, no cloud calls.",
     "installCta": "Install (~1.1 GB)",
     "installFailedTitle": "Install failed",

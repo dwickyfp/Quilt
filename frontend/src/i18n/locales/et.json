@@ -5,8 +5,8 @@
     "noContext": "Pole konteksti",
     "git": "Git (tööruum)",
     "gitAriaToggle": "Giti paneeli sisse- ja väljalülitamine",
-    "duckieAssistant": "Duckie AI assistent",
-    "duckieAssistantAriaToggle": "Lülitage Duckie AI assistent sisse",
+    "duckieAssistant": "Qunnie AI assistent",
+    "duckieAssistantAriaToggle": "Lülitage Qunnie AI assistent sisse",
     "switchLight": "Lülitage valgusrežiimile",
     "switchDark": "Lülitage tumedale režiimile",
     "themeAriaToggle": "Lülitage teema sisse",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI assistent",
+    "title": "Qunnie AI assistent",
     "localTag": "kohalik",
     "checking": "AI mootori kontrollimine...",
-    "installTitle": "Installige Duckie AI Assistant",
+    "installTitle": "Installige Qunnie AI Assistant",
     "installBody": "Quilt laadib alla väikese kohaliku mudeli (~1,1 GB), nii et assistent töötab täielikult teie masinas – pole API võtmeid ega pilvekõnesid.",
     "installCta": "Install (~1,1 GB)",
     "installFailedTitle": "Install ebaõnnestus",

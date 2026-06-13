@@ -731,6 +731,7 @@ impl DuckdbEngine {
                                             duration_ms: st.duration_ms,
                                             error: st.error.clone(),
                                             category: st.category.clone(),
+                                            ..Default::default()
                                         },
                                     );
                                 }
@@ -955,6 +956,40 @@ impl DuckdbEngine {
                         ),
                         StageKind::View => self.count_and_preview(&db_path, &stage.node_id),
                     };
+                    // Best-effort query-plan capture for View stages (profiler
+                    // A2). Plain EXPLAIN only (never ANALYZE - that re-executes)
+                    // and never for Sink stages (EXPLAIN on a write/COPY could
+                    // re-trigger side effects). Errors are swallowed: the plan
+                    // is a nice-to-have, not worth failing the stage over.
+                    let explain = match stage.kind {
+                        StageKind::View => self
+                            .run_rows(Some(&db_path), &format!("EXPLAIN {}", sql))
+                            .ok()
+                            .map(|rows| {
+                                rows.iter()
+                                    .filter_map(|r| r.as_object())
+                                    .flat_map(|o| {
+                                        // Prefer the "explain_value" column;
+                                        // otherwise fall back to any string
+                                        // field so we stay defensive about shape.
+                                        if let Some(v) =
+                                            o.get("explain_value").and_then(|v| v.as_str())
+                                        {
+                                            vec![v.to_string()]
+                                        } else {
+                                            o.values()
+                                                .filter_map(|v| {
+                                                    v.as_str().map(|s| s.to_string())
+                                                })
+                                                .collect()
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            })
+                            .filter(|s| !s.is_empty()),
+                        _ => None,
+                    };
                     nodes.insert(
                         stage.node_id.clone(),
                         NodeRunStatus {
@@ -964,6 +999,8 @@ impl DuckdbEngine {
                             duration_ms: Some(elapsed_ms),
                             error: None,
                             category: None,
+                            explain,
+                            ..Default::default()
                         },
                     );
                     on_event(PipelineEvent::StageFinished {
@@ -995,6 +1032,7 @@ impl DuckdbEngine {
                             duration_ms: Some(elapsed_ms),
                             error: Some(msg.clone()),
                             category: Some(category.into()),
+                            ..Default::default()
                         },
                     );
                     on_event(PipelineEvent::StageFinished {
@@ -1451,6 +1489,7 @@ impl DuckdbEngine {
                         duration_ms: Some(elapsed),
                         error: Some(msg.clone()),
                         category: Some(error_category::categorize_error(&msg).into()),
+                        ..Default::default()
                     },
                 );
                 on_event(PipelineEvent::StageFinished {
@@ -1727,6 +1766,7 @@ fn drain_batched_markers(
                 duration_ms: Some(elapsed),
                 error: None,
                 category: None,
+                ..Default::default()
             },
         );
         on_event(PipelineEvent::StageFinished {
@@ -3258,7 +3298,7 @@ impl RunResult {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 pub struct NodeRunStatus {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3273,6 +3313,16 @@ pub struct NodeRunStatus {
     /// cancelled/other) - present only when `error` is. See error_category.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<String>,
+    /// Profiler: rows read by this stage's inputs (input cardinality).
+    /// Populated from EXPLAIN ANALYZE where available.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rows_in: Option<u64>,
+    /// Profiler: peak memory used while executing this stage, in bytes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak_memory_bytes: Option<u64>,
+    /// Profiler: EXPLAIN ANALYZE plan text for this stage (read stages only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub explain: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

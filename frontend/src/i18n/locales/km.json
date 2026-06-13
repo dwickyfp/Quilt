@@ -5,8 +5,8 @@
     "noContext": "គ្មានបរិបទ",
     "git": "Git (កន្លែងធ្វើការ)",
     "gitAriaToggle": "បិទបើកបន្ទះ Git",
-    "duckieAssistant": "Duckie ជំនួយការ AI",
-    "duckieAssistantAriaToggle": "បិទបើក Duckie ជំនួយការ AI",
+    "duckieAssistant": "Qunnie ជំនួយការ AI",
+    "duckieAssistantAriaToggle": "បិទបើក Qunnie ជំនួយការ AI",
     "switchLight": "ប្តូរទៅរបៀបពន្លឺ",
     "switchDark": "ប្តូរទៅរបៀបងងឹត",
     "themeAriaToggle": "បិទបើកប្រធានបទ",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie ជំនួយការ AI",
+    "title": "Qunnie ជំនួយការ AI",
     "localTag": "ក្នុងស្រុក",
     "checking": "កំពុងពិនិត្យម៉ាស៊ីន AI...",
-    "installTitle": "ដំឡើង Duckie AI Assistant",
+    "installTitle": "ដំឡើង Qunnie AI Assistant",
     "installBody": "Quilt ទាញយកម៉ូដែលក្នុងស្រុកតូចមួយ (~1.1 GB) ដូច្នេះជំនួយការដំណើរការទាំងស្រុងលើម៉ាស៊ីនរបស់អ្នក - គ្មានសោ API គ្មានការហៅតាមពពកទេ។",
     "installCta": "ដំឡើង (~1.1 GB)",
     "installFailedTitle": "ការដំឡើងបរាជ័យ",

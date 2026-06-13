@@ -5,8 +5,8 @@
     "noContext": "Ingen sammenhæng",
     "git": "Git (arbejdsområde)",
     "gitAriaToggle": "Skift Git-panelet",
-    "duckieAssistant": "Duckie AI assistent",
-    "duckieAssistantAriaToggle": "Slå Duckie AI Assistant til/fra",
+    "duckieAssistant": "Qunnie AI assistent",
+    "duckieAssistantAriaToggle": "Slå Qunnie AI Assistant til/fra",
     "switchLight": "Skift til lystilstand",
     "switchDark": "Skift til mørk tilstand",
     "themeAriaToggle": "Skift tema",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI assistent",
+    "title": "Qunnie AI assistent",
     "localTag": "lokal",
     "checking": "Tjekker AI-motor...",
-    "installTitle": "Installer Duckie AI Assistant",
+    "installTitle": "Installer Qunnie AI Assistant",
     "installBody": "Quilt downloader en lille lokal model (~1,1 GB), så assistenten kører udelukkende på din maskine - ingen API-nøgler, ingen cloud-opkald.",
     "installCta": "Installer (~1,1 GB)",
     "installFailedTitle": "Installationen mislykkedes",

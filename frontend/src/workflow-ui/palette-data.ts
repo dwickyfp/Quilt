@@ -1,6 +1,6 @@
 export type Availability = 'available' | 'planned' | 'preview';
 
-export type NodeKind = 'source' | 'transform' | 'sink' | 'control' | 'quality' | 'custom' | 'ml';
+export type NodeKind = 'source' | 'transform' | 'sink' | 'control' | 'quality' | 'custom' | 'ml' | 'viz';
 
 export type ComponentDef = {
     id: string;
@@ -76,6 +76,14 @@ const ml = (id: string, label: string, availability: Availability, summary?: str
     id,
     label,
     kind: 'ml',
+    availability,
+    summary,
+});
+
+const viz = (id: string, label: string, availability: Availability, summary?: string): ComponentDef => ({
+    id: 'viz.' + id,
+    label,
+    kind: 'viz',
     availability,
     summary,
 });
@@ -668,6 +676,24 @@ export const PALETTE: Category[] = [
                     qa('dedupe', 'Fuzzy Deduplicate', 'available', 'Drop near-duplicate rows by string similarity'),
                     qa('match', 'Record Match', 'available', 'Find matching record pairs by similarity, with a score'),
                     qa('addressclean', 'Address Cleanse', 'planned'),
+                ],
+            },
+        ],
+    },
+    {
+        id: 'visualize',
+        label: 'Visualize',
+        icon: '▥',
+        accent: '#a371f7',
+        groups: [
+            {
+                id: 'viz.charts',
+                label: 'Charts',
+                components: [
+                    viz('bar', 'Bar Chart', 'available', 'Aggregate a measure by a dimension and render bars'),
+                    viz('line', 'Line Chart', 'available', 'Aggregate a measure by a dimension and render a line'),
+                    viz('scatter', 'Scatter Plot', 'available', 'Plot raw x vs y points to inspect correlation'),
+                    viz('histogram', 'Histogram', 'available', 'Count rows per dimension value'),
                 ],
             },
         ],

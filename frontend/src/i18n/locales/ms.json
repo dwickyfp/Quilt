@@ -5,8 +5,8 @@
     "noContext": "Tiada konteks",
     "git": "Git (ruang kerja)",
     "gitAriaToggle": "Togol panel Git",
-    "duckieAssistant": "Pembantu AI Duckie",
-    "duckieAssistantAriaToggle": "Togol Pembantu AI Duckie",
+    "duckieAssistant": "Pembantu AI Qunnie",
+    "duckieAssistantAriaToggle": "Togol Pembantu AI Qunnie",
     "switchLight": "Tukar ke mod cahaya",
     "switchDark": "Tukar ke mod gelap",
     "themeAriaToggle": "Togol tema",
@@ -74,10 +74,10 @@
     }
   },
   "chat": {
-    "title": "Pembantu AI Duckie",
+    "title": "Pembantu AI Qunnie",
     "localTag": "setempat",
     "checking": "Memeriksa enjin AI...",
-    "installTitle": "Pasang Pembantu AI Duckie",
+    "installTitle": "Pasang Pembantu AI Qunnie",
     "installBody": "Quilt memuat turun model tempatan kecil (~ 1.1 GB) supaya pembantu berjalan sepenuhnya pada mesin anda - tiada kekunci api, tiada panggilan awan.",
     "installCta": "Pasang (~1.1 GB)",
     "installFailedTitle": "Pemasangan gagal",

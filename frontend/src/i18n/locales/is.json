@@ -5,8 +5,8 @@
     "noContext": "Ekkert samhengi",
     "git": "Git (vinnusvæði)",
     "gitAriaToggle": "Skiptu um Git spjaldið",
-    "duckieAssistant": "Duckie AI aðstoðarmaður",
-    "duckieAssistantAriaToggle": "Skiptu um Duckie AI aðstoðarmann",
+    "duckieAssistant": "Qunnie AI aðstoðarmaður",
+    "duckieAssistantAriaToggle": "Skiptu um Qunnie AI aðstoðarmann",
     "switchLight": "Skiptu yfir í ljósastillingu",
     "switchDark": "Skiptu yfir í dökka stillingu",
     "themeAriaToggle": "Skiptu um þema",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI aðstoðarmaður",
+    "title": "Qunnie AI aðstoðarmaður",
     "localTag": "staðbundið",
     "checking": "Athugar gervigreind vél...",
-    "installTitle": "Settu upp Duckie AI aðstoðarmanninn",
+    "installTitle": "Settu upp Qunnie AI aðstoðarmanninn",
     "installBody": "Quilt halar niður lítilli staðbundinni gerð (~1,1 GB) þannig að aðstoðarmaðurinn keyrir algjörlega á vélinni þinni - engir API lyklar, engin skýjasímtöl.",
     "installCta": "Setja upp (~1,1 GB)",
     "installFailedTitle": "Uppsetning mistókst",

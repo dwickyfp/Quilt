@@ -5,8 +5,8 @@
     "noContext": "Asnjë kontekst",
     "git": "Git (hapësirë ​​pune)",
     "gitAriaToggle": "Ndrysho panelin Git",
-    "duckieAssistant": "Duckie AI Assistant",
-    "duckieAssistantAriaToggle": "Ndrysho \"Asistentin e AI\" të Duckie",
+    "duckieAssistant": "Qunnie AI Assistant",
+    "duckieAssistantAriaToggle": "Ndrysho \"Asistentin e AI\" të Qunnie",
     "switchLight": "Kalo në modalitetin e dritës",
     "switchDark": "Kalo në modalitetin e errët",
     "themeAriaToggle": "Ndrysho temën",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI Assistant",
+    "title": "Qunnie AI Assistant",
     "localTag": "lokale",
     "checking": "Po kontrollon motorin e AI...",
-    "installTitle": "Instaloni Duckie AI Assistant",
+    "installTitle": "Instaloni Qunnie AI Assistant",
     "installBody": "Quilt shkarkon një model të vogël lokal (~1,1 GB) në mënyrë që asistenti të funksionojë tërësisht në kompjuterin tuaj - pa çelësa API, pa thirrje në renë kompjuterike.",
     "installCta": "Instalo (~1,1 GB)",
     "installFailedTitle": "Instalimi dështoi",

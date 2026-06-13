@@ -39,6 +39,12 @@ export type NodeRunStatus = {
     /** Coarse error bucket (auth/network/timeout/oom/disk/schema/syntax/
      *  cancelled/other) - present only when `error` is. */
     category?: string;
+    /** Profiler: input cardinality (rows read by this stage's inputs). */
+    rows_in?: number;
+    /** Profiler: peak memory used while executing this stage, in bytes. */
+    peak_memory_bytes?: number;
+    /** Profiler: EXPLAIN plan text for this stage (View stages only). */
+    explain?: string;
 };
 
 export type NodePreview = {

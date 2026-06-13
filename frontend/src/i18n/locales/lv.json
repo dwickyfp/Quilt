@@ -5,8 +5,8 @@
     "noContext": "Nav konteksta",
     "git": "Git (darbvieta)",
     "gitAriaToggle": "Pārslēgt Git paneli",
-    "duckieAssistant": "Duckie AI palīgs",
-    "duckieAssistantAriaToggle": "Pārslēgt Duckie AI palīgu",
+    "duckieAssistant": "Qunnie AI palīgs",
+    "duckieAssistantAriaToggle": "Pārslēgt Qunnie AI palīgu",
     "switchLight": "Pārslēdzieties uz gaismas režīmu",
     "switchDark": "Pārslēdzieties uz tumšo režīmu",
     "themeAriaToggle": "Pārslēgt motīvu",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI palīgs",
+    "title": "Qunnie AI palīgs",
     "localTag": "vietējais",
     "checking": "Notiek AI dzinēja pārbaude...",
-    "installTitle": "Instalējiet Duckie AI palīgu",
+    "installTitle": "Instalējiet Qunnie AI palīgu",
     "installBody": "Quilt lejupielādē nelielu vietējo modeli (~1,1 GB), lai palīgs pilnībā darbotos jūsu datorā — bez API atslēgām, bez mākoņa zvanu.",
     "installCta": "Instalēt (~1,1 GB)",
     "installFailedTitle": "Instalēšana neizdevās",

@@ -5,8 +5,8 @@
     "noContext": "Brak kontekstu",
     "git": "Git (obszar roboczy)",
     "gitAriaToggle": "Przełącz panel Git",
-    "duckieAssistant": "Asystent Duckie AI",
-    "duckieAssistantAriaToggle": "Przełącz asystenta Duckie AI",
+    "duckieAssistant": "Asystent Qunnie AI",
+    "duckieAssistantAriaToggle": "Przełącz asystenta Qunnie AI",
     "switchLight": "Przełącz na tryb oświetlenia",
     "switchDark": "PRZEŁĄCZAM SIĘ W TRYB CIEMNY",
     "themeAriaToggle": "Przełącz motyw",
@@ -74,10 +74,10 @@
     }
   },
   "chat": {
-    "title": "Asystent Duckie AI",
+    "title": "Asystent Qunnie AI",
     "localTag": "lokalny",
     "checking": "Sprawdzanie silnika AI...",
-    "installTitle": "Zainstaluj Duckie AI Assistant",
+    "installTitle": "Zainstaluj Qunnie AI Assistant",
     "installBody": "Quilt pobiera mały model lokalny (~ 1,1 GB), więc asystent działa całkowicie na Twoim komputerze - bez kluczy API, bez wywołań w chmurze.",
     "installCta": "Zainstaluj (~ 1,1 GB)",
     "installFailedTitle": "Instalacja nie powiodła się",

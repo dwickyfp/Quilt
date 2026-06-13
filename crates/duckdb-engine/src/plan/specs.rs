@@ -5,6 +5,37 @@
 //! `pub use specs::*` from the parent module, so existing `plan::XxxSpec`
 //! paths are unchanged.
 
+use serde::Deserialize;
+
+/// viz.bar / viz.line / viz.scatter / viz.histogram: a visualization node.
+/// It is NOT a distinct runtime variant - the planner compiles it to a
+/// plain aggregation `StageKind::View` whose result the existing
+/// count_and_preview path surfaces as a NodePreview, which the frontend
+/// renders as a chart. Deserialized straight from `node.data.properties`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VizSpec {
+    /// "bar" | "line" | "scatter" | "histogram".
+    pub chart: String,
+    /// Dimension column (x axis).
+    pub x: String,
+    /// Measure column. None for histogram (-> COUNT(*)).
+    #[serde(default)]
+    pub y: Option<String>,
+    /// Aggregation function. Validated against a fixed allowlist before use.
+    #[serde(default)]
+    pub agg: Option<String>,
+    /// Optional group-by series column (a second breakdown dimension).
+    #[serde(default)]
+    pub series: Option<String>,
+    /// Row cap on the aggregated result. Clamped to a sane max in the planner.
+    #[serde(default = "default_viz_limit")]
+    pub limit: usize,
+}
+
+fn default_viz_limit() -> usize {
+    1000
+}
+
 /// ctl.parallelize: run the independent downstream branches concurrently.
 /// Each branch is a self-contained sub-pipeline doc (JSON) whose source is an
 /// injected src.parquet reading the `${__PSNAP__}` snapshot placeholder; the

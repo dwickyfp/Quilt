@@ -5,8 +5,8 @@
     "noContext": "Dim cyd-destun",
     "git": "Git (lle gwaith)",
     "gitAriaToggle": "Toggle Git panel",
-    "duckieAssistant": "Cynorthwy-ydd Duckie AI",
-    "duckieAssistantAriaToggle": "Toggle Cynorthwyydd AI Duckie",
+    "duckieAssistant": "Cynorthwy-ydd Qunnie AI",
+    "duckieAssistantAriaToggle": "Toggle Cynorthwyydd AI Qunnie",
     "switchLight": "Newid i'r modd golau",
     "switchDark": "Newid i'r modd tywyll",
     "themeAriaToggle": "Toglo thema",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Cynorthwy-ydd Duckie AI",
+    "title": "Cynorthwy-ydd Qunnie AI",
     "localTag": "lleol",
     "checking": "Wrthi'n gwirio injan AI...",
-    "installTitle": "Gosod y Cynorthwyydd AI Duckie",
+    "installTitle": "Gosod y Cynorthwyydd AI Qunnie",
     "installBody": "Mae Quilt yn lawrlwytho model lleol bach (~1.1 GB) felly mae'r cynorthwyydd yn rhedeg yn gyfan gwbl ar eich peiriant - dim allweddi API, dim galwadau cwmwl.",
     "installCta": "Gosod (~1.1 GB)",
     "installFailedTitle": "Methodd gosod",

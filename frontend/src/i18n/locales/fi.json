@@ -5,8 +5,8 @@
     "noContext": "Ei kontekstia",
     "git": "Git (työtila)",
     "gitAriaToggle": "Vaihda Git-paneeli",
-    "duckieAssistant": "Duckie AI Assistant",
-    "duckieAssistantAriaToggle": "Vaihda Duckie AI Assistant",
+    "duckieAssistant": "Qunnie AI Assistant",
+    "duckieAssistantAriaToggle": "Vaihda Qunnie AI Assistant",
     "switchLight": "Vaihda valotilaan",
     "switchDark": "Vaihda pimeään tilaan",
     "themeAriaToggle": "Vaihda teema",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI Assistant",
+    "title": "Qunnie AI Assistant",
     "localTag": "paikallinen",
     "checking": "Tarkistetaan tekoälymoottoria...",
-    "installTitle": "Asenna Duckie AI Assistant",
+    "installTitle": "Asenna Qunnie AI Assistant",
     "installBody": "Quilt lataa pienen paikallisen mallin (~1,1 Gt), joten avustaja toimii kokonaan koneellasi - ei API-avaimia, ei pilvipuheluita.",
     "installCta": "Asenna (~1,1 Gt)",
     "installFailedTitle": "Asennus epäonnistui",

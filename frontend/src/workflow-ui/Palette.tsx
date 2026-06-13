@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
     ArrowDownToLine,
     ArrowUpFromLine,
+    BarChart3,
     Brain,
     BrainCircuit,
     Check,
@@ -34,6 +35,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
     saas: <Cloud size={13} />,
     ml: <Brain size={13} />,
     dl: <BrainCircuit size={13} />,
+    visualize: <BarChart3 size={13} />,
 };
 
 const DEFAULT_EXPANDED = new Set<string>();

@@ -5,8 +5,8 @@
     "noContext": "စကားစပ်ခြင်း မရှိပါ။",
     "git": "Git (အလုပ်နေရာ)",
     "gitAriaToggle": "Git အကန့်ကို ပြောင်းပါ။",
-    "duckieAssistant": "Duckie AI လက်ထောက်",
-    "duckieAssistantAriaToggle": "Duckie AI Assistant ကို ပြောင်းပါ။",
+    "duckieAssistant": "Qunnie AI လက်ထောက်",
+    "duckieAssistantAriaToggle": "Qunnie AI Assistant ကို ပြောင်းပါ။",
     "switchLight": "အလင်းမုဒ်သို့ပြောင်းပါ။",
     "switchDark": "အမှောင်မုဒ်သို့ ပြောင်းပါ။",
     "themeAriaToggle": "အပြင်အဆင်ကို ပြောင်းပါ။",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI လက်ထောက်",
+    "title": "Qunnie AI လက်ထောက်",
     "localTag": "ပြည်တွင်း",
     "checking": "AI အင်ဂျင်ကို စစ်ဆေးနေသည်...",
-    "installTitle": "Duckie AI Assistant ကို ထည့်သွင်းပါ။",
+    "installTitle": "Qunnie AI Assistant ကို ထည့်သွင်းပါ။",
     "installBody": "Quilt သည် ဒေသတွင်း မော်ဒယ်ငယ် (~1.1 GB) ကို ဒေါင်းလုဒ်လုပ်သောကြောင့် assistant သည် သင့်စက်ပေါ်တွင် လုံးလုံးလျားလျား အလုပ်လုပ်သည် - API သော့မရှိ၊ cloud ခေါ်ဆိုမှုများ မရှိပါ။",
     "installCta": "ထည့်သွင်းပါ (~1.1 GB)",
     "installFailedTitle": "ထည့်သွင်းခြင်း မအောင်မြင်ပါ။",

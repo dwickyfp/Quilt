@@ -933,9 +933,14 @@ fn compiled_sql_maps_username_to_attach_user() {
         .map(|s| s.sql.clone())
         .collect::<Vec<_>>()
         .join("\n");
+    // The username must map to libpq's `user=` parameter. The value is
+    // libpq-quoted for safety (so a username with whitespace can't inject
+    // extra connection parameters); since the whole conn string is itself
+    // embedded in an outer single-quoted ATTACH '...' literal, the value's
+    // single quotes are doubled -> `user=''admin''`.
     assert!(
-        all_sql.contains("user=admin"),
-        "expected username to be rendered as DB user in ATTACH SQL: {}",
+        all_sql.contains("user=''admin''"),
+        "expected username to be rendered as a libpq-quoted DB user in ATTACH SQL: {}",
         all_sql
     );
 }
@@ -1146,6 +1151,29 @@ fn window_aggregate_keeps_rows() {
         out
     ));
     assert_eq!(total, "30", "got {}", total);
+}
+
+#[test]
+fn view_stage_captures_explain_plan() {
+    // Profiler A2: a successful View stage captures its query plan via
+    // plain EXPLAIN into NodeRunStatus.explain (best-effort, never ANALYZE).
+    let tmp = tempfile::tempdir().unwrap();
+    let csv = write_file(tmp.path(), "in.csv", "g,amt\na,10\nb,5\n");
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+            node("w1", "xf.aggwin", json!({
+                "function": "sum", "column": "amt", "partitionBy": ["g"], "outputName": "g_total"
+            })),
+        ]),
+        json!([main_edge("e1", "s1", "w1")]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "run failed: {:?}", result.error);
+    let view = result.nodes.get("w1").expect("view status present");
+    let plan = view.explain.as_deref().expect("explain populated for view");
+    assert!(!plan.is_empty(), "explain plan should be non-empty");
 }
 
 #[test]

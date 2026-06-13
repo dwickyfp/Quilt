@@ -3169,6 +3169,135 @@ fn build_stage(
                 .unwrap_or_else(|| "prediction".into()),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id.starts_with("viz.") {
+        // Visualization node (viz.bar / viz.line / viz.scatter / viz.histogram).
+        // Not a distinct runtime variant: it compiles to a plain aggregation
+        // VIEW whose result the existing count_and_preview path surfaces as a
+        // NodePreview, which the frontend renders as a chart. The SQL fully
+        // expresses its upstream dependency (it SELECTs from the quoted input
+        // relation) so `from` stays None, like ctl.checkpoint.
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let spec: VizSpec = serde_json::from_value(props.clone()).map_err(|e| {
+            EngineError::Config(format!("{}: invalid viz properties: {}", component_id, e))
+        })?;
+        // Chart kind: prefer the component-id suffix, fall back to spec.chart.
+        let suffix = component_id.strip_prefix("viz.").unwrap_or("");
+        let chart = if suffix.is_empty() { spec.chart.trim() } else { suffix };
+        let x = spec.x.trim();
+        if x.is_empty() {
+            return Err(EngineError::Config(format!(
+                "{}: x (dimension column) required",
+                component_id
+            )));
+        }
+        // Clamp the row cap so a huge user value can't blow up the preview.
+        let limit = spec.limit.clamp(1, 100_000);
+        // SQL-injection defense, layer 1: the aggregation function is matched
+        // against a fixed allowlist (case-insensitive). An arbitrary string is
+        // rejected - it is NEVER interpolated into the emitted SQL.
+        let resolve_agg = |a: &str| -> Option<&'static str> {
+            match a.trim().to_ascii_lowercase().as_str() {
+                "sum" => Some("sum"),
+                "avg" => Some("avg"),
+                "count" => Some("count"),
+                "min" => Some("min"),
+                "max" => Some("max"),
+                _ => None,
+            }
+        };
+        // SQL-injection defense, layer 2: every column identifier is quoted via
+        // the shared quote_ident helper (double-quote + doubled inner quotes),
+        // so column names are never raw-interpolated.
+        let qx = quote_ident(x);
+        let qfrom = quote_ident(from_view);
+        let select_sql = if chart == "histogram" {
+            // No measure column: per-dimension-value counts.
+            format!(
+                "SELECT {x} AS \"x\", count(*) AS \"y\" FROM {from} GROUP BY {x} ORDER BY {x} LIMIT {n}",
+                x = qx,
+                from = qfrom,
+                n = limit
+            )
+        } else {
+            // bar / line / scatter need a measure column.
+            let y = spec
+                .y
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| {
+                    EngineError::Config(format!(
+                        "{}: y (measure column) required for {} chart",
+                        component_id, chart
+                    ))
+                })?;
+            let qy = quote_ident(y);
+            let series = spec
+                .series
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty());
+            let agg_given = spec
+                .agg
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty());
+            if chart == "scatter" && agg_given.is_none() {
+                // Raw scatter points: x, y (+ optional series label), no agg.
+                match series {
+                    Some(s) => format!(
+                        "SELECT {x} AS \"x\", {y} AS \"y\", {s} AS \"series\" FROM {from} LIMIT {n}",
+                        x = qx,
+                        y = qy,
+                        s = quote_ident(s),
+                        from = qfrom,
+                        n = limit
+                    ),
+                    None => format!(
+                        "SELECT {x} AS \"x\", {y} AS \"y\" FROM {from} LIMIT {n}",
+                        x = qx,
+                        y = qy,
+                        from = qfrom,
+                        n = limit
+                    ),
+                }
+            } else {
+                // Aggregated chart. agg defaults to sum when omitted; anything
+                // off the allowlist is rejected (never interpolated).
+                let raw_agg = agg_given.unwrap_or("sum");
+                let agg = resolve_agg(raw_agg).ok_or_else(|| {
+                    EngineError::Config(format!(
+                        "{}: unsupported aggregation '{}' (allowed: sum, avg, count, min, max)",
+                        component_id, raw_agg
+                    ))
+                })?;
+                match series {
+                    Some(s) => format!(
+                        "SELECT {x} AS \"x\", {agg}({y}) AS \"y\", {s} AS \"series\" FROM {from} GROUP BY {x}, {s} ORDER BY {x} LIMIT {n}",
+                        x = qx,
+                        agg = agg,
+                        y = qy,
+                        s = quote_ident(s),
+                        from = qfrom,
+                        n = limit
+                    ),
+                    None => format!(
+                        "SELECT {x} AS \"x\", {agg}({y}) AS \"y\" FROM {from} GROUP BY {x} ORDER BY {x} LIMIT {n}",
+                        x = qx,
+                        agg = agg,
+                        y = qy,
+                        from = qfrom,
+                        n = limit
+                    ),
+                }
+            }
+        };
+        let sql = format!(
+            "CREATE OR REPLACE VIEW {} AS {}",
+            quote_ident(&node.id),
+            select_sql
+        );
+        (sql, StageKind::View, None)
     } else {
         // the body so CSV/TSV sources can switch to the tolerant pass/reject
         // split when (and only when) the reject port is wired (issue #15).

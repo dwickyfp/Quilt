@@ -5,8 +5,8 @@
     "noContext": "無上下文",
     "git": "Git （工作區）",
     "gitAriaToggle": "切換Git面板",
-    "duckieAssistant": "Duckie AI助手",
-    "duckieAssistantAriaToggle": "切換Duckie AI助手",
+    "duckieAssistant": "Qunnie AI助手",
+    "duckieAssistantAriaToggle": "切換Qunnie AI助手",
     "switchLight": "切換至淺色模式",
     "switchDark": "切換到黑暗模式",
     "themeAriaToggle": "切換主題",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI助手",
+    "title": "Qunnie AI助手",
     "localTag": "本地",
     "checking": "正在檢查AI引擎...",
-    "installTitle": "安裝Duckie AI Assistant",
+    "installTitle": "安裝Qunnie AI Assistant",
     "installBody": "Quilt下載一個小型本地模型（約1.1 GB ） ，因此助手完全在您的機器上運行-沒有API密鑰，沒有雲端調用。",
     "installCta": "安裝(~1.1 GB)",
     "installFailedTitle": "安裝失敗",

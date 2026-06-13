@@ -5,8 +5,8 @@
     "noContext": "Без контекст",
     "git": "Git (работно пространство)",
     "gitAriaToggle": "Превключване на панела Git",
-    "duckieAssistant": "Duckie AI Assistant",
-    "duckieAssistantAriaToggle": "Превключете Duckie AI Assistant",
+    "duckieAssistant": "Qunnie AI Assistant",
+    "duckieAssistantAriaToggle": "Превключете Qunnie AI Assistant",
     "switchLight": "Преминете към светъл режим",
     "switchDark": "Преминете към тъмен режим",
     "themeAriaToggle": "Превключване на темата",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI Assistant",
+    "title": "Qunnie AI Assistant",
     "localTag": "местен",
     "checking": "Проверка на AI двигателя...",
-    "installTitle": "Инсталирайте Duckie AI Assistant",
+    "installTitle": "Инсталирайте Qunnie AI Assistant",
     "installBody": "Quilt изтегля малък локален модел (~1,1 GB), така че асистентът да работи изцяло на вашата машина - без API ключове, без облачни повиквания.",
     "installCta": "Инсталиране (~1,1 GB)",
     "installFailedTitle": "Инсталирането е неуспешно",

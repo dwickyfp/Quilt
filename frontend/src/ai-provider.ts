@@ -1,4 +1,4 @@
-// App-level AI provider configuration for the Duckie chat assistant.
+// App-level AI provider configuration for the Qunnie chat assistant.
 //
 // Persisted in localStorage (app-global, like theme/language) via the
 // persistence helpers. NOTE: the API key is stored in plaintext - it is
@@ -41,9 +41,13 @@ export function saveAiProviderConfig(config: AiProviderConfig): void {
 }
 
 export function isAiConfigured(config: AiProviderConfig): boolean {
-    return (
-        config.apiKey.trim().length > 0 &&
-        config.baseUrl.trim().length > 0 &&
-        config.model.trim().length > 0
-    );
+    const hasEndpoint =
+        config.baseUrl.trim().length > 0 && config.model.trim().length > 0;
+    // OpenAI-compatible endpoints (Ollama, LM Studio, local llama.cpp / vLLM)
+    // commonly need no API key, so don't require one there. Hosted OpenAI /
+    // Claude still require a key.
+    if (config.provider === 'openai-compatible') {
+        return hasEndpoint;
+    }
+    return config.apiKey.trim().length > 0 && hasEndpoint;
 }

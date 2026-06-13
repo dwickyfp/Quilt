@@ -12,12 +12,15 @@ import type {
 } from '../repo-types';
 import { SECRET_CONNECTION_KEYS } from '../repo-types';
 import SchemaEditor from './SchemaEditor';
+import { useRunStatus } from '../canvas/run-status-context';
+import { formatBytes } from '../canvas/profile-overlay';
 import FieldRenderer from './fields/FieldRenderer';
 import { FieldContext, type ActiveContext } from './fields/FieldContext';
 import { getManifest } from './fields/component-manifests';
 import type { Field } from './fields/types';
+import VizChart from './VizChart';
 
-type TabId = 'basic' | 'schema' | 'preview' | 'advanced' | 'validation';
+type TabId = 'basic' | 'schema' | 'preview' | 'advanced' | 'validation' | 'profile';
 
 // Universal Advanced-tab fields. The engine reads retryAttempts /
 // retryBackoffMs / memoryLimitMb directly off the node's properties;
@@ -115,6 +118,8 @@ export default function PropertiesPanel({
         [selected, edges, allNodes],
     );
 
+    const runStatus = useRunStatus(selected?.id ?? '');
+
     const activeContext = useMemo<ActiveContext | undefined>(() => {
         if (!activeContextId) return undefined;
         const item = repoItems.find(r => r.id === activeContextId && r.type === 'context');
@@ -190,6 +195,7 @@ export default function PropertiesPanel({
         { id: 'preview', label: t('properties.tabPreview') },
         { id: 'advanced', label: t('properties.tabAdvanced') },
         { id: 'validation', label: t('properties.tabValidation') },
+        { id: 'profile', label: t('properties.tabProfile') },
     ];
 
     const setLabel = (label: string) => onUpdate(selected.id, { label });
@@ -404,6 +410,7 @@ export default function PropertiesPanel({
                     {tab === 'preview' ? (
                         <div className="properties-section">
                             <PreviewTab
+                                componentId={data.componentId}
                                 schema={
                                     manifest?.schemaSource === 'upstream'
                                         ? upstreamSchema
@@ -455,6 +462,51 @@ export default function PropertiesPanel({
                             </div>
                         </div>
                     ) : null}
+
+                    {tab === 'profile' ? (
+                        <div className="properties-section">
+                            {!runStatus ? (
+                                <div className="properties-hint">{t('properties.profileEmpty')}</div>
+                            ) : (
+                                <>
+                                    <dl className="profile-metrics">
+                                        {runStatus.duration_ms !== undefined ? (
+                                            <>
+                                                <dt>Duration</dt>
+                                                <dd>{runStatus.duration_ms} ms</dd>
+                                            </>
+                                        ) : null}
+                                        {runStatus.rows !== undefined ? (
+                                            <>
+                                                <dt>Rows out</dt>
+                                                <dd>{runStatus.rows}</dd>
+                                            </>
+                                        ) : null}
+                                        {runStatus.rows_in !== undefined ? (
+                                            <>
+                                                <dt>Rows in</dt>
+                                                <dd>{runStatus.rows_in}</dd>
+                                            </>
+                                        ) : null}
+                                        {runStatus.peak_memory_bytes !== undefined ? (
+                                            <>
+                                                <dt>Peak memory</dt>
+                                                <dd>{formatBytes(runStatus.peak_memory_bytes)}</dd>
+                                            </>
+                                        ) : null}
+                                        <dt>Status</dt>
+                                        <dd>{runStatus.status}</dd>
+                                    </dl>
+                                    {runStatus.explain ? (
+                                        <details className="profile-plan">
+                                            <summary>Query plan</summary>
+                                            <pre>{runStatus.explain}</pre>
+                                        </details>
+                                    ) : null}
+                                </>
+                            )}
+                        </div>
+                    ) : null}
                 </div>
             </FieldContext.Provider>
         </aside>
@@ -462,13 +514,16 @@ export default function PropertiesPanel({
 }
 
 type PreviewProps = {
+    componentId?: string;
     schema: Column[];
     rows: Record<string, unknown>[];
     inheritedRows?: boolean;
 };
 
-function PreviewTab({ schema, rows, inheritedRows }: PreviewProps) {
+function PreviewTab({ componentId, schema, rows, inheritedRows }: PreviewProps) {
     const { t } = useTranslation();
+    const isViz = componentId?.startsWith('viz.') ?? false;
+    const chart = componentId?.slice('viz.'.length) ?? '';
     // When no formal schema resolved (e.g. a DB sink whose upstream schema
     // is empty until the source is read), derive columns from the sample
     // rows so the preview still renders from whatever data is available -
@@ -515,6 +570,11 @@ function PreviewTab({ schema, rows, inheritedRows }: PreviewProps) {
     const cols = effectiveSchema.map(c => c.name);
     return (
         <div className="preview-wrap">
+            {isViz ? (
+                <div className="preview-chart">
+                    <VizChart chart={chart} rows={rows} />
+                </div>
+            ) : null}
             <div className="preview-meta">
                 {rows.length} sample row{rows.length === 1 ? '' : 's'} · {cols.length} column
                 {cols.length === 1 ? '' : 's'}

@@ -2100,3 +2100,120 @@
         assert!(stage.sql.contains("\"p__test\""), "test relation present: {}", stage.sql);
         assert!(stage.sql.contains("__quilt_split"), "split key used: {}", stage.sql);
     }
+
+    fn viz_sql(doc: &PipelineDoc, node_id: &str) -> String {
+        compile(doc)
+            .unwrap()
+            .stages
+            .iter()
+            .find(|s| s.node_id == node_id)
+            .unwrap()
+            .sql
+            .clone()
+    }
+
+    #[test]
+    fn viz_bar_emits_aggregation_with_quoted_idents() {
+        let doc = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/d.csv","hasHeader":true}}},
+                {"id":"v","position":{"x":0,"y":0},"data":{"label":"Bar","componentId":"viz.bar","properties":{"chart":"bar","x":"region","y":"amount","agg":"sum"}}}
+              ],
+              "edges":[
+                {"id":"e1","source":"s","target":"v","data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let sql = viz_sql(&doc, "v");
+        assert!(sql.contains("\"region\""), "x quoted: {}", sql);
+        assert!(sql.contains("sum(\"amount\")"), "agg over quoted measure: {}", sql);
+        assert!(sql.contains("GROUP BY \"region\""), "group by present: {}", sql);
+        assert!(sql.contains("LIMIT 1000"), "default limit clamp: {}", sql);
+    }
+
+    #[test]
+    fn viz_histogram_counts_per_dimension() {
+        let doc = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/d.csv","hasHeader":true}}},
+                {"id":"v","position":{"x":0,"y":0},"data":{"label":"Hist","componentId":"viz.histogram","properties":{"chart":"histogram","x":"status"}}}
+              ],
+              "edges":[
+                {"id":"e1","source":"s","target":"v","data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let sql = viz_sql(&doc, "v");
+        assert!(sql.contains("count(*)"), "count(*) present: {}", sql);
+        assert!(sql.contains("GROUP BY \"status\""), "group by status: {}", sql);
+    }
+
+    #[test]
+    fn viz_series_adds_second_group_by() {
+        let doc = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/d.csv","hasHeader":true}}},
+                {"id":"v","position":{"x":0,"y":0},"data":{"label":"Line","componentId":"viz.line","properties":{"chart":"line","x":"day","y":"sales","agg":"avg","series":"channel","limit":50}}}
+              ],
+              "edges":[
+                {"id":"e1","source":"s","target":"v","data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let sql = viz_sql(&doc, "v");
+        assert!(sql.contains("avg(\"sales\")"), "avg agg: {}", sql);
+        assert!(sql.contains("\"channel\" AS \"series\""), "series projected: {}", sql);
+        assert!(sql.contains("GROUP BY \"day\", \"channel\""), "two-dim group by: {}", sql);
+        assert!(sql.contains("LIMIT 50"), "user limit honoured: {}", sql);
+    }
+
+    #[test]
+    fn viz_scatter_without_agg_emits_raw_points() {
+        let doc = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/d.csv","hasHeader":true}}},
+                {"id":"v","position":{"x":0,"y":0},"data":{"label":"Scatter","componentId":"viz.scatter","properties":{"chart":"scatter","x":"height","y":"weight"}}}
+              ],
+              "edges":[
+                {"id":"e1","source":"s","target":"v","data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        let sql = viz_sql(&doc, "v");
+        assert!(sql.contains("\"height\" AS \"x\""), "raw x: {}", sql);
+        assert!(sql.contains("\"weight\" AS \"y\""), "raw y: {}", sql);
+        assert!(!sql.contains("GROUP BY"), "no aggregation for raw scatter: {}", sql);
+    }
+
+    #[test]
+    fn viz_rejects_malicious_agg_no_injection() {
+        // A malicious agg string must never appear raw in the SQL. The fixed
+        // allowlist rejects it: compile() returns an error rather than emitting
+        // an injectable query.
+        let doc = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/d.csv","hasHeader":true}}},
+                {"id":"v","position":{"x":0,"y":0},"data":{"label":"Bar","componentId":"viz.bar","properties":{"chart":"bar","x":"region","y":"amount","agg":"sum); DROP TABLE x;--"}}}
+              ],
+              "edges":[
+                {"id":"e1","source":"s","target":"v","data":{"connectionType":"main"}}
+              ]
+            }"#,
+        );
+        match compile(&doc) {
+            Err(_) => {} // rejected by allowlist - the desired outcome
+            Ok(plan) => {
+                let stage = plan.stages.iter().find(|s| s.node_id == "v").unwrap();
+                assert!(
+                    !stage.sql.contains("DROP TABLE"),
+                    "malicious agg leaked into SQL: {}",
+                    stage.sql
+                );
+            }
+        }
+    }

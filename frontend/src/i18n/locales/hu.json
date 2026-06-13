@@ -5,7 +5,7 @@
     "noContext": "Nincs kontextus",
     "git": "Git (munkaterület)",
     "gitAriaToggle": "Git panel ki-/bekapcsolása",
-    "duckieAssistant": "Duckie AI Asszisztens",
+    "duckieAssistant": "Qunnie AI Asszisztens",
     "duckieAssistantAriaToggle": "Kacsa AI-asszisztens be- és kikapcsolása",
     "switchLight": "Váltás világítás üzemmódra",
     "switchDark": "Váltás ebbe a módba:",
@@ -74,10 +74,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI Asszisztens",
+    "title": "Qunnie AI Asszisztens",
     "localTag": "helyi",
     "checking": "AI-motor ellenőrzése folyamatban...",
-    "installTitle": "A Duckie AI Assistant telepítése",
+    "installTitle": "A Qunnie AI Assistant telepítése",
     "installBody": "A Quilt letölt egy kis helyi modellt (~ 1,1 GB), így az asszisztens teljes mértékben az Ön gépén fut - nincs API-kulcs, nincs felhőhívás.",
     "installCta": "Telepítés (~ 1,1 GB)",
     "installFailedTitle": "A telepítés nem sikerült",

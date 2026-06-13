@@ -5409,6 +5409,18 @@ html[dir='rtl'] .topbar-lang {
     }
 }
 
+/* Profiler overlay (A3): per-node execution-metric badge. */
+.node-profile-badge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 1px 7px;
+    background: var(--bg-3);
+    border-radius: 9px;
+    font-size: 9px;
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+}
+
 .node.is-run-running {
     box-shadow:
         0 0 0 1px var(--accent),
@@ -6436,6 +6448,63 @@ html[dir='rtl'] .topbar-lang {
 }
 .chat-bubble-insert:hover {
     background: var(--accent-strong);
+}
+.chat-patch-card {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 11.5px;
+}
+.chat-patch-head {
+    font-weight: 600;
+    color: var(--text-1);
+    margin-bottom: 6px;
+}
+.chat-patch-ops {
+    margin: 0 0 8px;
+    padding-left: 16px;
+    color: var(--text-2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.chat-patch-actions {
+    display: flex;
+    gap: 8px;
+}
+.chat-patch-apply {
+    padding: 5px 12px;
+    background: var(--accent);
+    color: var(--bg-0);
+    border: 0;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 100ms;
+}
+.chat-patch-apply:hover {
+    background: var(--accent-strong);
+}
+.chat-patch-dismiss {
+    padding: 5px 12px;
+    background: transparent;
+    color: var(--text-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.chat-patch-dismiss:hover {
+    color: var(--text-1);
+    border-color: var(--text-2);
+}
+.chat-patch-applied {
+    font-weight: 600;
+    color: var(--accent);
 }
 .chat-panel-form {
     display: flex;
@@ -7684,4 +7753,39 @@ html[dir='rtl'] .topbar-lang {
     color: var(--danger);
     border-color: color-mix(in srgb, var(--danger) 40%, transparent);
     background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.profile-metrics {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 12px;
+    margin: 0 0 12px;
+    font-size: 13px;
+}
+
+.profile-metrics dt {
+    color: var(--text-2);
+}
+
+.profile-metrics dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.profile-plan > summary {
+    cursor: pointer;
+    color: var(--text-2);
+    font-size: 13px;
+}
+
+.profile-plan pre {
+    margin: 8px 0 0;
+    padding: 8px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    white-space: pre;
+    overflow: auto;
 }

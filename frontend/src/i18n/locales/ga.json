@@ -5,8 +5,8 @@
     "noContext": "Gan comhthéacs",
     "git": "Git (spás oibre)",
     "gitAriaToggle": "Scoránaigh painéal Git",
-    "duckieAssistant": "Cúntóir AI Duckie",
-    "duckieAssistantAriaToggle": "Scoránaigh Cúntóir AI Duckie",
+    "duckieAssistant": "Cúntóir AI Qunnie",
+    "duckieAssistantAriaToggle": "Scoránaigh Cúntóir AI Qunnie",
     "switchLight": "Athraigh go mód solais",
     "switchDark": "Athraigh go mód dorcha",
     "themeAriaToggle": "Scoránaigh téama",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Cúntóir AI Duckie",
+    "title": "Cúntóir AI Qunnie",
     "localTag": "áitiúil",
     "checking": "Inneall AI á sheiceáil...",
-    "installTitle": "Suiteáil an Cúntóir AI Duckie",
+    "installTitle": "Suiteáil an Cúntóir AI Qunnie",
     "installBody": "Íoslódálann Quilt múnla beag áitiúil (~1.1 GB) agus mar sin ritheann an cúntóir go hiomlán ar do ríomhaire - gan eochracha API, gan néalghlao.",
     "installCta": "Suiteáil (~ 1.1 GB)",
     "installFailedTitle": "Theip ar an tsuiteáil",

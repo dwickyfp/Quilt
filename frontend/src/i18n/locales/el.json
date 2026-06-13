@@ -5,8 +5,8 @@
     "noContext": "Χωρίς περιεχόμενο",
     "git": "Git (χώρος εργασίας)",
     "gitAriaToggle": "Εναλλαγή πίνακα Git",
-    "duckieAssistant": "Βοηθός τεχνητής νοημοσύνης Duckie",
-    "duckieAssistantAriaToggle": "Εναλλαγή βοηθού τεχνητής νοημοσύνης Duckie",
+    "duckieAssistant": "Βοηθός τεχνητής νοημοσύνης Qunnie",
+    "duckieAssistantAriaToggle": "Εναλλαγή βοηθού τεχνητής νοημοσύνης Qunnie",
     "switchLight": "Μετάβαση σε λειτουργία φωτισμού",
     "switchDark": "Μετάβαση σε σκοτεινή λειτουργία",
     "themeAriaToggle": "Εναλλαγή θέματος",
@@ -74,10 +74,10 @@
     }
   },
   "chat": {
-    "title": "Βοηθός τεχνητής νοημοσύνης Duckie",
+    "title": "Βοηθός τεχνητής νοημοσύνης Qunnie",
     "localTag": "τοπική",
     "checking": "Έλεγχος μηχανής τεχνητής νοημοσύνης...",
-    "installTitle": "Εγκατάσταση του Βοηθού Τεχνητής Νοημοσύνης Duckie",
+    "installTitle": "Εγκατάσταση του Βοηθού Τεχνητής Νοημοσύνης Qunnie",
     "installBody": "Το Quilt κατεβάζει ένα μικρό τοπικό μοντέλο (~ 1,1 GB), ώστε ο βοηθός να τρέχει εξ ολοκλήρου στον υπολογιστή σας - χωρίς κλειδιά API, χωρίς κλήσεις cloud.",
     "installCta": "Εγκατάσταση (~1,1 GB)",
     "installFailedTitle": "Η εγκατάσταση απέτυχε",

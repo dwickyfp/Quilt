@@ -5,8 +5,8 @@
     "noContext": "Jokio konteksto",
     "git": "Git (darbo sritis)",
     "gitAriaToggle": "Perjungti Git skydelį",
-    "duckieAssistant": "Duckie AI padėjėjas",
-    "duckieAssistantAriaToggle": "Perjungti „Duckie AI Assistant“.",
+    "duckieAssistant": "Qunnie AI padėjėjas",
+    "duckieAssistantAriaToggle": "Perjungti „Qunnie AI Assistant“.",
     "switchLight": "Perjungti į šviesos režimą",
     "switchDark": "Perjungti į tamsųjį režimą",
     "themeAriaToggle": "Perjungti temą",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI padėjėjas",
+    "title": "Qunnie AI padėjėjas",
     "localTag": "vietinis",
     "checking": "Tikrinamas AI variklis...",
-    "installTitle": "Įdiekite „Duckie AI Assistant“.",
+    "installTitle": "Įdiekite „Qunnie AI Assistant“.",
     "installBody": "Quilt atsisiunčia nedidelį vietinį modelį (~1,1 GB), todėl asistentas veikia tik jūsų kompiuteryje – nėra API raktų, jokių debesies skambučių.",
     "installCta": "Įdiegti (~1,1 GB)",
     "installFailedTitle": "Diegimas nepavyko",

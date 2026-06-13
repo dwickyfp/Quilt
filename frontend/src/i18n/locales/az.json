@@ -5,8 +5,8 @@
     "noContext": "Kontekst yoxdur",
     "git": "Git (iş sahəsi)",
     "gitAriaToggle": "Git panelini dəyişin",
-    "duckieAssistant": "Duckie AI köməkçisi",
-    "duckieAssistantAriaToggle": "Duckie AI köməkçisini dəyişdirin",
+    "duckieAssistant": "Qunnie AI köməkçisi",
+    "duckieAssistantAriaToggle": "Qunnie AI köməkçisini dəyişdirin",
     "switchLight": "İşıq rejiminə keçin",
     "switchDark": "Qaranlıq rejimə keçin",
     "themeAriaToggle": "Mövzunu dəyişin",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI köməkçisi",
+    "title": "Qunnie AI köməkçisi",
     "localTag": "yerli",
     "checking": "AI mühərriki yoxlanılır...",
-    "installTitle": "Duckie AI köməkçisini quraşdırın",
+    "installTitle": "Qunnie AI köməkçisini quraşdırın",
     "installBody": "Quilt kiçik yerli modeli (~1,1 GB) endirir, beləliklə, köməkçi tamamilə sizin maşınınızda işləyir - API düymələri yoxdur, bulud zəngləri yoxdur.",
     "installCta": "Quraşdırma (~1,1 GB)",
     "installFailedTitle": "Quraşdırma uğursuz oldu",

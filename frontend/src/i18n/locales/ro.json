@@ -5,8 +5,8 @@
     "noContext": "Fără context",
     "git": "Git (spațiu de lucru)",
     "gitAriaToggle": "Comutați panoul Git",
-    "duckieAssistant": "Duckie AI Assistant",
-    "duckieAssistantAriaToggle": "Comutați Duckie AI Assistant",
+    "duckieAssistant": "Qunnie AI Assistant",
+    "duckieAssistantAriaToggle": "Comutați Qunnie AI Assistant",
     "switchLight": "Comută la modul iluminat",
     "switchDark": "Comută la modul întunecat",
     "themeAriaToggle": "Comută tema",
@@ -74,10 +74,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI Assistant",
+    "title": "Qunnie AI Assistant",
     "localTag": "local",
     "checking": "Se verifică motorul AI...",
-    "installTitle": "Instalați Duckie AI Assistant",
+    "installTitle": "Instalați Qunnie AI Assistant",
     "installBody": "Quilt descarcă un model local mic (~ 1,1 GB), astfel încât asistentul rulează în întregime pe mașina dvs. - fără chei API, fără apeluri în cloud.",
     "installCta": "Instalare (~ 1,1 GB)",
     "installFailedTitle": "Instalare eșuată",

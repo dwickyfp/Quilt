@@ -5,8 +5,8 @@
     "noContext": "ไม่มีบริบท",
     "git": "GIT (พื้นที่ทำงาน)",
     "gitAriaToggle": "สลับแผง Git",
-    "duckieAssistant": "ผู้ช่วย Duckie AI",
-    "duckieAssistantAriaToggle": "สลับผู้ช่วย Duckie AI",
+    "duckieAssistant": "ผู้ช่วย Qunnie AI",
+    "duckieAssistantAriaToggle": "สลับผู้ช่วย Qunnie AI",
     "switchLight": "เปลี่ยนเป็นโหมดสว่าง",
     "switchDark": "เปลี่ยนเป็นโหมดสีเข้ม",
     "themeAriaToggle": "สลับธีม",
@@ -74,10 +74,10 @@
     }
   },
   "chat": {
-    "title": "ผู้ช่วย Duckie AI",
+    "title": "ผู้ช่วย Qunnie AI",
     "localTag": "สถานที่",
     "checking": "กำลังตรวจสอบเครื่องมือ AI...",
-    "installTitle": "ติดตั้ง Duckie AI Assistant",
+    "installTitle": "ติดตั้ง Qunnie AI Assistant",
     "installBody": "Quilt ดาวน์โหลดโมเดลในเครื่องขนาดเล็ก (~1.1 GB) เพื่อให้ผู้ช่วยทำงานบนเครื่องของคุณทั้งหมด - ไม่มีคีย์ API ไม่มีการโทรผ่านคลาวด์",
     "installCta": "ติดตั้ง (~1.1 GB)",
     "installFailedTitle": "ติดตั้ง PSP ล้มเหลว",

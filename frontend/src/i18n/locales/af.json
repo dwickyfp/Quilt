@@ -5,8 +5,8 @@
     "noContext": "Geen konteks nie",
     "git": "Git (werkspasie)",
     "gitAriaToggle": "Wissel Git-paneel",
-    "duckieAssistant": "Duckie AI assistent",
-    "duckieAssistantAriaToggle": "Wissel Duckie AI Assistant",
+    "duckieAssistant": "Qunnie AI assistent",
+    "duckieAssistantAriaToggle": "Wissel Qunnie AI Assistant",
     "switchLight": "Skakel oor na ligmodus",
     "switchDark": "Skakel oor na donker modus",
     "themeAriaToggle": "Wissel tema",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI assistent",
+    "title": "Qunnie AI assistent",
     "localTag": "plaaslik",
     "checking": "Gaan tans KI-enjin na...",
-    "installTitle": "Installeer die Duckie AI Assistant",
+    "installTitle": "Installeer die Qunnie AI Assistant",
     "installBody": "Quilt laai 'n klein plaaslike model af (~1,1 GB) sodat die assistent heeltemal op jou masjien werk - geen API-sleutels, geen wolkoproepe nie.",
     "installCta": "Installeer (~1,1 GB)",
     "installFailedTitle": "Installering het misluk",

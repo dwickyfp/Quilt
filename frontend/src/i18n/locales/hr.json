@@ -5,8 +5,8 @@
     "noContext": "Bez konteksta",
     "git": "Git (radni prostor)",
     "gitAriaToggle": "Uključi/isključi Git ploču",
-    "duckieAssistant": "Duckie AI pomoćnik",
-    "duckieAssistantAriaToggle": "Uključi/isključi Duckie AI Assistant",
+    "duckieAssistant": "Qunnie AI pomoćnik",
+    "duckieAssistantAriaToggle": "Uključi/isključi Qunnie AI Assistant",
     "switchLight": "Prebacite se na svjetlosni način rada",
     "switchDark": "Prebacite se na tamni način rada",
     "themeAriaToggle": "Uključi/isključi temu",
@@ -109,10 +109,10 @@
     }
   },
   "chat": {
-    "title": "Duckie AI pomoćnik",
+    "title": "Qunnie AI pomoćnik",
     "localTag": "lokalni",
     "checking": "Provjera AI motora...",
-    "installTitle": "Instalirajte Duckie AI Assistant",
+    "installTitle": "Instalirajte Qunnie AI Assistant",
     "installBody": "Quilt preuzima mali lokalni model (~1,1 GB) tako da pomoćnik u potpunosti radi na vašem računalu - bez API ključeva, bez poziva u oblaku.",
     "installCta": "Instaliraj (~1,1 GB)",
     "installFailedTitle": "Install failed",
