@@ -3569,10 +3569,8 @@ mod builders;
 pub(crate) use builders::*;
 
 // Pure cache-key / cacheability / prune logic for smart incremental re-run
-// (feature #1). The engine wiring (manifest + parquet checkpoint + plan
-// rewrite in execute_pipeline_with_events) lands next; until then these
-// functions are exercised only by their own unit tests, hence the allow.
-#[allow(dead_code)]
+// (feature #1). Wired into execute_pipeline_with_events as an opt-in
+// content-addressed Parquet stage cache (gated on QUILT_STAGE_CACHE_DIR).
 pub(crate) mod stage_cache;
 
 #[cfg(test)]

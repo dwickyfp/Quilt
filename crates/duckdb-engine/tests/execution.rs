@@ -10057,3 +10057,301 @@ fn ml_partition_splits_train_and_test_complementary() {
     ));
     assert_eq!(overlap, 0, "train and test must not overlap");
 }
+
+// ===================================================================
+// Smart incremental re-run: content-addressed Parquet stage cache.
+//
+// These drive the REAL DuckDB CLI end-to-end with QUILT_STAGE_CACHE_DIR
+// set, proving the 6 correctness invariants. Env is process-global and
+// tests run in parallel, so each test holds `env_guard()` for its whole
+// body and removes the var before asserting.
+// ===================================================================
+
+/// Count `*.parquet` files in a cache dir (0 if the dir doesn't exist).
+fn parquet_count(dir: &Path) -> usize {
+    std::fs::read_dir(dir)
+        .map(|rd| {
+            rd.flatten()
+                .filter(|e| {
+                    e.path().extension().and_then(|x| x.to_str()) == Some("parquet")
+                })
+                .count()
+        })
+        .unwrap_or(0)
+}
+
+/// Set-equality of two CSV outputs (each row of `a` appears in `b` and
+/// vice-versa), plus equal row counts. Robust to row-order differences.
+fn assert_csv_same(a: &str, b: &str) {
+    let na = count(&format!("read_csv_auto('{}')", a));
+    let nb = count(&format!("read_csv_auto('{}')", b));
+    assert_eq!(na, nb, "row counts differ: {} vs {}", na, nb);
+    let ab = count(&format!(
+        "(SELECT * FROM read_csv_auto('{}') EXCEPT SELECT * FROM read_csv_auto('{}'))",
+        a, b
+    ));
+    let ba = count(&format!(
+        "(SELECT * FROM read_csv_auto('{}') EXCEPT SELECT * FROM read_csv_auto('{}'))",
+        b, a
+    ));
+    assert_eq!(ab, 0, "rows in {} not in {}", a, b);
+    assert_eq!(ba, 0, "rows in {} not in {}", b, a);
+}
+
+const CACHE_CSV: &str =
+    "order_id,status,amount\n1,paid,10\n2,pending,20\n3,paid,30\n4,refunded,5\n";
+
+/// Invariant 1: an unchanged re-run is served from the parquet cache and
+/// returns byte/row-identical data; a `<key>.parquet` is created.
+#[test]
+fn cache_hit_serves_identical_data() {
+    let _g = env_guard();
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = tmp.path().join("cache");
+    let csv = write_file(tmp.path(), "orders.csv", CACHE_CSV);
+    let out1 = out_path(tmp.path(), "o1.csv");
+    let out2 = out_path(tmp.path(), "o2.csv");
+
+    std::env::set_var("QUILT_STAGE_CACHE_DIR", &cache);
+
+    let mk = |out: &str| {
+        doc(
+            json!([
+                node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+                node("f1", "xf.filter", json!({ "predicate": "status = 'paid'" })),
+                node("k1", "snk.csv", json!({ "path": out })),
+            ]),
+            json!([main_edge("e1", "s1", "f1"), main_edge("e2", "f1", "k1")]),
+        )
+    };
+
+    let r1 = engine.execute_pipeline(&mk(&out1));
+    assert_eq!(r1.status, "ok", "run1 failed: {:?}", r1.error);
+    let r2 = engine.execute_pipeline(&mk(&out2));
+    assert_eq!(r2.status, "ok", "run2 failed: {:?}", r2.error);
+
+    let pq = parquet_count(&cache);
+    std::env::remove_var("QUILT_STAGE_CACHE_DIR");
+
+    assert!(pq >= 1, "expected >=1 cached parquet, found {}", pq);
+    assert_csv_same(&out1, &out2);
+    // And it really is the 2 paid rows.
+    assert_eq!(count(&format!("read_csv_auto('{}')", out2)), 2);
+}
+
+/// Invariant 2: changing the filter's predicate recomputes (no stale cache).
+#[test]
+fn config_change_recomputes() {
+    let _g = env_guard();
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = tmp.path().join("cache");
+    let csv = write_file(tmp.path(), "orders.csv", CACHE_CSV);
+    let out1 = out_path(tmp.path(), "o1.csv");
+    let out2 = out_path(tmp.path(), "o2.csv");
+
+    std::env::set_var("QUILT_STAGE_CACHE_DIR", &cache);
+
+    let mk = |pred: &str, out: &str| {
+        doc(
+            json!([
+                node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+                node("f1", "xf.filter", json!({ "predicate": pred })),
+                node("k1", "snk.csv", json!({ "path": out })),
+            ]),
+            json!([main_edge("e1", "s1", "f1"), main_edge("e2", "f1", "k1")]),
+        )
+    };
+
+    let r1 = engine.execute_pipeline(&mk("status = 'paid'", &out1));
+    assert_eq!(r1.status, "ok", "run1 failed: {:?}", r1.error);
+    // Predicate changed -> filter key changes -> must recompute, not serve stale.
+    let r2 = engine.execute_pipeline(&mk("status = 'pending'", &out2));
+    assert_eq!(r2.status, "ok", "run2 failed: {:?}", r2.error);
+
+    std::env::remove_var("QUILT_STAGE_CACHE_DIR");
+
+    assert_eq!(count(&format!("read_csv_auto('{}')", out1)), 2, "paid rows");
+    assert_eq!(count(&format!("read_csv_auto('{}')", out2)), 1, "pending rows");
+    let stale = count(&format!(
+        "read_csv_auto('{}') WHERE status != 'pending'",
+        out2
+    ));
+    assert_eq!(stale, 0, "run2 must reflect NEW predicate, not cached rows");
+}
+
+/// Invariant 3: changing a prop on an UPSTREAM transform cascades to the
+/// downstream output (an intermediate cache hit must not mask the change).
+#[test]
+fn upstream_change_invalidates_downstream() {
+    let _g = env_guard();
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = tmp.path().join("cache");
+    let csv = write_file(tmp.path(), "orders.csv", CACHE_CSV);
+    let out1 = out_path(tmp.path(), "o1.csv");
+    let out2 = out_path(tmp.path(), "o2.csv");
+
+    std::env::set_var("QUILT_STAGE_CACHE_DIR", &cache);
+
+    // s1 -> f1 (upstream) -> f2 (downstream) -> k1. Change f1's predicate
+    // on the 2nd run; f2 is unchanged but must NOT serve its old cache.
+    let mk = |pred1: &str, out: &str| {
+        doc(
+            json!([
+                node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+                node("f1", "xf.filter", json!({ "predicate": pred1 })),
+                node("f2", "xf.filter", json!({ "predicate": "amount > 0" })),
+                node("k1", "snk.csv", json!({ "path": out })),
+            ]),
+            json!([
+                main_edge("e1", "s1", "f1"),
+                main_edge("e2", "f1", "f2"),
+                main_edge("e3", "f2", "k1"),
+            ]),
+        )
+    };
+
+    let r1 = engine.execute_pipeline(&mk("status = 'paid'", &out1));
+    assert_eq!(r1.status, "ok", "run1 failed: {:?}", r1.error);
+    let r2 = engine.execute_pipeline(&mk("status = 'refunded'", &out2));
+    assert_eq!(r2.status, "ok", "run2 failed: {:?}", r2.error);
+
+    std::env::remove_var("QUILT_STAGE_CACHE_DIR");
+
+    assert_eq!(count(&format!("read_csv_auto('{}')", out1)), 2, "paid");
+    assert_eq!(count(&format!("read_csv_auto('{}')", out2)), 1, "refunded");
+    let stale = count(&format!(
+        "read_csv_auto('{}') WHERE status != 'refunded'",
+        out2
+    ));
+    assert_eq!(stale, 0, "downstream must reflect upstream change");
+}
+
+/// Invariant 4 (KEY): editing the source file on disk (same path, graph
+/// unchanged) invalidates the cache via the mtime+size fingerprint.
+#[test]
+fn external_file_change_invalidates() {
+    let _g = env_guard();
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = tmp.path().join("cache");
+    let csv = write_file(tmp.path(), "orders.csv", CACHE_CSV);
+    let out1 = out_path(tmp.path(), "o1.csv");
+    let out2 = out_path(tmp.path(), "o2.csv");
+
+    std::env::set_var("QUILT_STAGE_CACHE_DIR", &cache);
+
+    let mk = |out: &str| {
+        doc(
+            json!([
+                node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+                node("f1", "xf.filter", json!({ "predicate": "status = 'paid'" })),
+                node("k1", "snk.csv", json!({ "path": out })),
+            ]),
+            json!([main_edge("e1", "s1", "f1"), main_edge("e2", "f1", "k1")]),
+        )
+    };
+
+    let r1 = engine.execute_pipeline(&mk(&out1));
+    assert_eq!(r1.status, "ok", "run1 failed: {:?}", r1.error);
+
+    // Rewrite the SAME path with DIFFERENT content (3 paid rows now, and a
+    // different byte length -> size component of the fingerprint changes,
+    // so we don't depend on filesystem mtime resolution).
+    write_file(
+        tmp.path(),
+        "orders.csv",
+        "order_id,status,amount\n10,paid,1\n11,paid,2\n12,paid,3\n13,pending,4\n14,refunded,5\n",
+    );
+
+    let r2 = engine.execute_pipeline(&mk(&out2));
+    assert_eq!(r2.status, "ok", "run2 failed: {:?}", r2.error);
+
+    std::env::remove_var("QUILT_STAGE_CACHE_DIR");
+
+    // Run1 saw 2 paid rows; run2 must see the NEW file's 3 paid rows, not
+    // the stale cached parquet.
+    assert_eq!(count(&format!("read_csv_auto('{}')", out1)), 2, "old file");
+    assert_eq!(count(&format!("read_csv_auto('{}')", out2)), 3, "new file");
+}
+
+/// Invariant 5: pruning never changes results. A cached/pruned re-run yields
+/// the same final sink output as a cold (cache-off) run.
+#[test]
+fn prune_keeps_results_correct() {
+    let _g = env_guard();
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = tmp.path().join("cache");
+    let csv = write_file(tmp.path(), "orders.csv", CACHE_CSV);
+    let cold = out_path(tmp.path(), "cold.csv");
+    let warm1 = out_path(tmp.path(), "warm1.csv");
+    let warm2 = out_path(tmp.path(), "warm2.csv");
+
+    let mk = |out: &str| {
+        doc(
+            json!([
+                node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+                node("f1", "xf.filter", json!({ "predicate": "amount >= 10" })),
+                node("k1", "snk.csv", json!({ "path": out })),
+            ]),
+            json!([main_edge("e1", "s1", "f1"), main_edge("e2", "f1", "k1")]),
+        )
+    };
+
+    // Cold run with caching OFF.
+    std::env::remove_var("QUILT_STAGE_CACHE_DIR");
+    let rc = engine.execute_pipeline(&mk(&cold));
+    assert_eq!(rc.status, "ok", "cold run failed: {:?}", rc.error);
+
+    // Warm: populate the cache, then re-run so pruning kicks in (source
+    // pruned, filter served from parquet).
+    std::env::set_var("QUILT_STAGE_CACHE_DIR", &cache);
+    let rw1 = engine.execute_pipeline(&mk(&warm1));
+    assert_eq!(rw1.status, "ok", "warm1 failed: {:?}", rw1.error);
+    let rw2 = engine.execute_pipeline(&mk(&warm2));
+    assert_eq!(rw2.status, "ok", "warm2 failed: {:?}", rw2.error);
+    std::env::remove_var("QUILT_STAGE_CACHE_DIR");
+
+    assert_csv_same(&cold, &warm1);
+    assert_csv_same(&cold, &warm2);
+}
+
+/// Invariant 6: with QUILT_STAGE_CACHE_DIR unset, behavior is unchanged and
+/// no cache dir is created.
+#[test]
+fn cache_disabled_unaffected() {
+    let _g = env_guard();
+    let engine = engine_or_skip!();
+    let tmp = tempfile::tempdir().unwrap();
+    let cache = tmp.path().join("cache");
+    let csv = write_file(tmp.path(), "orders.csv", CACHE_CSV);
+    let out1 = out_path(tmp.path(), "o1.csv");
+    let out2 = out_path(tmp.path(), "o2.csv");
+
+    // Ensure it's unset for this test.
+    std::env::remove_var("QUILT_STAGE_CACHE_DIR");
+
+    let mk = |out: &str| {
+        doc(
+            json!([
+                node("s1", "src.csv", json!({ "path": csv, "hasHeader": true })),
+                node("f1", "xf.filter", json!({ "predicate": "status = 'paid'" })),
+                node("k1", "snk.csv", json!({ "path": out })),
+            ]),
+            json!([main_edge("e1", "s1", "f1"), main_edge("e2", "f1", "k1")]),
+        )
+    };
+
+    let r1 = engine.execute_pipeline(&mk(&out1));
+    assert_eq!(r1.status, "ok", "run1 failed: {:?}", r1.error);
+    let r2 = engine.execute_pipeline(&mk(&out2));
+    assert_eq!(r2.status, "ok", "run2 failed: {:?}", r2.error);
+
+    // No cache dir created; results correct + identical.
+    assert!(!cache.exists(), "cache dir must not be created when disabled");
+    assert_eq!(count(&format!("read_csv_auto('{}')", out1)), 2);
+    assert_csv_same(&out1, &out2);
+}

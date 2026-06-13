@@ -363,10 +363,144 @@ impl DuckdbEngine {
             Some(t) => plan::compile_partial(doc, t),
             None => plan::compile(doc),
         };
-        let compiled = match compiled {
+        let mut compiled = match compiled {
             Ok(c) => c,
             Err(e) => return RunResult::failed(total_start, e.to_string()),
         };
+
+        // ---- Smart incremental re-run: content-addressed Parquet stage cache.
+        //
+        // Opt-in, gated entirely on QUILT_STAGE_CACHE_DIR. Unset/empty => this
+        // whole block is a no-op and the executor behaves exactly as before.
+        //
+        // When enabled we (1) compute a content key per stage (component +
+        // canonical props + external file fingerprint + cascading upstream
+        // keys, via the pure `plan::stage_cache` core), (2) treat a stage as a
+        // HIT when its <key>.parquet already exists in the cache dir (file
+        // existence IS the validity proof - the key folds in everything that
+        // could change the output, including on-disk file mtime+size), (3)
+        // rewrite hits to `read_parquet(...)` views and prune now-dead
+        // upstreams, and (4) remember cacheable misses to write back after a
+        // successful run. Correctness never depends on a manifest.
+        let stage_cache_dir: Option<PathBuf> = std::env::var("QUILT_STAGE_CACHE_DIR")
+            .ok()
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from);
+        let cache_budget_mb: u64 = std::env::var("QUILT_STAGE_CACHE_BUDGET_MB")
+            .ok()
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .filter(|n| *n > 0)
+            .unwrap_or(2048);
+        // (node_id, key) for cacheable, non-pruned, non-sink misses -> write back.
+        let mut cache_misses: Vec<(String, String)> = Vec::new();
+        if let Some(ref dir) = stage_cache_dir {
+            if let Err(e) = std::fs::create_dir_all(dir) {
+                // Can't create the cache dir -> silently run without caching.
+                // A broken cache must never break a run.
+                eprintln!("stage cache: could not create {}: {}", dir.display(), e);
+            } else {
+                let node_by_id: std::collections::HashMap<&str, &quilt_metadata::PipelineNode> =
+                    doc.nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+                // A stage is a source iff nothing in the doc targets it.
+                let targets: std::collections::HashSet<&str> =
+                    doc.edges.iter().map(|e| e.target.as_str()).collect();
+                const FILE_SOURCES: &[&str] = &[
+                    "src.csv", "src.tsv", "src.parquet", "src.json", "src.jsonl",
+                    "src.avro", "src.excel",
+                ];
+                let empty_obj = JsonValue::Object(serde_json::Map::new());
+                let mut cnodes: Vec<plan::stage_cache::CacheNode> =
+                    Vec::with_capacity(compiled.stages.len());
+                for stage in &compiled.stages {
+                    let props_val = node_by_id
+                        .get(stage.node_id.as_str())
+                        .and_then(|n| n.data.properties.as_ref())
+                        .unwrap_or(&empty_obj);
+                    let canonical_props = plan::stage_cache::canonical_json(props_val);
+                    let is_sink = matches!(stage.kind, StageKind::Sink);
+                    let is_source = !targets.contains(stage.node_id.as_str());
+                    // Fingerprint only local-file sources we can stat. The key
+                    // folds this in, so editing the file on disk (same path,
+                    // same graph) changes the key and forces a recompute.
+                    let mut external_fingerprint: Option<String> = None;
+                    if is_source && FILE_SOURCES.contains(&stage.component_id.as_str()) {
+                        if let Some(path) = props_val.get("path").and_then(|v| v.as_str()) {
+                            if let Ok(md) = std::fs::metadata(path) {
+                                let mtime_ns = md
+                                    .modified()
+                                    .ok()
+                                    .and_then(|m| {
+                                        m.duration_since(std::time::UNIX_EPOCH).ok()
+                                    })
+                                    .map(|d| d.as_nanos());
+                                external_fingerprint = plan::stage_cache::file_fingerprint(
+                                    mtime_ns,
+                                    Some(md.len()),
+                                );
+                            }
+                        }
+                    }
+                    let source_fingerprinted = external_fingerprint.is_some();
+                    cnodes.push(plan::stage_cache::CacheNode {
+                        node_id: stage.node_id.clone(),
+                        component_id: stage.component_id.clone(),
+                        canonical_props,
+                        external_fingerprint,
+                        is_pure_sql: stage.is_pure_sql(),
+                        is_sink,
+                        source_fingerprinted,
+                        is_source,
+                    });
+                }
+                let cedges: Vec<plan::stage_cache::CacheEdge> = doc
+                    .edges
+                    .iter()
+                    .map(|e| plan::stage_cache::CacheEdge {
+                        source: e.source.clone(),
+                        target: e.target.clone(),
+                    })
+                    .collect();
+                let keys = plan::stage_cache::compute_keys(&cnodes, &cedges);
+                let cacheable = plan::stage_cache::cacheable_set(&cnodes, &cedges);
+                // HIT = cacheable stage whose parquet already exists on disk.
+                let mut hits: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
+                for id in &cacheable {
+                    if let Some(key) = keys.get(id) {
+                        if dir.join(format!("{}.parquet", key)).exists() {
+                            hits.insert(id.clone());
+                        }
+                    }
+                }
+                let prunable = plan::stage_cache::prunable_set(&cnodes, &cedges, &hits);
+                // Rewrite the plan in place: drop prunable stages, swap hits for
+                // a read_parquet view, and record cacheable misses to write back.
+                let old_stages = std::mem::take(&mut compiled.stages);
+                let mut new_stages: Vec<plan::Stage> = Vec::with_capacity(old_stages.len());
+                for mut stage in old_stages {
+                    if prunable.contains(&stage.node_id) {
+                        // Every consumer reads parquet; this stage is dead weight.
+                        continue;
+                    }
+                    if hits.contains(&stage.node_id) {
+                        let key = &keys[&stage.node_id];
+                        let pq = dir.join(format!("{}.parquet", key));
+                        stage.sql = format!(
+                            "CREATE OR REPLACE VIEW {} AS SELECT * FROM read_parquet('{}')",
+                            plan::quote_ident(&stage.node_id),
+                            sql_escape(&pq.to_string_lossy()),
+                        );
+                    } else if cacheable.contains(&stage.node_id)
+                        && !matches!(stage.kind, StageKind::Sink)
+                    {
+                        cache_misses
+                            .push((stage.node_id.clone(), keys[&stage.node_id].clone()));
+                    }
+                    new_stages.push(stage);
+                }
+                compiled.stages = new_stages;
+            }
+        }
 
         // Component-level run log (Splunk / Dynatrace), gated on
         // QUILT_LOG_DIR. We tee every event through it so BOTH the fast
@@ -480,6 +614,15 @@ impl DuckdbEngine {
                 &compiled.stages,
                 total_start,
                 &mut on_event,
+            );
+            // Cache write-back happens while db_path is still alive (the temp
+            // db is deleted when this fn returns). No-op when caching is off.
+            self.stage_cache_writeback(
+                &stage_cache_dir,
+                &cache_misses,
+                &r,
+                &db_path,
+                cache_budget_mb,
             );
             return r;
         }
@@ -1099,13 +1242,94 @@ impl DuckdbEngine {
         let category = overall_error
             .as_deref()
             .map(|e| error_category::categorize_error(e).to_string());
-        RunResult {
+        let result = RunResult {
             status: final_status.into(),
             duration_ms: total_start.elapsed().as_millis() as u64,
             nodes,
             preview,
             error: overall_error,
             category,
+        };
+        // Cache write-back while db_path is still alive. No-op when off.
+        self.stage_cache_writeback(
+            &stage_cache_dir,
+            &cache_misses,
+            &result,
+            &db_path,
+            cache_budget_mb,
+        );
+        result
+    }
+
+    /// Best-effort write-back of cacheable stage outputs to content-addressed
+    /// Parquet files, then a best-effort LRU sweep. A no-op when caching is
+    /// disabled (`dir` is None) or the run didn't succeed. Cache write failures
+    /// are swallowed: a missed write just becomes a future cache miss, never a
+    /// run failure. Must be called while `db_path` is still alive.
+    fn stage_cache_writeback(
+        &self,
+        dir: &Option<PathBuf>,
+        misses: &[(String, String)],
+        result: &RunResult,
+        db_path: &Path,
+        budget_mb: u64,
+    ) {
+        let dir = match dir {
+            Some(d) => d,
+            None => return,
+        };
+        if result.status != "ok" {
+            return;
+        }
+        for (node_id, key) in misses {
+            let pq = dir.join(format!("{}.parquet", key));
+            // Skip if some earlier run already wrote this exact content.
+            if pq.exists() {
+                continue;
+            }
+            let sql = format!(
+                "COPY (SELECT * FROM {}) TO '{}' (FORMAT parquet)",
+                plan::quote_ident(node_id),
+                sql_escape(&pq.to_string_lossy()),
+            );
+            let _ = self.run(Some(db_path), &sql, false);
+        }
+        Self::stage_cache_evict(dir, budget_mb);
+    }
+
+    /// Best-effort LRU eviction: if the total size of `*.parquet` in `dir`
+    /// exceeds the byte budget, delete oldest-by-mtime files until under it.
+    /// Purely a housekeeping concern - correctness never depends on it.
+    fn stage_cache_evict(dir: &Path, budget_mb: u64) {
+        let budget = budget_mb.saturating_mul(1024 * 1024);
+        let mut entries: Vec<(std::time::SystemTime, u64, PathBuf)> = Vec::new();
+        let rd = match std::fs::read_dir(dir) {
+            Ok(rd) => rd,
+            Err(_) => return,
+        };
+        let mut total: u64 = 0;
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.extension().and_then(|x| x.to_str()) != Some("parquet") {
+                continue;
+            }
+            if let Ok(md) = e.metadata() {
+                let mtime = md.modified().unwrap_or(std::time::UNIX_EPOCH);
+                total += md.len();
+                entries.push((mtime, md.len(), p));
+            }
+        }
+        if total <= budget {
+            return;
+        }
+        entries.sort_by_key(|(mtime, _, _)| *mtime); // oldest first
+        for (_, len, path) in entries {
+            if total <= budget {
+                break;
+            }
+            if std::fs::remove_file(&path).is_ok() {
+                total = total.saturating_sub(len);
+            }
         }
     }
 
