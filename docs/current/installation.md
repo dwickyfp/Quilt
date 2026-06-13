@@ -1,6 +1,6 @@
 # Installation & App Setup
 
-Duckle is a lightweight desktop app that runs entirely on your local machine. Because it does not run in the cloud, there are no remote servers to configure, and all your work remains completely secure.
+Quilt is a lightweight desktop app that runs entirely on your local machine. Because it does not run in the cloud, there are no remote servers to configure, and all your work remains completely secure.
 
 ---
 
@@ -8,17 +8,17 @@ Duckle is a lightweight desktop app that runs entirely on your local machine. Be
 
 Download the application package for your operating system:
 
-* **Windows**: Run the `Duckle-windows-x64.exe` setup helper. 
+* **Windows**: Run the `Quilt-windows-x64.exe` setup helper. 
   * *Unsigned App Warning*: Windows SmartScreen may block launch. Click **"More info"** and then select **"Run anyway"**.
-* **macOS**: Extract and open `Duckle-macos-arm64` (for Apple Silicon) or the Intel version.
+* **macOS**: Extract and open `Quilt-macos-arm64` (for Apple Silicon) or the Intel version.
   * *Gatekeeper Bypass*: Right-click the app icon in Finder and select **"Open"** to bypass security alerts.
-* **Linux**: Ensure WebKitGTK (`libwebkit2gtk-4.1-0`) is installed on your package manager, then run `chmod +x Duckle-linux-x64 && ./Duckle-linux-x64`.
+* **Linux**: Ensure WebKitGTK (`libwebkit2gtk-4.1-0`) is installed on your package manager, then run `chmod +x Quilt-linux-x64 && ./Quilt-linux-x64`.
 
 ---
 
 ## 2. Guided Startup Setup Modal
 
-The first time you open Duckle, the **Engine Setup Modal** will appear to help download the necessary engine tools:
+The first time you open Quilt, the **Engine Setup Modal** will appear to help download the necessary engine tools:
 
 1. **DuckDB Database Engine (Required)**
    * **Visual Action**: Click the **Install** button.
@@ -32,7 +32,7 @@ The first time you open Duckle, the **Engine Setup Modal** will appear to help d
    * **Estimated Time**: 5-10 minutes depending on your internet connection.
 
 > [!TIP]
-> If you ever need to redownload these engines or reset their installation status, close Duckle, navigate to your platform's configuration folder (Windows: `%APPDATA%\io.duckle.app\engines\`), delete the contents, and launch the application again.
+> If you ever need to redownload these engines or reset their installation status, close Quilt, navigate to your platform's configuration folder (Windows: `%APPDATA%\io.quilt.app\engines\`), delete the contents, and launch the application again.
 
 ---
 
@@ -41,7 +41,7 @@ The first time you open Duckle, the **Engine Setup Modal** will appear to help d
 After setting up the engines, the **Workspace Picker Modal** will ask you to select a folder on your local drive. 
 
 * Click **"Browse / Select Folder"** to open your operating system's native folder dialog.
-* Select an empty directory or choose an existing Duckle workspace.
+* Select an empty directory or choose an existing Quilt workspace.
 
 ### What is inside the Workspace Folder?
 Your workspace is organized into simple, human-readable files that make version control easy:

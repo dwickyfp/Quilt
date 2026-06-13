@@ -2,7 +2,7 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 import { isTauri } from './tauri-dialog';
 import type { Column } from './pipeline-types';
 import type { Edge, Node } from '@xyflow/react';
-import type { DuckleNodeData } from './pipeline-types';
+import type { QuiltNodeData } from './pipeline-types';
 
 type AutodetectPayload = {
     columns: Column[];
@@ -82,7 +82,7 @@ export type PipelineEvent =
     | { type: 'finished'; status: 'ok' | 'error' | 'cancelled'; duration_ms: number };
 
 export async function runPipeline(
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
     onEvent?: (evt: PipelineEvent) => void,
     pipelineId?: string,
@@ -113,7 +113,7 @@ export async function runPipeline(
 }
 
 export async function runPipelinePartial(
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
     targetNodeId: string,
     onEvent?: (evt: PipelineEvent) => void,
@@ -303,7 +303,7 @@ export async function chatSend(
 }
 
 /**
- * Pull a Duckle pipeline JSON out of an assistant message - the
+ * Pull a Quilt pipeline JSON out of an assistant message - the
  * model is asked to wrap pipelines in ```json fenced code blocks.
  * Returns null if no extractable pipeline.
  */
@@ -449,7 +449,7 @@ export type StageSql = {
 };
 
 export async function compilePipelineSql(
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
 ): Promise<StageSql[] | null> {
     // null = compilation not available (web build / no Tauri). A real
@@ -531,7 +531,7 @@ export type UpdateInfo = {
 };
 
 /**
- * Ask the backend whether a newer Duckle build is available on GitHub
+ * Ask the backend whether a newer Quilt build is available on GitHub
  * (compares the running binary's build time to the latest release asset for
  * this OS). Returns null in browser mode or on any failure, so the banner
  * simply stays hidden when offline.
@@ -552,7 +552,7 @@ export type SecretsMode = 'env' | 'passphrase';
 
 /**
  * Build a single self-contained file for a pipeline via the embedded
- * duckle-runner. Returns the produced file path. Throws the runner's stderr
+ * quilt-runner. Returns the produced file path. Throws the runner's stderr
  * on failure so the caller can show it inline.
  */
 export async function buildBundle(
@@ -595,7 +595,7 @@ export async function mcpConnectionInfo(): Promise<McpConnInfo> {
 }
 
 /**
- * Run `claude mcp add duckle ...` to connect Claude Code in one click.
+ * Run `claude mcp add quilt ...` to connect Claude Code in one click.
  * Resolves with the CLI output; rejects (so the caller can show it) when the
  * CLI is missing or the add fails.
  */
@@ -606,7 +606,7 @@ export async function connectClaudeCode(): Promise<string> {
 export type McpClient = 'claude_desktop' | 'cursor';
 
 /**
- * Inject the duckle MCP server into a desktop client's config file (Claude
+ * Inject the quilt MCP server into a desktop client's config file (Claude
  * Desktop or Cursor), merging into any existing mcpServers. Resolves with the
  * written config path; rejects (with a hint) when the write needs permissions
  * or the existing file is not valid JSON.

@@ -78,7 +78,7 @@
     "localTag": "מקומי",
     "checking": "בודק את מנוע הבינה המלאכותית...",
     "installTitle": "התקן את עוזר ה - Duckie AI",
-    "installBody": "Duckle מוריד דגם מקומי קטן (~1.1 GB) כך שהעוזר פועל כולו במחשב שלך - אין מפתחות API, אין שיחות ענן.",
+    "installBody": "Quilt מוריד דגם מקומי קטן (~1.1 GB) כך שהעוזר פועל כולו במחשב שלך - אין מפתחות API, אין שיחות ענן.",
     "installCta": "התקן (~1.1 GB)",
     "installFailedTitle": "ההתקנה נכשלה",
     "retry": "נסה שוב",
@@ -132,9 +132,9 @@
     "copySqlDesc": "הידור ל-DuckDB SQL, העתק ללוח",
     "exportSql": "ייצא כ-‎.sql",
     "exportSqlDesc": "הורד את ה-SQL המהודר כקובץ",
-    "exportJson": "ייצא כ-.duckle.json",
+    "exportJson": "ייצא כ-.quilt.json",
     "exportJsonDesc": "הורד צמתים + קצוות כ-JSON נייד",
-    "importJson": "ייבוא ​​‎.duckle.json...",
+    "importJson": "ייבוא ​​‎.quilt.json...",
     "importJsonDesc": "פתח JSON נייד כצינור חדש"
   },
   "properties": {

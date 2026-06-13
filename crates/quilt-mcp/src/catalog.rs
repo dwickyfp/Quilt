@@ -72,7 +72,7 @@ pub fn schema(id: &str) -> Option<Value> {
         .cloned()
 }
 
-/// The whole embedded catalog (for the duckle://catalog resource).
+/// The whole embedded catalog (for the quilt://catalog resource).
 pub fn full() -> &'static Value {
     catalog()
 }

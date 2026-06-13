@@ -1,4 +1,4 @@
-//! Duckle plugin SDK.
+//! Quilt plugin SDK.
 //!
 //! Public Rust contract for shipping connectors, transforms, and engines.
 //! Phase 1 exposes the schema-inspection contract so the desktop runtime
@@ -6,7 +6,7 @@
 //! data-flow traits land as the execution layer matures.
 
 use async_trait::async_trait;
-use duckle_metadata::Schema;
+use quilt_metadata::Schema;
 use serde_json::Value as JsonValue;
 use thiserror::Error;
 

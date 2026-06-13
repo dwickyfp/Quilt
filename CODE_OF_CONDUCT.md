@@ -2,7 +2,7 @@
 
 ## Our pledge
 
-We want Duckle to be a welcoming, harassment-free project for everyone,
+We want Quilt to be a welcoming, harassment-free project for everyone,
 regardless of experience level, background, or identity.
 
 ## Expected behavior

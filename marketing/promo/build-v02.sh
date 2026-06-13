@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Build the Duckle v0.2 capability promo (silent, 1080p, ~30s).
+# Build the Quilt v0.2 capability promo (silent, 1080p, ~30s).
 # Inputs: logo PNG + 6 real v0.2 screenshots.
-# Output: marketing/promo/out/duckle-promo-v02.mp4
+# Output: marketing/promo/out/quilt-promo-v02.mp4
 #
 # Same look as build.sh, but screenshots are FIT (not cropped) onto the
 # 1920x1080 frame so the UI sidebars/panels stay visible, with the caption
@@ -51,7 +51,7 @@ shot_scene () {
         pad=${W}:${H}:(ow-iw)/2:0:color=0x07090f,
         drawtext=fontfile=${FB}:text='${TITLE}':fontcolor=${TEXT}:fontsize=56:x=80:y=926,
         drawtext=fontfile=${FR}:text='${SUB}':fontcolor=${MUTED}:fontsize=32:x=80:y=1000,
-        drawtext=fontfile=${FB}:text='Duckle':fontcolor=${ACCENT}:fontsize=24:x=w-tw-40:y=934,
+        drawtext=fontfile=${FB}:text='Quilt':fontcolor=${ACCENT}:fontsize=24:x=w-tw-40:y=934,
         fade=t=in:st=0:d=0.4,fade=t=out:st=${FO}:d=0.5
       " -c:v libx264 -pix_fmt yuv420p -preset medium -crf 18 -t "$DUR" "$OUT"
 }
@@ -62,7 +62,7 @@ $FF -f lavfi -i "color=c=#07090f:s=${W}x${H}:r=${FPS}:d=4" \
     -filter_complex "
       [1:v]scale=420:420[lg];
       [0:v][lg]overlay=(W-w)/2:(H-h)/2-120:enable='between(t,0.2,4)',
-      drawtext=fontfile=${FB}:text='Duckle v0.2':fontcolor=${TEXT}:fontsize=110:x=(w-tw)/2:y=h/2+180:alpha='if(lt(t,0.7),0,if(lt(t,1.5),(t-0.7)/0.8,1))',
+      drawtext=fontfile=${FB}:text='Quilt v0.2':fontcolor=${TEXT}:fontsize=110:x=(w-tw)/2:y=h/2+180:alpha='if(lt(t,0.7),0,if(lt(t,1.5),(t-0.7)/0.8,1))',
       drawtext=fontfile=${FR}:text='Local-first ETL. New in this release.':fontcolor=${MUTED}:fontsize=40:x=(w-tw)/2:y=h/2+320:alpha='if(lt(t,1.3),0,if(lt(t,2.1),(t-1.3)/0.8,1))',
       fade=t=out:st=3.5:d=0.5
     " -c:v libx264 -pix_fmt yuv420p -preset medium -crf 18 "$SCENES/01_logo.mp4"
@@ -98,9 +98,9 @@ $FF -f lavfi -i "color=c=#07090f:s=${W}x${H}:r=${FPS}:d=4" \
     -filter_complex "
       [1:v]scale=300:300[lg];
       [0:v][lg]overlay=(W-w)/2:(H-h)/2-220,
-      drawtext=fontfile=${FB}:text='Duckle':fontcolor=${TEXT}:fontsize=92:x=(w-tw)/2:y=h/2+120,
+      drawtext=fontfile=${FB}:text='Quilt':fontcolor=${TEXT}:fontsize=92:x=(w-tw)/2:y=h/2+120,
       drawtext=fontfile=${FR}:text='Free  /  Open source  /  Local-first':fontcolor=${MUTED}:fontsize=36:x=(w-tw)/2:y=h/2+240,
-      drawtext=fontfile=${FB}:text='github.com/SouravRoy-ETL/duckle':fontcolor=${ACCENT}:fontsize=44:x=(w-tw)/2:y=h/2+320,
+      drawtext=fontfile=${FB}:text='github.com/dwickyfp/Quilt':fontcolor=${ACCENT}:fontsize=44:x=(w-tw)/2:y=h/2+320,
       fade=t=in:st=0:d=0.5,fade=t=out:st=3.5:d=0.5
     " -c:v libx264 -pix_fmt yuv420p -preset medium -crf 18 "$SCENES/08_end.mp4"
 
@@ -116,8 +116,8 @@ file '07_incremental.mp4'
 file '08_end.mp4'
 EOF
 
-$FF -f concat -safe 0 -i "$SCENES/concat.txt" -c copy "$OUTDIR/duckle-promo-v02.mp4"
+$FF -f concat -safe 0 -i "$SCENES/concat.txt" -c copy "$OUTDIR/quilt-promo-v02.mp4"
 
-echo "Done: $OUTDIR/duckle-promo-v02.mp4"
-ls -lh "$OUTDIR/duckle-promo-v02.mp4"
-ffprobe -v error -show_entries format=duration -show_entries stream=width,height,codec_name -of default=noprint_wrappers=1 "$OUTDIR/duckle-promo-v02.mp4"
+echo "Done: $OUTDIR/quilt-promo-v02.mp4"
+ls -lh "$OUTDIR/quilt-promo-v02.mp4"
+ffprobe -v error -show_entries format=duration -show_entries stream=width,height,codec_name -of default=noprint_wrappers=1 "$OUTDIR/quilt-promo-v02.mp4"

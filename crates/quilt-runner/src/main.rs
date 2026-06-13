@@ -1,4 +1,4 @@
-//! duckle-runner: headless execution of a Duckle pipeline file.
+//! quilt-runner: headless execution of a Quilt pipeline file.
 //!
 //! Runs a pipeline standalone on a server with no desktop app. It also serves
 //! as the clean stub at the front of a "Build Pipeline" single-file artifact:
@@ -10,12 +10,12 @@
 //! stays a thin wrapper around the engine.
 //!
 //! Usage:
-//!   duckle-runner --pipeline <file.json> [--workspace <dir>]
+//!   quilt-runner --pipeline <file.json> [--workspace <dir>]
 //!                 [--duckdb <path>] [--log-dir <dir>] [--name <label>]
 //!
 //! Exit code: 0 on success, 1 on pipeline error, 2 on usage/IO error.
 
-use duckle_duckdb_engine::{DuckdbEngine, PipelineDoc};
+use quilt_duckdb_engine::{DuckdbEngine, PipelineDoc};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -25,18 +25,18 @@ mod context;
 mod selfextract;
 
 const USAGE: &str = "\
-duckle-runner - run a Duckle pipeline headlessly
+quilt-runner - run a Quilt pipeline headlessly
 
 USAGE:
-    duckle-runner --pipeline <file.json> [options]
+    quilt-runner --pipeline <file.json> [options]
 
 OPTIONS:
     --pipeline <path>    Pipeline JSON to execute (required)
     --workspace <dir>    Workspace root (default: pipeline file's parent).
-                         Exposed as DUCKLE_WORKSPACE for child-job and
+                         Exposed as QUILT_WORKSPACE for child-job and
                          incremental-state resolution.
     --duckdb <path>      DuckDB CLI binary. Resolution order if omitted:
-                         DUCKLE_DUCKDB_BIN, then bin/duckdb next to this
+                         QUILT_DUCKDB_BIN, then bin/duckdb next to this
                          runner, then 'duckdb' on PATH.
     --log-dir <dir>      Run-log directory (default: <workspace>/logs)
     --name <label>       Run-log + state folder name (default: pipeline file stem)
@@ -164,7 +164,7 @@ fn resolve_duckdb(flag: Option<PathBuf>) -> Result<PathBuf, String> {
         }
         return Err(format!("--duckdb path does not exist: {}", p.display()));
     }
-    if let Ok(env) = std::env::var("DUCKLE_DUCKDB_BIN") {
+    if let Ok(env) = std::env::var("QUILT_DUCKDB_BIN") {
         let p = PathBuf::from(env);
         if p.exists() {
             return Ok(p);
@@ -209,7 +209,7 @@ fn resolve_workspace(args: &Args) -> PathBuf {
 /// running the pipeline. Resolves the state folder from --name / pipeline stem
 /// under the workspace, the same layout a real run reads.
 fn run_backfill(args: &Args) -> Result<bool, String> {
-    use duckle_duckdb_engine::watermark;
+    use quilt_duckdb_engine::watermark;
     let workspace = resolve_workspace(args);
     let name = resolve_name(args)?;
 
@@ -280,8 +280,8 @@ fn run() -> Result<bool, String> {
     let env_file = workspace.join("secrets.env");
     apply_env_pass(&mut doc, &workspace, &env_file)?;
     let log_dir = args.log_dir.clone().unwrap_or_else(|| workspace.join("logs"));
-    std::env::set_var("DUCKLE_WORKSPACE", &workspace);
-    std::env::set_var("DUCKLE_LOG_DIR", &log_dir);
+    std::env::set_var("QUILT_WORKSPACE", &workspace);
+    std::env::set_var("QUILT_LOG_DIR", &log_dir);
 
     let duckdb = resolve_duckdb(args.duckdb)?;
     let name = args.name.clone().unwrap_or_else(|| {
@@ -291,7 +291,7 @@ fn run() -> Result<bool, String> {
             .unwrap_or_else(|| "pipeline".into())
     });
 
-    eprintln!("duckle-runner: {} (workspace {})", pipeline.display(), workspace.display());
+    eprintln!("quilt-runner: {} (workspace {})", pipeline.display(), workspace.display());
     let engine = DuckdbEngine::new(duckdb);
     let result = engine.execute_pipeline_named(&doc, &name);
 
@@ -329,7 +329,7 @@ fn parse_env_file(text: &str) -> HashMap<String, String> {
     out
 }
 
-/// Decrypt `<workspace>/secrets.enc` under DUCKLE_BUNDLE_PASSPHRASE and
+/// Decrypt `<workspace>/secrets.enc` under QUILT_BUNDLE_PASSPHRASE and
 /// parse it into a KEY=VALUE map. Hard-fails (exit 2) when the file is
 /// present but the passphrase is unset, the blob is corrupt, or the tag
 /// fails - never silently falls through to unresolved placeholders.
@@ -343,10 +343,10 @@ fn load_secrets_enc(workspace: &Path) -> Result<Option<HashMap<String, String>>,
     if !path.exists() {
         return Ok(None);
     }
-    let passphrase = std::env::var("DUCKLE_BUNDLE_PASSPHRASE")
+    let passphrase = std::env::var("QUILT_BUNDLE_PASSPHRASE")
         .ok()
         .filter(|p| !p.is_empty())
-        .ok_or_else(|| "secrets.enc present but DUCKLE_BUNDLE_PASSPHRASE is not set".to_string())?;
+        .ok_or_else(|| "secrets.enc present but QUILT_BUNDLE_PASSPHRASE is not set".to_string())?;
 
     let b64 = std::fs::read_to_string(&path)
         .map_err(|e| format!("read {}: {}", path.display(), e))?;
@@ -362,7 +362,7 @@ fn load_secrets_enc(workspace: &Path) -> Result<Option<HashMap<String, String>>,
     let nonce = Nonce::from_slice(nonce_bytes);
     let plain = cipher
         .decrypt(nonce, ciphertext)
-        .map_err(|_| "wrong DUCKLE_BUNDLE_PASSPHRASE or corrupt secrets.enc".to_string())?;
+        .map_err(|_| "wrong QUILT_BUNDLE_PASSPHRASE or corrupt secrets.enc".to_string())?;
     let text = String::from_utf8(plain).map_err(|e| format!("secrets.enc not UTF-8: {}", e))?;
     Ok(Some(parse_env_file(&text)))
 }
@@ -406,7 +406,7 @@ fn apply_env_pass(doc: &mut PipelineDoc, workspace: &Path, env_path: &Path) -> R
                 Some(v) => v,
                 None => {
                     if warned.borrow_mut().insert(name.to_string()) {
-                        eprintln!("duckle-runner: ${{ENV:{}}} is unresolved (set it in the environment or secrets.env)", name);
+                        eprintln!("quilt-runner: ${{ENV:{}}} is unresolved (set it in the environment or secrets.env)", name);
                     }
                     caps[0].to_string()
                 }
@@ -432,18 +432,18 @@ fn run_artifact(payload: Vec<u8>) -> ExitCode {
     let root = match selfextract::extract_to_cache(&payload) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("duckle-runner: {e}");
+            eprintln!("quilt-runner: {e}");
             return ExitCode::from(2);
         }
     };
 
     // Point at the embedded duckdb + its extensions. The engine spawns
-    // duckdb without env_clear, so DUCKLE_DUCKDB_BIN and HOME/USERPROFILE
+    // duckdb without env_clear, so QUILT_DUCKDB_BIN and HOME/USERPROFILE
     // set here are inherited by the spawned child, which resolves extensions
     // under <home>/.duckdb/extensions.
     let duckdb_name = if cfg!(windows) { "duckdb.exe" } else { "duckdb" };
     let duckdb = root.join("bin").join(duckdb_name);
-    std::env::set_var("DUCKLE_DUCKDB_BIN", &duckdb);
+    std::env::set_var("QUILT_DUCKDB_BIN", &duckdb);
     let binhome = root.join("bin");
     if cfg!(windows) {
         std::env::set_var("USERPROFILE", &binhome);
@@ -455,7 +455,7 @@ fn run_artifact(payload: Vec<u8>) -> ExitCode {
     let pipeline = match find_pipeline_json(&root) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("duckle-runner: {e}");
+            eprintln!("quilt-runner: {e}");
             return ExitCode::from(2);
         }
     };
@@ -465,8 +465,8 @@ fn run_artifact(payload: Vec<u8>) -> ExitCode {
         .unwrap_or_else(|| "pipeline".into());
 
     // Workspace = the extraction root; mirror run()'s env wiring.
-    std::env::set_var("DUCKLE_WORKSPACE", &root);
-    std::env::set_var("DUCKLE_LOG_DIR", root.join("logs"));
+    std::env::set_var("QUILT_WORKSPACE", &root);
+    std::env::set_var("QUILT_LOG_DIR", root.join("logs"));
 
     // Resolve the operator-supplied secrets.env PER INVOCATION: next to the
     // artifact exe first, then CWD. It is read at its real location and never
@@ -496,23 +496,23 @@ fn run_artifact(payload: Vec<u8>) -> ExitCode {
     let text = match std::fs::read_to_string(&pipeline) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("duckle-runner: read {}: {}", pipeline.display(), e);
+            eprintln!("quilt-runner: read {}: {}", pipeline.display(), e);
             return ExitCode::from(2);
         }
     };
     let mut doc: PipelineDoc = match serde_json::from_str(&text) {
         Ok(d) => d,
         Err(e) => {
-            eprintln!("duckle-runner: parse {}: {}", pipeline.display(), e);
+            eprintln!("quilt-runner: parse {}: {}", pipeline.display(), e);
             return ExitCode::from(2);
         }
     };
     if let Err(e) = apply_env_pass(&mut doc, &root, &env_file) {
-        eprintln!("duckle-runner: {e}");
+        eprintln!("quilt-runner: {e}");
         return ExitCode::from(2);
     }
 
-    eprintln!("duckle-runner: {} (artifact, workspace {})", pipeline.display(), root.display());
+    eprintln!("quilt-runner: {} (artifact, workspace {})", pipeline.display(), root.display());
     let engine = DuckdbEngine::new(duckdb);
     let result = engine.execute_pipeline_named(&doc, &name);
 
@@ -551,7 +551,7 @@ fn main() -> ExitCode {
             Ok(Some(payload)) => return run_artifact(payload),
             Ok(None) => {}
             Err(e) => {
-                eprintln!("duckle-runner: {e}");
+                eprintln!("quilt-runner: {e}");
                 return ExitCode::from(2);
             }
         }
@@ -563,7 +563,7 @@ fn main() -> ExitCode {
         return match build::run() {
             Ok(()) => ExitCode::from(0),
             Err(e) => {
-                eprintln!("duckle-runner: {e}");
+                eprintln!("quilt-runner: {e}");
                 ExitCode::from(2)
             }
         };
@@ -572,7 +572,7 @@ fn main() -> ExitCode {
         Ok(true) => ExitCode::from(0),
         Ok(false) => ExitCode::from(1),
         Err(e) => {
-            eprintln!("duckle-runner: {e}");
+            eprintln!("quilt-runner: {e}");
             ExitCode::from(2)
         }
     }

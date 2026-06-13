@@ -1,7 +1,7 @@
-# Duckle - Groundbreaking feature ideas
+# Quilt - Groundbreaking feature ideas
 
 A shortlist of differentiating features to pull in more users, chosen to lean on
-Duckle's unique edge that cloud ETL tools structurally cannot match:
+Quilt's unique edge that cloud ETL tools structurally cannot match:
 
 - **Local-first**: data, schemas and credentials never leave the machine.
 - **DuckDB engine**: columnar, out-of-core, parquet-native speed on a laptop.
@@ -10,7 +10,7 @@ Duckle's unique edge that cloud ETL tools structurally cannot match:
 - **Visual + code**: a canvas that compiles to inspectable SQL/code.
 
 The market is converging on AI-assisted, self-healing, lineage-aware pipelines
-(see Sources). Almost every vendor delivers these as cloud SaaS. Duckle's wedge
+(see Sources). Almost every vendor delivers these as cloud SaaS. Quilt's wedge
 is delivering the same magic **privately, on-device, for free**.
 
 ---
@@ -20,7 +20,7 @@ is delivering the same magic **privately, on-device, for free**.
 ### 1. Natural-language -> pipeline ("describe it, get a DAG")
 Type "join orders with customers, flag refunds over $500, write parquet" and the
 bundled local LLM wires up the canvas (sources, joins, filters, sink) using the
-existing component manifests. Competitors charge for cloud NL->pipeline; Duckle
+existing component manifests. Competitors charge for cloud NL->pipeline; Quilt
 does it **fully offline**, so no schema or sample row ever leaves the laptop.
 - *Builds on:* the existing AI chat + llama runtime + component manifest registry.
 - *Lure:* the single biggest "wow" in 2026 data tooling, minus the privacy cost.
@@ -33,7 +33,7 @@ The planner already propagates schemas (`derive_output_columns`); extend that to
 column-level edges and overlay it on the canvas.
 - *Lure:* audit/governance catnip (regulated industries demand provable lineage),
   and it is genuinely useful day-to-day. Cloud tools sell this as a separate
-  product; Duckle gets it for free from its own compiler.
+  product; Quilt gets it for free from its own compiler.
 - *Effort:* medium.
 
 ### 3. AI self-healing / one-click fix
@@ -58,7 +58,7 @@ DuckDB's own `EXCEPT`/anti-join in milliseconds.
 Nodes subscribe to upstream output changes; only the affected downstream re-runs
 (keyed on changed partitions). Pairs with the DuckLake connector for change feeds.
 This was already floated for the ducklake-cdc direction.
-- *Lure:* makes large local datasets practical; turns Duckle from batch to
+- *Lure:* makes large local datasets practical; turns Quilt from batch to
   near-incremental.
 - *Effort:* high.
 
@@ -69,7 +69,7 @@ violation, with a pass/fail history panel.
 - *Effort:* medium.
 
 ### 7. Semantic catalog / "search your data lake"
-Point Duckle at a folder or lake; it auto-profiles and embeds each schema with
+Point Quilt at a folder or lake; it auto-profiles and embeds each schema with
 on-device embeddings so you can search "where is the customer email column?"
 across hundreds of parquet/csv files - a private semantic catalog.
 - *Builds on:* `xf.ai.embed` + DuckDB profiling.

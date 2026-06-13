@@ -12,8 +12,7 @@ import Canvas, { type DropPosition, type NodeAction, type PaneAction } from '../
 import PlanView from './PlanView';
 import RunView from './RunView';
 import RunHistoryView from './RunHistoryView';
-import type { EngineId } from './EngineSelector';
-import type { DuckleNodeData } from '../pipeline-types';
+import type { QuiltNodeData } from '../pipeline-types';
 import type { ComponentDef } from './palette-data';
 import type { ConnectionType } from '../canvas/connection-types';
 import type { RunResult } from '../tauri-bridge';
@@ -24,8 +23,7 @@ type TabId = 'canvas' | 'plan' | 'run' | 'history';
 const TAB_IDS: TabId[] = ['canvas', 'plan', 'run', 'history'];
 
 type Props = {
-    engine: EngineId;
-    nodes: Node<DuckleNodeData>[];
+    nodes: Node<QuiltNodeData>[];
     edges: Edge[];
     runResult: RunResult | null;
     isRunning: boolean;
@@ -47,7 +45,6 @@ type Props = {
 };
 
 export default function EditorTabs({
-    engine: _engine,
     nodes,
     edges,
     runResult,

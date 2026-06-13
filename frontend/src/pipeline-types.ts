@@ -39,7 +39,7 @@ export type Column = {
 
 export type NodeKind = 'source' | 'transform' | 'sink';
 
-export type DuckleNodeData = {
+export type QuiltNodeData = {
     label: string;
     subtitle?: string;
     componentId?: string;

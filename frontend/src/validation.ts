@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import type { DuckleNodeData } from './pipeline-types';
+import type { QuiltNodeData } from './pipeline-types';
 import { getManifest } from './workflow-ui/fields/component-manifests';
 
 export type ValidationIssue = {
@@ -44,7 +44,7 @@ const PATH_REQUIRED_SINKS = new Set<string>([
 ]);
 
 export function validatePipeline(
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
 ): ValidationResult {
     if (nodes.length === 0) return EMPTY;
@@ -92,21 +92,36 @@ export function validatePipeline(
             }
         }
 
-        // Required inputs connected. Inputs without `optional: true`
-        // must have at least one upstream edge of any matching type
-        // (we accept the edge regardless of connectionType for now -
-        // the picker already enforces compatibility on creation).
+        // Required inputs connected. Inputs without `optional: true` must have
+        // an upstream edge. For a single required input we accept any incoming
+        // edge (legacy edges may not carry a targetHandle). For multiple
+        // required inputs we match each port by `targetHandle` so a node can't
+        // pass with one port wired and another (e.g. a join's right side) left
+        // unconnected.
         const inputs = manifest.ports?.inputs ?? [];
         const required = inputs.filter(p => !p.optional);
-        if (required.length > 0) {
-            const hasMain = edges.some(e => e.target === node.id);
-            if (!hasMain) {
+        if (required.length === 1) {
+            if (!edges.some(e => e.target === node.id)) {
                 push({
                     severity: 'error',
                     code: 'missing-required-input',
                     message: `${node.data.label} has no upstream connection.`,
                     nodeId: node.id,
                 });
+            }
+        } else if (required.length > 1) {
+            for (const port of required) {
+                const wired = edges.some(
+                    e => e.target === node.id && e.targetHandle === port.id,
+                );
+                if (!wired) {
+                    push({
+                        severity: 'error',
+                        code: 'missing-required-input',
+                        message: `${node.data.label} input "${port.label}" is not connected.`,
+                        nodeId: node.id,
+                    });
+                }
             }
         }
 
@@ -202,7 +217,7 @@ export function validatePipeline(
 }
 
 function hasCycle(
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
 ): boolean {
     const adj = new Map<string, string[]>();

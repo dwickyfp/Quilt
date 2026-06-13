@@ -1,4 +1,4 @@
-//! Shared TLS trust configuration for Duckle's HTTP clients.
+//! Shared TLS trust configuration for Quilt's HTTP clients.
 //!
 //! ureq (REST / cloud-API connectors) and reqwest (the desktop engine
 //! downloads) both default to the bundled Mozilla root set (webpki-roots),
@@ -10,7 +10,7 @@
 //! We build ONE rustls client config whose root store is the union of:
 //!   1. the bundled Mozilla roots (identical to the previous default), plus
 //!   2. the OS native trust store (adds the corporate inspection CA), plus
-//!   3. an optional explicit PEM bundle pointed at by `DUCKLE_CA_CERT`.
+//!   3. an optional explicit PEM bundle pointed at by `QUILT_CA_CERT`.
 //!
 //! It is a strict superset of the old trust set, so non-corporate users see
 //! no behavioural change: everything that validated before still validates.
@@ -20,7 +20,7 @@
 use std::sync::{Arc, OnceLock};
 
 /// Assemble the union root store: bundled Mozilla roots, the OS native store,
-/// and an optional `DUCKLE_CA_CERT` PEM bundle.
+/// and an optional `QUILT_CA_CERT` PEM bundle.
 fn build_root_store() -> rustls::RootCertStore {
     let mut roots = rustls::RootCertStore::empty();
 
@@ -34,13 +34,13 @@ fn build_root_store() -> rustls::RootCertStore {
             let _ = roots.add_parsable_certificates(certs);
         }
         Err(e) => {
-            eprintln!("duckle: could not read OS certificate store: {e}");
+            eprintln!("quilt: could not read OS certificate store: {e}");
         }
     }
 
     // 3. Optional explicit PEM bundle, for split-tunnel setups or where the
     //    proxy CA is handed out as a file rather than installed in the store.
-    if let Ok(path) = std::env::var("DUCKLE_CA_CERT") {
+    if let Ok(path) = std::env::var("QUILT_CA_CERT") {
         if !path.is_empty() {
             match std::fs::read(&path) {
                 Ok(bytes) => {
@@ -50,7 +50,7 @@ fn build_root_store() -> rustls::RootCertStore {
                         .collect();
                     let _ = roots.add_parsable_certificates(extra);
                 }
-                Err(e) => eprintln!("duckle: DUCKLE_CA_CERT unreadable ({path}): {e}"),
+                Err(e) => eprintln!("quilt: QUILT_CA_CERT unreadable ({path}): {e}"),
             }
         }
     }
@@ -59,7 +59,7 @@ fn build_root_store() -> rustls::RootCertStore {
 }
 
 /// Build a fresh rustls client config trusting bundled + OS-native (+ optional
-/// `DUCKLE_CA_CERT`) roots. reqwest consumes this via `use_preconfigured_tls`.
+/// `QUILT_CA_CERT`) roots. reqwest consumes this via `use_preconfigured_tls`.
 pub fn build_client_config() -> rustls::ClientConfig {
     // Match ureq's provider (ring) so we add no second crypto backend and
     // avoid depending on a process-wide default provider being installed.

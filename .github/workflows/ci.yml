@@ -29,7 +29,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      # The full workspace (engine + duckle-runner + duckle-mcp + apps/desktop
+      # The full workspace (engine + quilt-runner + quilt-mcp + apps/desktop
       # with two embedded binaries) plus test artifacts can exceed the ~14 GB
       # free on a GitHub Linux runner ("No space left on device"). Drop large
       # preinstalled toolchains we never use to reclaim ~20 GB.
@@ -75,7 +75,7 @@ jobs:
           bin="$dest/$exe"
           if [ "$RUNNER_OS" = "Windows" ]; then bin="$(cygpath -w "$bin")"; fi
           echo "using duckdb at: $bin"
-          echo "DUCKLE_DUCKDB_BIN=$bin" >> "$GITHUB_ENV"
+          echo "QUILT_DUCKDB_BIN=$bin" >> "$GITHUB_ENV"
 
       - name: Pre-install DuckDB extensions
         shell: bash
@@ -83,24 +83,24 @@ jobs:
         # parallel test threads downloading the same extension into the
         # shared ~/.duckdb cache.
         run: |
-          "$DUCKLE_DUCKDB_BIN" :memory: -c "INSTALL postgres; INSTALL mysql; INSTALL sqlite; INSTALL excel; INSTALL httpfs; INSTALL iceberg; INSTALL delta; INSTALL ducklake; INSTALL vss; INSTALL fts; INSTALL inet;"
+          "$QUILT_DUCKDB_BIN" :memory: -c "INSTALL postgres; INSTALL mysql; INSTALL sqlite; INSTALL excel; INSTALL httpfs; INSTALL iceberg; INSTALL delta; INSTALL ducklake; INSTALL vss; INSTALL fts; INSTALL inet;"
 
-      # The desktop crate embeds duckle-runner AND duckle-mcp at compile time
+      # The desktop crate embeds quilt-runner AND quilt-mcp at compile time
       # via build.rs include_bytes!, so both binaries must exist before anything
       # that compiles apps/desktop. Build them in the dev profile so the engine
       # compilation is shared with the cargo test below.
-      - name: Build + stage duckle-runner + duckle-mcp (embedded into the desktop app)
+      - name: Build + stage quilt-runner + quilt-mcp (embedded into the desktop app)
         shell: bash
         run: |
           set -e
-          cargo build -p duckle-runner -p duckle-mcp
+          cargo build -p quilt-runner -p quilt-mcp
           mkdir -p apps/desktop/bin
           if [ "$RUNNER_OS" = "Windows" ]; then
-            cp target/debug/duckle-runner.exe apps/desktop/bin/duckle-runner.exe
-            cp target/debug/duckle-mcp.exe apps/desktop/bin/duckle-mcp.exe
+            cp target/debug/quilt-runner.exe apps/desktop/bin/quilt-runner.exe
+            cp target/debug/quilt-mcp.exe apps/desktop/bin/quilt-mcp.exe
           else
-            cp target/debug/duckle-runner apps/desktop/bin/duckle-runner
-            cp target/debug/duckle-mcp apps/desktop/bin/duckle-mcp
+            cp target/debug/quilt-runner apps/desktop/bin/quilt-runner
+            cp target/debug/quilt-mcp apps/desktop/bin/quilt-mcp
           fi
 
       - name: Test
@@ -152,17 +152,17 @@ jobs:
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev libgtk-3-dev \
             libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev
-      # Build + stage duckle-runner + duckle-mcp first: the desktop crate embeds
+      # Build + stage quilt-runner + quilt-mcp first: the desktop crate embeds
       # both at compile time (build.rs include_bytes!). Release profile so the
       # engine build is shared with the desktop release build below.
-      - name: Build + stage duckle-runner + duckle-mcp (embedded into the desktop app)
+      - name: Build + stage quilt-runner + quilt-mcp (embedded into the desktop app)
         run: |
           set -e
-          cargo build --release -p duckle-runner -p duckle-mcp
+          cargo build --release -p quilt-runner -p quilt-mcp
           mkdir -p apps/desktop/bin
-          cp target/release/duckle-runner apps/desktop/bin/duckle-runner
-          cp target/release/duckle-mcp apps/desktop/bin/duckle-mcp
-      - name: Build raw Duckle binary (release workflow command)
+          cp target/release/quilt-runner apps/desktop/bin/quilt-runner
+          cp target/release/quilt-mcp apps/desktop/bin/quilt-mcp
+      - name: Build raw Quilt binary (release workflow command)
         run: cargo build --release --manifest-path apps/desktop/Cargo.toml --features custom-protocol
       - name: Verify embedded frontend (not devUrl) is in binary
         # Grep the built binary for the frontend's main JS chunk filename.
@@ -171,7 +171,7 @@ jobs:
         run: |
           set -e
           asset=$(ls frontend/dist/assets/index-*.js | head -1 | xargs basename)
-          if grep -q "$asset" target/release/duckle; then
+          if grep -q "$asset" target/release/quilt; then
             echo "OK: embedded frontend asset '$asset' is present in the binary"
           else
             echo "FAIL: frontend asset '$asset' NOT found in binary - tauri-codegen likely embedded devUrl"
@@ -179,7 +179,7 @@ jobs:
           fi
 
   # Live PostgreSQL integration tests. Runs against a real postgres
-  # service container; engine tests that don't see DUCKLE_PG_HOST in the
+  # service container; engine tests that don't see QUILT_PG_HOST in the
   # main matrix job skip cleanly, so this is the only place they execute.
   postgres-integration:
     runs-on: ubuntu-latest
@@ -205,18 +205,18 @@ jobs:
           curl -L -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
           mkdir -p "$RUNNER_TEMP/duckdb"
           unzip -o duckdb.zip -d "$RUNNER_TEMP/duckdb"
-          echo "DUCKLE_DUCKDB_BIN=$RUNNER_TEMP/duckdb/duckdb" >> "$GITHUB_ENV"
+          echo "QUILT_DUCKDB_BIN=$RUNNER_TEMP/duckdb/duckdb" >> "$GITHUB_ENV"
       - name: Pre-install postgres extension
         run: |
-          "$DUCKLE_DUCKDB_BIN" :memory: -c "INSTALL postgres;"
+          "$QUILT_DUCKDB_BIN" :memory: -c "INSTALL postgres;"
       - name: Run PostgreSQL integration tests
         env:
-          DUCKLE_PG_HOST: localhost
-          DUCKLE_PG_PORT: '5432'
-          DUCKLE_PG_DB: postgres
-          DUCKLE_PG_USER: postgres
-          DUCKLE_PG_PASS: pgtest
-        run: cargo test -p duckle-duckdb-engine --test execution -- pg_
+          QUILT_PG_HOST: localhost
+          QUILT_PG_PORT: '5432'
+          QUILT_PG_DB: postgres
+          QUILT_PG_USER: postgres
+          QUILT_PG_PASS: pgtest
+        run: cargo test -p quilt-duckdb-engine --test execution -- pg_
 
   # Live MySQL integration tests (also covers MariaDB, same wire).
   mysql-integration:
@@ -243,18 +243,18 @@ jobs:
           curl -L -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
           mkdir -p "$RUNNER_TEMP/duckdb"
           unzip -o duckdb.zip -d "$RUNNER_TEMP/duckdb"
-          echo "DUCKLE_DUCKDB_BIN=$RUNNER_TEMP/duckdb/duckdb" >> "$GITHUB_ENV"
+          echo "QUILT_DUCKDB_BIN=$RUNNER_TEMP/duckdb/duckdb" >> "$GITHUB_ENV"
       - name: Pre-install mysql extension
         run: |
-          "$DUCKLE_DUCKDB_BIN" :memory: -c "INSTALL mysql;"
+          "$QUILT_DUCKDB_BIN" :memory: -c "INSTALL mysql;"
       - name: Run MySQL integration tests
         env:
-          DUCKLE_MYSQL_HOST: 127.0.0.1
-          DUCKLE_MYSQL_PORT: '3306'
-          DUCKLE_MYSQL_DB: ducktest
-          DUCKLE_MYSQL_USER: root
-          DUCKLE_MYSQL_PASS: mytest
-        run: cargo test -p duckle-duckdb-engine --test execution -- mysql_
+          QUILT_MYSQL_HOST: 127.0.0.1
+          QUILT_MYSQL_PORT: '3306'
+          QUILT_MYSQL_DB: ducktest
+          QUILT_MYSQL_USER: root
+          QUILT_MYSQL_PASS: mytest
+        run: cargo test -p quilt-duckdb-engine --test execution -- mysql_
 
   # Live MinIO integration tests (covers all S3-compatible: MinIO, R2, B2).
   # MinIO needs `server /data` as the container command; GitHub Actions
@@ -281,20 +281,20 @@ jobs:
           curl -fsSL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
           chmod +x /usr/local/bin/mc
           mc alias set local http://localhost:9000 minioadmin minioadmin
-          mc mb local/duckle-test
+          mc mb local/quilt-test
       - name: Install DuckDB CLI
         run: |
           set -e
           curl -L -o duckdb.zip https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip
           mkdir -p "$RUNNER_TEMP/duckdb"
           unzip -o duckdb.zip -d "$RUNNER_TEMP/duckdb"
-          echo "DUCKLE_DUCKDB_BIN=$RUNNER_TEMP/duckdb/duckdb" >> "$GITHUB_ENV"
+          echo "QUILT_DUCKDB_BIN=$RUNNER_TEMP/duckdb/duckdb" >> "$GITHUB_ENV"
       - name: Seed MinIO with a test object
         run: |
           set -e
-          # Upload a small parquet file to s3://duckle-test/orders.parquet
+          # Upload a small parquet file to s3://quilt-test/orders.parquet
           # via the DuckDB CLI itself, so the source test reads it back.
-          "$DUCKLE_DUCKDB_BIN" :memory: -c "
+          "$QUILT_DUCKDB_BIN" :memory: -c "
             INSTALL httpfs; LOAD httpfs;
             CREATE OR REPLACE SECRET seed (
               TYPE S3,
@@ -306,13 +306,13 @@ jobs:
               USE_SSL false
             );
             COPY (SELECT * FROM (VALUES (1,'alice'),(2,'bob'),(3,'carol')) t(id,name))
-              TO 's3://duckle-test/orders.parquet' (FORMAT PARQUET);
+              TO 's3://quilt-test/orders.parquet' (FORMAT PARQUET);
           "
       - name: Run MinIO integration tests
         env:
-          DUCKLE_MINIO_HOST: localhost
-          DUCKLE_MINIO_PORT: '9000'
-          DUCKLE_MINIO_BUCKET: duckle-test
-          DUCKLE_MINIO_ACCESS_KEY: minioadmin
-          DUCKLE_MINIO_SECRET_KEY: minioadmin
-        run: cargo test -p duckle-duckdb-engine --test execution -- minio_
+          QUILT_MINIO_HOST: localhost
+          QUILT_MINIO_PORT: '9000'
+          QUILT_MINIO_BUCKET: quilt-test
+          QUILT_MINIO_ACCESS_KEY: minioadmin
+          QUILT_MINIO_SECRET_KEY: minioadmin
+        run: cargo test -p quilt-duckdb-engine --test execution -- minio_

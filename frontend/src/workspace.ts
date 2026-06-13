@@ -1,12 +1,12 @@
 import { isTauri } from './tauri-dialog';
 
-const WORKSPACE_PATH_KEY = 'duckle:workspace-path';
+const WORKSPACE_PATH_KEY = 'quilt:workspace-path';
 
 // Workspace v1 (single file, everything in one blob). Kept for the
 // migration path.
 const V1_FILE = 'workspace.json';
 // Workspace v2 (this commit).
-const METADATA_FILE = 'duckle.json';
+const METADATA_FILE = 'quilt.json';
 const REPOSITORY_FILE = 'repository.json';
 const PIPELINES_DIR = 'pipelines';
 const CONNECTIONS_DIR = 'connections';
@@ -24,7 +24,6 @@ const PAYLOAD_DIR_BY_TYPE: Record<string, string> = {
 
 export type WorkspaceState = {
     version: number;
-    engine?: string;
     pipelineData?: Record<string, unknown>;
     repo?: unknown[];
     jobs?: unknown[];
@@ -71,7 +70,7 @@ export async function pickWorkspaceDirectory(): Promise<string | null> {
         const result = await open({
             directory: true,
             multiple: false,
-            title: 'Choose Duckle workspace folder',
+            title: 'Choose Quilt workspace folder',
         });
         return typeof result === 'string' ? result : null;
     } catch (err) {
@@ -86,23 +85,19 @@ async function fs(): Promise<FsLib> {
     return await import('@tauri-apps/plugin-fs');
 }
 
-// Encrypt / decrypt a connection payload's sensitive fields (password, tokens,
-// keys) via the desktop crypto commands, which use a per-workspace key under
-// `.duckle/keys/`. On any error we fall back to the original payload so a save
-// never loses data and a load never blocks. `${...}` placeholders and
+// Encrypt a connection payload's sensitive fields (password, tokens, keys) via
+// the desktop crypto command, which uses a per-workspace key under
+// `.quilt/keys/`. Encryption is mandatory: on any failure we throw rather than
+// fall back to the plaintext payload, so a transient key/backend error can
+// never silently persist secrets in cleartext. `${...}` placeholders and
 // non-secret fields are left untouched by the command.
 async function encryptConnectionPayload(workspace: string, payload: unknown): Promise<unknown> {
-    try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        const enc = await invoke<string>('connection_encrypt_payload', {
-            workspace,
-            payloadJson: JSON.stringify(payload),
-        });
-        return JSON.parse(enc);
-    } catch (err) {
-        console.error('encrypt connection failed', err);
-        return payload;
-    }
+    const { invoke } = await import('@tauri-apps/api/core');
+    const enc = await invoke<string>('connection_encrypt_payload', {
+        workspace,
+        payloadJson: JSON.stringify(payload),
+    });
+    return JSON.parse(enc);
 }
 
 async function decryptConnectionPayload(workspace: string, payload: unknown): Promise<unknown> {
@@ -114,7 +109,10 @@ async function decryptConnectionPayload(workspace: string, payload: unknown): Pr
         });
         return JSON.parse(dec);
     } catch (err) {
-        console.error('decrypt connection failed', err);
+        // Decrypt is allowed to fail open: a missing key returns the payload
+        // unchanged (legacy plaintext still loads). Log without the raw error
+        // object, which could embed payload fragments.
+        console.error('decrypt connection failed');
         return payload;
     }
 }
@@ -176,7 +174,6 @@ export async function loadWorkspace(path: string): Promise<WorkspaceState | null
 async function loadV2(path: string): Promise<WorkspaceState | null> {
     const meta = await readJsonIfExists<{
         version?: number;
-        engine?: string;
         jobs?: unknown[];
         activeJobId?: string;
     }>(joinPath(path, METADATA_FILE));
@@ -210,7 +207,6 @@ async function loadV2(path: string): Promise<WorkspaceState | null> {
 
     return {
         version: meta.version ?? 2,
-        engine: meta.engine,
         jobs: meta.jobs,
         activeJobId: meta.activeJobId,
         repo,
@@ -249,7 +245,7 @@ async function loadAndMigrateV1(path: string): Promise<WorkspaceState | null> {
  */
 export async function saveMetadata(
     path: string,
-    metadata: { engine?: string; jobs?: unknown; activeJobId?: string },
+    metadata: { jobs?: unknown; activeJobId?: string },
 ): Promise<void> {
     if (!isTauri()) return;
     try {
@@ -309,11 +305,23 @@ export async function saveItemPayload(
     if (!isTauri()) return;
     const dir = PAYLOAD_DIR_BY_TYPE[itemType];
     if (!dir) return;
+    // Encrypt connection payloads first. If encryption throws we must NOT fall
+    // through to writing the plaintext payload, so do it before opening/writing
+    // the file and bail out (without writing) on failure.
+    let toWrite = payload;
+    if (itemType === 'connection') {
+        try {
+            toWrite = await encryptConnectionPayload(path, payload);
+        } catch {
+            // Fail closed: never persist an unencrypted connection. Log a
+            // static message (not the raw error, which could embed secrets).
+            console.error('connection encryption failed; not saving to avoid writing plaintext secrets');
+            return;
+        }
+    }
     try {
         const folder = joinPath(path, dir);
         await ensureDir(folder);
-        const toWrite =
-            itemType === 'connection' ? await encryptConnectionPayload(path, payload) : payload;
         await writeJson(joinPath(folder, `${itemId}.json`), toWrite);
     } catch (err) {
         console.error('saveItemPayload failed', err);
@@ -359,7 +367,6 @@ export async function saveAll(path: string, state: WorkspaceState): Promise<void
     if (!isTauri()) return;
     await ensureDir(path);
     await saveMetadata(path, {
-        engine: state.engine,
         jobs: state.jobs,
         activeJobId: state.activeJobId,
     });

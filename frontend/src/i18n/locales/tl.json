@@ -83,7 +83,7 @@
     "installFailedTitle": "Nabigo ang pag - install",
     "retry": "Subukang muli",
     "emptyTitle": "Ilarawan ang pipeline",
-    "emptyHint": "Ang assistant outputs isang Duckle pipeline maaari mong i - click upang ipasok sa canvas.",
+    "emptyHint": "Ang assistant outputs isang Quilt pipeline maaari mong i - click upang ipasok sa canvas.",
     "insertIntoCanvas": "Ipasok sa canvas",
     "thinking": "Pag-iisip",
     "placeholder": "Ilarawan kung ano ang kailangan mo...",
@@ -132,9 +132,9 @@
     "copySqlDesc": "Mag-compile sa DuckDB SQL, kopyahin sa clipboard",
     "exportSql": "I-export bilang .sql",
     "exportSqlDesc": "I-download ang pinagsama-samang SQL bilang isang file",
-    "exportJson": "I-export bilang .duckle.json",
+    "exportJson": "I-export bilang .quilt.json",
     "exportJsonDesc": "Mag-download ng mga node + edge bilang portable JSON",
-    "importJson": "Mag-import ng .duckle.json...",
+    "importJson": "Mag-import ng .quilt.json...",
     "importJsonDesc": "Magbukas ng portable JSON bilang bagong pipeline"
   },
   "properties": {

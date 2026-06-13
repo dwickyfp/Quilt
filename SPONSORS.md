@@ -1,16 +1,16 @@
 <div align="center">
 
-<img src="docs/assets/hero.svg" alt="Duckle" width="80%"/>
+<img src="docs/assets/hero.svg" alt="Quilt" width="80%"/>
 
-# Sponsor Duckle
+# Sponsor Quilt
 
-<a href="https://github.com/sponsors/SouravRoy-ETL">
-<img alt="Sponsor Duckle" src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white"/>
+<a href="https://github.com/sponsors/dwickyfp">
+<img alt="Sponsor Quilt" src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-db61a2?logo=githubsponsors&logoColor=white"/>
 </a>
 
 </div>
 
-Duckle is a free, open-source, local-first ETL / ELT studio: drag a pipeline
+Quilt is a free, open-source, local-first ETL / ELT studio: drag a pipeline
 onto the canvas, run it at native speed through DuckDB, and own your data end to
 end. No cloud, no servers, no lock-in.
 
@@ -18,12 +18,12 @@ It is built in the open, clean-room, and given away for free. Sponsorship is wha
 lets that continue: it pays for the time to ship connectors, keep the engine
 fast and correct, write the docs, and turn issues around quickly.
 
-If Duckle saves you or your team time (or a warehouse bill), please consider
+If Quilt saves you or your team time (or a warehouse bill), please consider
 sponsoring its development.
 
 <div align="center">
 
-### [Become a sponsor on GitHub Sponsors](https://github.com/sponsors/SouravRoy-ETL)
+### [Become a sponsor on GitHub Sponsors](https://github.com/sponsors/dwickyfp)
 
 </div>
 
@@ -39,7 +39,7 @@ sponsoring its development.
 
 ## Tiers
 
-Tiers are configured on the [GitHub Sponsors page](https://github.com/sponsors/SouravRoy-ETL);
+Tiers are configured on the [GitHub Sponsors page](https://github.com/sponsors/dwickyfp);
 this is the gist:
 
 | Tier | Monthly | What you get |
@@ -56,14 +56,14 @@ GitHub Sponsors page.
 
 Not everyone can sponsor, and that is completely fine. These help just as much:
 
-- Star the repo: [SouravRoy-ETL/duckle](https://github.com/SouravRoy-ETL/duckle)
+- Star the repo: [dwickyfp/Quilt](https://github.com/dwickyfp/Quilt)
 - File clear bug reports and feature requests.
-- Share Duckle with a colleague, or write about how you use it.
+- Share Quilt with a colleague, or write about how you use it.
 - Contribute a fix or a connector (see the contributing notes in the README).
 
 ## Sponsors
 
-Sponsors will be listed here. Thank you for keeping Duckle free and open.
+Sponsors will be listed here. Thank you for keeping Quilt free and open.
 
 <!-- sponsors -->
 <!-- Add sponsor names / logos here. -->

@@ -1,4 +1,4 @@
-//! duckle-mcp: a Model Context Protocol server for Duckle.
+//! quilt-mcp: a Model Context Protocol server for Quilt.
 //!
 //! Speaks newline-delimited JSON-RPC 2.0 over stdio (the MCP stdio transport):
 //! one JSON message per line on stdin, one JSON response per line on stdout.
@@ -74,7 +74,7 @@ fn dispatch(method: &str, params: Value) -> Result<Value, (i64, String)> {
         "initialize" => Ok(json!({
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": { "tools": {}, "resources": {}, "prompts": {} },
-            "serverInfo": { "name": "duckle-mcp", "version": env!("CARGO_PKG_VERSION") },
+            "serverInfo": { "name": "quilt-mcp", "version": env!("CARGO_PKG_VERSION") },
             "instructions": tools::INSTRUCTIONS
         })),
         "ping" => Ok(json!({})),

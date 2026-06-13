@@ -13,7 +13,7 @@ type Props = {
     onCancel: () => void;
 };
 
-const RECENT_KEY = 'duckle:recent-paths';
+const RECENT_KEY = 'quilt:recent-paths';
 const MAX_RECENT = 8;
 
 function getRecentPaths(): string[] {

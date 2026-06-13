@@ -1,4 +1,4 @@
-//! Duckle native transform engine.
+//! Quilt native transform engine.
 //!
 //! Vectorized, Arrow-native operators: filter, project, join, aggregate,
 //! union, sort, deduplicate, window, pivot. Operators consume and produce

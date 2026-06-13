@@ -1,20 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { Bug } from 'lucide-react';
-import type { EngineId } from './EngineSelector';
 import { openExternal } from '../tauri-io';
 
 const DISCORD_INVITE = 'https://discord.gg/VbSVt7Etx';
 
-const ENGINE_LABEL: Record<EngineId, string> = {
-    duckdb: 'DuckDB',
-    slothdb: 'SlothDB',
-    native: 'Native',
-};
-
 type RuntimeState = 'connecting' | 'ready' | 'offline';
 
 type Props = {
-    engine: EngineId;
     runtime: RuntimeState;
     nodeCount: number;
     edgeCount: number;
@@ -24,7 +16,6 @@ type Props = {
 };
 
 export default function StatusBar({
-    engine,
     runtime,
     nodeCount,
     edgeCount,
@@ -65,7 +56,7 @@ export default function StatusBar({
             <div className="statusbar-spacer" />
             <div className="statusbar-section">
                 <span className="statusbar-label">{t('status.engineLabel')}</span>
-                <span>{ENGINE_LABEL[engine]}</span>
+                <span>DuckDB</span>
             </div>
             <div className="statusbar-sep" />
             <div className="statusbar-section">

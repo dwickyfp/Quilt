@@ -1,4 +1,4 @@
-//! Duckle metadata.
+//! Quilt metadata.
 //!
 //! Pipeline documents, schemas, and lineage records. These types are the
 //! authoritative shape of what a pipeline _is_; the canvas UI, the
@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 // ---- Types ----
 
-/// All the primitive cell types Duckle understands. Mirrors the
+/// All the primitive cell types Quilt understands. Mirrors the
 /// TypeScript `DataType` in the frontend so JSON round-trips cleanly.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]

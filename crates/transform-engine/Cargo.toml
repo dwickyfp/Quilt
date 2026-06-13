@@ -1,5 +1,5 @@
 [package]
-name = "duckle-transform-engine"
+name = "quilt-transform-engine"
 description = "Native vectorized transforms (filter, project, join, aggregate, ...) operating on Arrow record batches."
 version.workspace = true
 edition.workspace = true

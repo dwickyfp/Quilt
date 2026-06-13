@@ -19,7 +19,7 @@ The **Map** node is a visual join and column mapping editor. To use it:
 
 ## 2. Enforcing Data Quality (QA Validators)
 
-Duckle's data validation nodes split data flow based on rules you configure. Validator nodes feature two distinct output handles on the right:
+Quilt's data validation nodes split data flow based on rules you configure. Validator nodes feature two distinct output handles on the right:
 
 ```text
                      ┌───────────────┐
@@ -45,7 +45,7 @@ To create a Dead Letter Queue (DLQ):
 
 ## 3. Custom Code Editors (UDFs)
 
-When your logic cannot be built using standard visual blocks, you can paste custom scripts directly inside Duckle:
+When your logic cannot be built using standard visual blocks, you can paste custom scripts directly inside Quilt:
 
 ### JavaScript & WebAssembly Nodes
 1. Drag a **JavaScript UDF** or **WASM UDF** node onto the canvas and connect it.

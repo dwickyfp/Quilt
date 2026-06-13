@@ -1,6 +1,6 @@
-# Contributing to Duckle
+# Contributing to Quilt
 
-Thanks for your interest in Duckle. This project is in early development; contributions, issues, and design discussion are all welcome.
+Thanks for your interest in Quilt. This project is in early development; contributions, issues, and design discussion are all welcome.
 
 By participating you agree to abide by the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
@@ -20,7 +20,7 @@ npm --prefix frontend install
 cargo build --workspace
 
 # run the desktop app
-cargo run -p duckle-desktop
+cargo run -p quilt-desktop
 ```
 
 The desktop app launches Vite's dev server automatically and opens a Tauri window pointing at it.

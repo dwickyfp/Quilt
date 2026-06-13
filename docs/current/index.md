@@ -1,17 +1,17 @@
-# Duckle User Guide
+# Quilt User Guide
 
-Welcome to the **Duckle User Guide**! Duckle is an open-source, local-first desktop ETL / ELT studio. It features an intuitive drag-and-drop canvas, a comprehensive properties panel, real-time data previews, and a built-in AI assistant (**Duckie**) that runs entirely on your local machine.
+Welcome to the **Quilt User Guide**! Quilt is an open-source, local-first desktop ETL / ELT studio. It features an intuitive drag-and-drop canvas, a comprehensive properties panel, real-time data previews, and a built-in AI assistant (**Duckie**) that runs entirely on your local machine.
 
-Using Duckle, you can construct visual pipelines to extract, clean, transform, validate, and load data without writing complex SQL scripts or code. Every visual node you place is translated into highly optimized queries behind the scenes, giving you full visibility and speed.
+Using Quilt, you can construct visual pipelines to extract, clean, transform, validate, and load data without writing complex SQL scripts or code. Every visual node you place is translated into highly optimized queries behind the scenes, giving you full visibility and speed.
 
 ---
 
 ## Documentation Navigation
 
-This guide is organized into the following sections to help you get the most out of the Duckle application:
+This guide is organized into the following sections to help you get the most out of the Quilt application:
 
 ### 1. [Installation & Setup](installation.md)
-* How to download and run the Duckle application on **Windows, macOS, and Linux**.
+* How to download and run the Quilt application on **Windows, macOS, and Linux**.
 * Running the **Guided Startup Setup** to download database and local AI engines.
 * Understanding your **Workspace Folder** structure on disk.
 
@@ -35,7 +35,7 @@ This guide is organized into the following sections to help you get the most out
 
 ### 5. [Execution Controls](engines.md)
 * Running pipelines using the **Run** and **Stop** controls.
-* Switching between execution backends (DuckDB and SlothDB) in the header.
+* Running pipelines on the **DuckDB** execution engine.
 * How the application pre-installs database extensions so you can work completely offline.
 
 ### 6. [Scheduler & Automation](scheduler.md)
@@ -54,7 +54,7 @@ This guide is organized into the following sections to help you get the most out
 
 ## Core Visual Concepts
 
-When using Duckle, you will primarily work with three visual structures:
+When using Quilt, you will primarily work with three visual structures:
 * **The Canvas**: A large interactive board where you design pipelines by drawing connector lines between handles on nodes.
 * **Nodes (Components)**: Visual blocks representing a source (e.g. CSV), a transformation (e.g. Filter), a QA validator, or a target destination (e.g. database table).
 * **Ports & Edges**: Connective pins on nodes. Circles on the left are inputs; circles on the right are outputs. Connector lines (edges) carry the data flow.

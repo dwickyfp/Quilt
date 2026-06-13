@@ -1,5 +1,5 @@
 <!--
-Thanks for contributing to Duckle. Keep this short; delete any section
+Thanks for contributing to Quilt. Keep this short; delete any section
 that does not apply.
 -->
 
@@ -22,7 +22,7 @@ that does not apply.
 ## Checklist
 
 - [ ] `cargo fmt` and `cargo clippy --workspace --all-targets -- -D warnings` pass
-- [ ] `cargo test --workspace` passes (engine tests need `DUCKLE_DUCKDB_BIN` set - see CONTRIBUTING.md)
+- [ ] `cargo test --workspace` passes (engine tests need `QUILT_DUCKDB_BIN` set - see CONTRIBUTING.md)
 - [ ] `npm --prefix frontend run lint` passes (if the frontend changed)
 - [ ] Commits are small with imperative subject lines
 - [ ] No code ported from incompatibly licensed sources

@@ -190,9 +190,9 @@ pub struct AdbcSourceSpec {
 pub struct AttachParquetSourceSpec {
     pub node_id: String,
     /// INSTALL/LOAD/ATTACH preamble (ends with a trailing space); creates the
-    /// process-local `duckle_src` alias the body reads from.
+    /// process-local `quilt_src` alias the body reads from.
     pub attach: String,
-    /// The source SELECT body (e.g. `SELECT * FROM duckle_src."orders"`).
+    /// The source SELECT body (e.g. `SELECT * FROM quilt_src."orders"`).
     pub body: String,
 }
 
@@ -506,7 +506,7 @@ pub struct ShellSpec {
 /// engine generates a profiles.yml pointing dbt at the run's working
 /// database (or `database` when set), so dbt models see every upstream
 /// node table and their output tables are readable downstream. The
-/// upstream table name is passed to dbt as the `duckle_input` var. With
+/// upstream table name is passed to dbt as the `quilt_input` var. With
 /// `output_model` set the node's output is that model's rows; otherwise
 /// it is a per-model summary parsed from target/run_results.json.
 /// Requires a user-installed dbt with the duckdb adapter (pip/pipx
@@ -520,11 +520,11 @@ pub struct DbtSpec {
     /// Inline model SQL (UI authoring, no external project). Scaffolded as
     /// models/<inline_model_name>.sql in a temp project when project_dir is None.
     pub inline_model: Option<String>,
-    /// Name of the inline model (and its output table). Default "duckle_model".
+    /// Name of the inline model (and its output table). Default "quilt_model".
     pub inline_model_name: String,
     /// dbt subcommand + args, e.g. "run --select staging". Default "run".
     pub command: String,
-    /// dbt executable override; otherwise DUCKLE_DBT_BIN / bundled / PATH.
+    /// dbt executable override; otherwise QUILT_DBT_BIN / bundled / PATH.
     pub dbt_bin: Option<String>,
     /// Target DuckDB file; default = the run's working database.
     pub database: Option<String>,
@@ -532,10 +532,10 @@ pub struct DbtSpec {
     pub schema: String,
     /// Model/table to read back as this node's output rows.
     pub output_model: Option<String>,
-    /// First upstream node table, exposed to dbt as var("duckle_input").
+    /// First upstream node table, exposed to dbt as var("quilt_input").
     pub from_view: Option<String>,
     /// All upstream node tables (by node id), exposed to dbt as the list
-    /// var("duckle_inputs") so a multi-source inline model can reference them
+    /// var("quilt_inputs") so a multi-source inline model can reference them
     /// all. Each is also a real table dbt can read via sources.
     pub from_views: Vec<String>,
     pub timeout_ms: Option<u64>,
@@ -1164,7 +1164,7 @@ pub struct UpsertSpec {
     /// INSTALL/LOAD/ATTACH preamble; ends with a trailing space.
     pub attach: String,
     /// Fully qualified target inside the ATTACHed DB
-    /// (e.g. `duckle_dst."public"."orders"`).
+    /// (e.g. `quilt_dst."public"."orders"`).
     pub target: String,
     /// The upstream materialized table name in the temp DB.
     pub from_view: String,

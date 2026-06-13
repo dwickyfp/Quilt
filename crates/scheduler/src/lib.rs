@@ -1,4 +1,4 @@
-//! Duckle scheduler.
+//! Quilt scheduler.
 //!
 //! Cron- and interval-based triggers for pipelines. Schedules are
 //! persisted to `<workspace>/schedules.json` so they survive restarts.
@@ -8,7 +8,7 @@
 
 use chrono::{DateTime, Utc};
 use cron::Schedule as CronSchedule;
-use duckle_duckdb_engine::{
+use quilt_duckdb_engine::{
     append_run_record, DuckdbEngine, PipelineDoc, RunRecord, RunResult,
 };
 use notify::{RecommendedWatcher, RecursiveMode};

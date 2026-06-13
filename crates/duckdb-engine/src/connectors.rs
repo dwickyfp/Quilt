@@ -63,10 +63,10 @@ impl DuckdbEngine {
             .collect();
         let target_native = spec
             .target
-            .strip_prefix("duckle_dst.")
+            .strip_prefix("quilt_dst.")
             .unwrap_or(&spec.target)
             .to_string();
-        let staging_unqualified = format!("duckle_upsert_staging_{}", suffix);
+        let staging_unqualified = format!("quilt_upsert_staging_{}", suffix);
 
         // Step 1: stage the rows in the target DB (via ATTACH).
         // Default schema differs per family (public for PG/Cockroach;
@@ -75,14 +75,14 @@ impl DuckdbEngine {
             plan::UpsertFamily::Postgres => format!("public.{}", staging_unqualified),
             plan::UpsertFamily::MySql => staging_unqualified.clone(),
         };
-        let staging_duckle = format!("duckle_dst.{}", staging_native);
+        let staging_quilt = format!("quilt_dst.{}", staging_native);
         let stage_sql = format!(
             "{secret}{attach}DROP TABLE IF EXISTS {sd}; \
              CREATE TABLE {sd} AS SELECT * FROM {from} WHERE 1=0; \
              INSERT INTO {sd} SELECT * FROM {from};",
             secret = secret_prefix,
             attach = spec.attach,
-            sd = staging_duckle,
+            sd = staging_quilt,
             from = plan::quote_ident(&spec.from_view)
         );
         self.run(Some(db), &stage_sql, false)?;
@@ -102,7 +102,7 @@ impl DuckdbEngine {
         let mut last = String::new();
         for stmt in &native_stmts {
             let exec_sql = format!(
-                "{secret}{attach}CALL {fn_name}('duckle_dst', '{sql}');",
+                "{secret}{attach}CALL {fn_name}('quilt_dst', '{sql}');",
                 secret = secret_prefix,
                 attach = spec.attach,
                 fn_name = exec_fn,
@@ -493,8 +493,12 @@ impl DuckdbEngine {
             )));
         }
         let qualified = match &spec.schema {
-            Some(s) => format!("\"{}\".\"{}\"", s, spec.table),
-            None => format!("\"{}\"", spec.table),
+            Some(s) => format!(
+                "\"{}\".\"{}\"",
+                s.replace('"', "\"\""),
+                spec.table.replace('"', "\"\"")
+            ),
+            None => format!("\"{}\"", spec.table.replace('"', "\"\"")),
         };
         let cols_list = cols
             .iter()
@@ -821,7 +825,7 @@ impl DuckdbEngine {
         _spec: &OracleSinkSpec,
     ) -> Result<String, EngineError> {
         Err(EngineError::Config(
-            "snk.oracle: this Duckle binary was built without the default \
+            "snk.oracle: this Quilt binary was built without the default \
              `oracle` feature. Default builds include Oracle support; if \
              you're seeing this, rebuild with `cargo build --release` (no \
              --no-default-features). At runtime users still need Oracle \
@@ -842,7 +846,7 @@ impl DuckdbEngine {
         // Liveness trace (issue #4): each phase plus periodic row progress
         // is timestamped to a temp file so a stuck pull can be located from
         // the log even when the desktop shows no console. Truncated per run.
-        let trace_path = std::env::temp_dir().join("duckle-oracle-trace.log");
+        let trace_path = std::env::temp_dir().join("quilt-oracle-trace.log");
         let _ = std::fs::remove_file(&trace_path);
         let t0 = std::time::Instant::now();
         let mark = |msg: &str| {
@@ -860,7 +864,7 @@ impl DuckdbEngine {
             {
                 let _ = writeln!(f, "{}", line);
             }
-            eprintln!("[duckle:oracle] {}", line);
+            eprintln!("[quilt:oracle] {}", line);
         };
         mark(&format!("connecting to {} as {}", spec.connect, spec.user));
 
@@ -1045,7 +1049,7 @@ impl DuckdbEngine {
         _spec: &OracleSourceSpec,
     ) -> Result<String, EngineError> {
         Err(EngineError::Config(
-            "src.oracle: this Duckle binary was built without the default \
+            "src.oracle: this Quilt binary was built without the default \
              `oracle` feature. Default builds include Oracle support."
                 .into(),
         ))
@@ -1207,7 +1211,7 @@ impl DuckdbEngine {
     /// read_parquet VIEW. The parquet write is cheaper than an on-disk table
     /// insert and the consumer gets projection / predicate pushdown; typed
     /// parquet is lossless. The ATTACH prelude + COPY + VIEW run in one CLI
-    /// call (the duckle_src alias is live for the COPY; the VIEW references the
+    /// call (the quilt_src alias is live for the COPY; the VIEW references the
     /// parquet file, so downstream stages read it with no re-attach). The
     /// parquet is keyed off the run db and swept by the run's TempDbGuard.
     pub(crate) fn run_attach_parquet_source(
@@ -1436,7 +1440,11 @@ impl DuckdbEngine {
             .map(|c| format!("\"{}\"", c.replace('"', "\"\"")))
             .collect::<Vec<_>>()
             .join(", ");
-        let qualified = format!("{}.{}", spec.keyspace, spec.table);
+        let qualified = format!(
+            "\"{}\".\"{}\"",
+            spec.keyspace.replace('"', "\"\""),
+            spec.table.replace('"', "\"\"")
+        );
         let cancel = self.cancel.clone();
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -2633,7 +2641,7 @@ impl DuckdbEngine {
     /// tables it builds are readable by downstream stages. profiles.yml is
     /// generated per run into a temp dir, named after the project's declared
     /// profile, so the user's project runs unmodified. The upstream table
-    /// name (when wired) is passed as var("duckle_input").
+    /// name (when wired) is passed as var("quilt_input").
     pub(crate) fn run_dbt(&self, db: &Path, spec: &DbtSpec) -> Result<String, EngineError> {
         self.check_cancelled()?;
         let started = std::time::Instant::now();
@@ -2662,13 +2670,13 @@ impl DuckdbEngine {
             ))
         })?;
         // Name the generated profile after the project's `profile:` so the
-        // project runs unmodified; fall back to "duckle" + --profile flag.
+        // project runs unmodified; fall back to "quilt" + --profile flag.
         let declared_profile = serde_yaml::from_str::<serde_yaml::Value>(&project_text)
             .ok()
             .and_then(|v| v.get("profile").and_then(|p| p.as_str().map(String::from)));
         let (profile_name, force_profile_flag) = match declared_profile {
             Some(p) if !p.trim().is_empty() => (p, false),
-            _ => ("duckle".to_string(), true),
+            _ => ("quilt".to_string(), true),
         };
 
         // Target database: the run db by default, so dbt composes with the
@@ -2680,14 +2688,14 @@ impl DuckdbEngine {
         let target_db_yaml = target_db.replace('\\', "/");
 
         let profiles_dir = std::env::temp_dir().join(format!(
-            "duckle_dbt_{}_{}",
+            "quilt_dbt_{}_{}",
             std::process::id(),
             spec.node_id.replace(|c: char| !c.is_alphanumeric(), "_")
         ));
         std::fs::create_dir_all(&profiles_dir)
             .map_err(|e| EngineError::Query(format!("xf.dbt: profiles dir: {}", e)))?;
         let profiles_yaml = format!(
-            "{}:\n  target: duckle\n  outputs:\n    duckle:\n      type: duckdb\n      path: \"{}\"\n      schema: {}\n      threads: 1\n",
+            "{}:\n  target: quilt\n  outputs:\n    quilt:\n      type: duckdb\n      path: \"{}\"\n      schema: {}\n      threads: 1\n",
             profile_name, target_db_yaml, spec.schema
         );
         std::fs::write(profiles_dir.join("profiles.yml"), profiles_yaml)
@@ -2709,21 +2717,21 @@ impl DuckdbEngine {
             args.push("--profile".into());
             args.push(profile_name.clone());
         }
-        // Expose the upstream tables to dbt: the first as var('duckle_input')
+        // Expose the upstream tables to dbt: the first as var('quilt_input')
         // (back-compat / single-source) and ALL of them as the list
-        // var('duckle_inputs') for multi-source inline models.
+        // var('quilt_inputs') for multi-source inline models.
         if !spec.from_views.is_empty() {
             args.push("--vars".into());
             args.push(
                 serde_json::json!({
-                    "duckle_input": spec.from_views.first(),
-                    "duckle_inputs": spec.from_views,
+                    "quilt_input": spec.from_views.first(),
+                    "quilt_inputs": spec.from_views,
                 })
                 .to_string(),
             );
         } else if let Some(fv) = &spec.from_view {
             args.push("--vars".into());
-            args.push(serde_json::json!({ "duckle_input": fv }).to_string());
+            args.push(serde_json::json!({ "quilt_input": fv }).to_string());
         }
 
         let dbt_bin = resolve_dbt_bin(spec.dbt_bin.as_deref());
@@ -2740,7 +2748,7 @@ impl DuckdbEngine {
         let mut child = cmd.spawn().map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
                 EngineError::Config(format!(
-                    "xf.dbt: dbt was not found (tried '{}'). Duckle ships a bundled dbt \
+                    "xf.dbt: dbt was not found (tried '{}'). Quilt ships a bundled dbt \
                      engine; if you are running a bare build, install dbt with the DuckDB \
                      adapter (pipx install dbt-duckdb) or set the 'dbtBin' property to the \
                      dbt executable path.",
@@ -3197,7 +3205,7 @@ impl DuckdbEngine {
             "jsonl" => "jsonl",
             _ => "csv",
         };
-        let name = format!("duckle-ftp-{}.{}", std::process::id(), ext);
+        let name = format!("quilt-ftp-{}.{}", std::process::id(), ext);
         let path = std::env::temp_dir().join(name);
         // Best-effort clear of any stale temp from a prior run with the same pid.
         let _ = std::fs::remove_file(&path);
@@ -6193,7 +6201,7 @@ impl DuckdbEngine {
     /// past the last successful run's mark, and queue the new mark to be
     /// persisted iff the whole run succeeds (the executor writes
     /// `pending` after the final stage). The mark lives in
-    /// `$DUCKLE_WORKSPACE/state/<pipeline>/<node>.json` as {column, value,
+    /// `$QUILT_WORKSPACE/state/<pipeline>/<node>.json` as {column, value,
     /// type}; the type lets the next run cast the stored string back to the
     /// column's real type for a correct comparison.
     pub(crate) fn run_incremental(
@@ -6290,7 +6298,7 @@ impl DuckdbEngine {
     ) -> Result<String, EngineError> {
         let path = spec.path.replace('\\', "/").replace('\'', "''");
         let attach = format!(
-            "INSTALL ducklake; LOAD ducklake; ATTACH 'ducklake:{}' AS duckle_src (READ_ONLY); ",
+            "INSTALL ducklake; LOAD ducklake; ATTACH 'ducklake:{}' AS quilt_src (READ_ONLY); ",
             path
         );
         let node_q = plan::quote_ident(&spec.node_id);
@@ -6305,7 +6313,7 @@ impl DuckdbEngine {
         // Current snapshot id from the catalog.
         let cur_rows = self.run_rows(
             Some(db),
-            &format!("{}SELECT max(snapshot_id) AS cur FROM duckle_src.snapshots();", attach),
+            &format!("{}SELECT max(snapshot_id) AS cur FROM quilt_src.snapshots();", attach),
         )?;
         let current = cur_rows
             .into_iter()
@@ -6333,7 +6341,7 @@ impl DuckdbEngine {
                 format!("CREATE OR REPLACE TABLE {node} AS SELECT NULL::BIGINT AS snapshot_id, NULL::VARCHAR AS change_type LIMIT 0;", node = node_q)
             } else {
                 format!(
-                    "{attach}CREATE OR REPLACE TABLE {node} AS SELECT * FROM duckle_src.table_changes('{tbl}', {cur}, {cur}) WHERE 1=0;",
+                    "{attach}CREATE OR REPLACE TABLE {node} AS SELECT * FROM quilt_src.table_changes('{tbl}', {cur}, {cur}) WHERE 1=0;",
                     attach = attach, node = node_q, tbl = table_arg, cur = current,
                 )
             };
@@ -6345,7 +6353,7 @@ impl DuckdbEngine {
         }
 
         let materialize = format!(
-            "{attach}CREATE OR REPLACE TABLE {node} AS SELECT * FROM duckle_src.table_changes('{tbl}', {last}, {cur}) WHERE snapshot_id > {last}{type_filter};",
+            "{attach}CREATE OR REPLACE TABLE {node} AS SELECT * FROM quilt_src.table_changes('{tbl}', {last}, {cur}) WHERE snapshot_id > {last}{type_filter};",
             attach = attach,
             node = node_q,
             tbl = table_arg,
@@ -6951,7 +6959,7 @@ impl DuckdbEngine {
 /// Resolve a child-pipeline reference (Run Job / Iterate / Foreach / Try)
 /// to a file path the engine can read. An explicit path - absolute, or
 /// containing a separator, or ending in `.json` - is used verbatim. A bare
-/// workspace pipeline id is looked up under `$DUCKLE_WORKSPACE/pipelines/`,
+/// workspace pipeline id is looked up under `$QUILT_WORKSPACE/pipelines/`,
 /// matching how the desktop stores pipelines. This is the single resolution
 /// point that makes id references work for every run mode: interactive runs
 /// pre-resolve in the frontend (and arrive here as a real path, untouched),
@@ -6959,13 +6967,13 @@ impl DuckdbEngine {
 /// here. A bare id that doesn't resolve is returned as-is so the caller's
 /// open error names the original reference.
 /// State file for an xf.incremental node:
-/// `$DUCKLE_WORKSPACE/state/<pipeline>/<node>.json`. None when there's no
+/// `$QUILT_WORKSPACE/state/<pipeline>/<node>.json`. None when there's no
 /// workspace (then the mark can't persist and every run loads from the
 /// configured initial value, which is safe - just not incremental).
 /// Scaffold an ephemeral one-model dbt project for xf.dbt inline mode. Writes
-/// `dbt_project.yml` (profile `duckle`, matching the generated profiles.yml) and
+/// `dbt_project.yml` (profile `quilt`, matching the generated profiles.yml) and
 /// `models/<model_name>.sql` holding the user's inline SQL (which may reference
-/// `{{ var('duckle_input') }}` for the upstream table). Returns the temp project
+/// `{{ var('quilt_input') }}` for the upstream table). Returns the temp project
 /// dir. The model name is sanitized to a SQL/dbt-safe identifier.
 /// Write `content` to `path` only if it differs from what's already there.
 /// Preserves file mtime when unchanged, which keeps dbt's partial-parse cache
@@ -6992,7 +7000,7 @@ fn scaffold_inline_dbt_project(
     // parse is the dominant cost of an inline run; a warm partial-parse cache
     // shaves ~1s off an otherwise-cold start.
     let root = std::env::temp_dir().join(format!(
-        "duckle_dbt_proj_{}",
+        "quilt_dbt_proj_{}",
         node_id.replace(|c: char| !c.is_alphanumeric(), "_")
     ));
     let models = root.join("models");
@@ -7009,7 +7017,7 @@ fn scaffold_inline_dbt_project(
             }
         }
     }
-    let project_yml = "name: duckle\nversion: '1.0.0'\nprofile: duckle\nconfig-version: 2\nmodel-paths: [\"models\"]\nmodels:\n  duckle:\n    +materialized: table\n";
+    let project_yml = "name: quilt\nversion: '1.0.0'\nprofile: quilt\nconfig-version: 2\nmodel-paths: [\"models\"]\nmodels:\n  quilt:\n    +materialized: table\n";
     // Write only when content differs: a touched dbt_project.yml forces dbt to
     // discard the partial-parse cache, and a re-touched model file needlessly
     // re-parses it. Identical content keeps the whole cache valid.
@@ -7018,7 +7026,7 @@ fn scaffold_inline_dbt_project(
     Ok(root)
 }
 
-/// Resolve the dbt executable. Order: explicit `dbtBin` prop -> DUCKLE_DBT_BIN
+/// Resolve the dbt executable. Order: explicit `dbtBin` prop -> QUILT_DBT_BIN
 /// env -> a bundled dbt/Fusion binary next to the running executable (the
 /// shipped sidecar) -> `dbt` on PATH. The bundled binary makes xf.dbt work
 /// out of the box without a Python install.
@@ -7026,7 +7034,7 @@ fn resolve_dbt_bin(explicit: Option<&str>) -> String {
     if let Some(b) = explicit.filter(|s| !s.trim().is_empty()) {
         return b.to_string();
     }
-    if let Ok(env) = std::env::var("DUCKLE_DBT_BIN") {
+    if let Ok(env) = std::env::var("QUILT_DBT_BIN") {
         if !env.is_empty() && Path::new(&env).exists() {
             return env;
         }
@@ -7065,7 +7073,7 @@ fn tail_chars(s: &str, max: usize) -> &str {
 }
 
 fn incremental_state_path(pipeline_name: Option<&str>, node_id: &str) -> Option<std::path::PathBuf> {
-    let ws = std::env::var("DUCKLE_WORKSPACE").ok().filter(|s| !s.is_empty())?;
+    let ws = std::env::var("QUILT_WORKSPACE").ok().filter(|s| !s.is_empty())?;
     let folder = sanitize_path_segment(pipeline_name.unwrap_or("pipeline"));
     let file = format!("{}.json", sanitize_path_segment(node_id));
     Some(
@@ -7207,7 +7215,7 @@ fn resolve_subpipeline_ref(reference: &str) -> String {
     if looks_like_path {
         return reference.to_string();
     }
-    if let Ok(ws) = std::env::var("DUCKLE_WORKSPACE") {
+    if let Ok(ws) = std::env::var("QUILT_WORKSPACE") {
         if !ws.is_empty() {
             let candidate = std::path::Path::new(&ws)
                 .join("pipelines")

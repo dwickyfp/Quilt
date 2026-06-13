@@ -1,17 +1,15 @@
 //! Engine installation manager.
 //!
-//! Duckle ships a tiny shell and downloads its execution engines on
+//! Quilt ships a tiny shell and downloads its execution engine on
 //! first launch into the app-data directory, rather than statically
-//! bundling them. DuckDB and SlothDB install through one shared path:
-//! fetch the platform's release zip from GitHub, extract the binary,
-//! mark it executable, and verify it runs.
+//! bundling it: fetch the platform's release zip from GitHub, extract
+//! the binary, mark it executable, and verify it runs.
 
 use serde::Serialize;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
 pub const DUCKDB_VERSION: &str = "1.5.3";
-pub const SLOTHDB_VERSION: &str = "0.2.7";
 /// Pinned llama.cpp build. Bump periodically; the GGUF wire format
 /// is stable so newer server binaries keep working with older models.
 /// Note: assets at older builds use a different naming (avx/avx2/cuda
@@ -46,16 +44,6 @@ const DUCKDB: EngineSpec = EngineSpec {
     binary: "duckdb",
 };
 
-const SLOTHDB: EngineSpec = EngineSpec {
-    id: "slothdb",
-    name: "SlothDB",
-    description: "Optional embedded engine. Downloads from the SlothDB releases.",
-    required: false,
-    repo: "SouravRoy-ETL/slothdb",
-    version: SLOTHDB_VERSION,
-    binary: "slothdb",
-};
-
 /// llama.cpp HTTP server + a small Qwen GGUF model. Treated as an
 /// optional "engine" for UX consistency with the setup screen but
 /// powers the Duckie AI Assistant chat panel rather than the SQL
@@ -72,7 +60,7 @@ const LLAMACPP: EngineSpec = EngineSpec {
     binary: "llama-server",
 };
 
-const ENGINES: [&EngineSpec; 3] = [&DUCKDB, &SLOTHDB, &LLAMACPP];
+const ENGINES: [&EngineSpec; 2] = [&DUCKDB, &LLAMACPP];
 
 fn spec(id: &str) -> Option<&'static EngineSpec> {
     ENGINES.iter().copied().find(|e| e.id == id)
@@ -121,17 +109,6 @@ fn asset_for(s: &EngineSpec) -> Option<String> {
                 ("linux", "x86_64") => "duckdb_cli-linux-amd64.zip",
                 ("linux", "aarch64") => "duckdb_cli-linux-aarch64.zip",
                 ("macos", _) => "duckdb_cli-osx-universal.zip",
-                _ => return None,
-            }
-            .to_string(),
-        ),
-        // SlothDB ships raw, single-file binaries per its releases -
-        // not zips. Names per https://github.com/SouravRoy-ETL/slothdb.
-        "slothdb" => Some(
-            match (os, arch) {
-                ("windows", _) => "slothdb.exe",
-                ("linux", "x86_64") => "slothdb-linux-x64",
-                ("macos", _) => "slothdb-macos",
                 _ => return None,
             }
             .to_string(),
@@ -185,7 +162,7 @@ pub enum InstallProgress {
     Done { path: String },
 }
 
-/// DuckDB extensions Duckle uses or is wired to use. Pre-installed once
+/// DuckDB extensions Quilt uses or is wired to use. Pre-installed once
 /// at first launch so future ATTACH / read_xlsx / httpfs calls do not
 /// stop to download an extension mid-run.
 const DUCKDB_EXTENSIONS: &[&str] = &[
@@ -205,6 +182,7 @@ const DUCKDB_EXTENSIONS: &[&str] = &[
 ];
 
 fn duckdb_command(bin: &Path) -> std::process::Command {
+    #[cfg_attr(not(windows), allow(unused_mut))]
     let mut cmd = std::process::Command::new(bin);
     #[cfg(windows)]
     {
@@ -215,7 +193,7 @@ fn duckdb_command(bin: &Path) -> std::process::Command {
     cmd
 }
 
-/// Walk through every DuckDB extension Duckle needs, INSTALL+LOADing each
+/// Walk through every DuckDB extension Quilt needs, INSTALL+LOADing each
 /// so the file lands in the user's local DuckDB extension cache. Failures
 /// are logged via the progress callback but never abort the engine
 /// install: a user offline for one extension still gets a working engine
@@ -284,10 +262,10 @@ fn install_spec<F: FnMut(InstallProgress)>(
             std::env::consts::ARCH
         )
     })?;
-    // Tag naming convention varies per upstream: DuckDB + SlothDB
-    // both use v-prefixed semver tags (v1.5.3); llama.cpp uses raw
-    // build tags (b9305). Pre-prepending `v` to every version
-    // produces a 404 against ggml-org/llama.cpp.
+    // Tag naming convention varies per upstream: DuckDB uses
+    // v-prefixed semver tags (v1.5.3); llama.cpp uses raw build tags
+    // (b9305). Pre-prepending `v` to every version produces a 404
+    // against ggml-org/llama.cpp.
     let tag = if s.id == "llamacpp" {
         s.version.to_string()
     } else {
@@ -302,10 +280,10 @@ fn install_spec<F: FnMut(InstallProgress)>(
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
     let client = reqwest::blocking::Client::builder()
-        .user_agent("duckle")
-        // Trust the OS store (+ optional DUCKLE_CA_CERT) on top of the bundled
+        .user_agent("quilt")
+        // Trust the OS store (+ optional QUILT_CA_CERT) on top of the bundled
         // roots so the engine download works behind a TLS-inspecting proxy.
-        .use_preconfigured_tls(duckle_duckdb_engine::tls::build_client_config())
+        .use_preconfigured_tls(quilt_duckdb_engine::tls::build_client_config())
         .build()
         .map_err(|e| e.to_string())?;
     let mut resp = client.get(&url).send().map_err(|e| e.to_string())?;
@@ -428,11 +406,14 @@ fn install_spec<F: FnMut(InstallProgress)>(
             ));
         }
     } else {
-        // Raw single-file binary (SlothDB) - the download IS the binary.
-        if buf.is_empty() {
-            return Err(format!("{} download was empty", s.name));
-        }
-        std::fs::write(&target, &buf).map_err(|e| e.to_string())?;
+        // Every engine asset is a .zip (duckdb, llamacpp/win) or
+        // .tar.gz (llamacpp/unix). An unrecognized format means a new
+        // engine was added without a matching extract path - fail loudly
+        // rather than write a misnamed blob to the binary path.
+        return Err(format!(
+            "{} asset '{}' has an unsupported format (expected .zip or .tar.gz)",
+            s.name, asset
+        ));
     }
 
     #[cfg(unix)]
@@ -451,9 +432,9 @@ fn install_spec<F: FnMut(InstallProgress)>(
     }
     let _ = duckdb_command(&target).arg("--version").output();
 
-    // Pre-fetch the extensions Duckle uses so the first connector hit
+    // Pre-fetch the extensions Quilt uses so the first connector hit
     // doesn't pause to download an extension. Only meaningful for the
-    // DuckDB engine; SlothDB has its own model.
+    // DuckDB engine.
     if s.id == "duckdb" {
         install_duckdb_extensions(&target, &mut on_progress);
     }
@@ -490,11 +471,11 @@ fn install_llama_model<F: FnMut(InstallProgress)>(
         LLAMA_MODEL_REPO, LLAMA_MODEL_FILE
     );
     let client = reqwest::blocking::Client::builder()
-        .user_agent("duckle")
+        .user_agent("quilt")
         // No global timeout - the model is over a GB on home internet.
         .timeout(None)
         // Same merged trust store as the engine download (OS + bundled roots).
-        .use_preconfigured_tls(duckle_duckdb_engine::tls::build_client_config())
+        .use_preconfigured_tls(quilt_duckdb_engine::tls::build_client_config())
         .build()
         .map_err(|e| e.to_string())?;
     let mut resp = client.get(&url).send().map_err(|e| e.to_string())?;
@@ -537,11 +518,9 @@ mod tests {
     fn status_lists_all_engines_missing_in_empty_dir() {
         let tmp = tempfile::tempdir().unwrap();
         let st = status(tmp.path());
-        assert_eq!(st.len(), 3);
+        assert_eq!(st.len(), 2);
         let duck = st.iter().find(|e| e.id == "duckdb").unwrap();
         assert!(!duck.installed && duck.required && duck.available);
-        let sloth = st.iter().find(|e| e.id == "slothdb").unwrap();
-        assert!(!sloth.installed && !sloth.required);
         let llama = st.iter().find(|e| e.id == "llamacpp").unwrap();
         assert!(!llama.installed && !llama.required);
     }
@@ -555,21 +534,5 @@ mod tests {
         assert!(status(tmp.path())
             .iter()
             .any(|e| e.id == "duckdb" && e.installed));
-    }
-
-    #[test]
-    #[ignore = "downloads the SlothDB raw binary from GitHub releases (network)"]
-    fn installs_slothdb() {
-        let tmp = tempfile::tempdir().unwrap();
-        let path = install(tmp.path(), "slothdb", |_| {}).expect("install");
-        let p = std::path::Path::new(&path);
-        assert!(p.exists(), "binary should exist");
-        assert!(
-            std::fs::metadata(p).unwrap().len() > 0,
-            "binary should be non-empty"
-        );
-        assert!(status(tmp.path())
-            .iter()
-            .any(|e| e.id == "slothdb" && e.installed));
     }
 }

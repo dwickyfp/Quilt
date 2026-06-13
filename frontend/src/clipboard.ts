@@ -1,19 +1,19 @@
 import type { Edge, Node } from '@xyflow/react';
-import type { DuckleNodeData } from './pipeline-types';
+import type { QuiltNodeData } from './pipeline-types';
 
 // A localStorage-backed clipboard for canvas components (issue #28). Using
 // localStorage (not React state) means a copy survives switching the active
 // pipeline, so components can be pasted from one pipeline into another.
-const CLIPBOARD_KEY = 'duckle.clipboard';
+const CLIPBOARD_KEY = 'quilt.clipboard';
 
 export type Clipboard = {
-    nodes: Node<DuckleNodeData>[];
+    nodes: Node<QuiltNodeData>[];
     edges: Edge[];
 };
 
 // Store the given nodes plus only the edges whose endpoints are both in the
 // copied set (internal wiring). Returns how many nodes were copied.
-export function writeClipboard(nodes: Node<DuckleNodeData>[], allEdges: Edge[]): number {
+export function writeClipboard(nodes: Node<QuiltNodeData>[], allEdges: Edge[]): number {
     if (nodes.length === 0) return 0;
     const ids = new Set(nodes.map(n => n.id));
     const edges = allEdges.filter(e => ids.has(e.source) && ids.has(e.target));
@@ -50,7 +50,7 @@ export function instantiateClipboard(
     mkNodeId: () => string,
     mkEdgeId: () => string,
     offset = 40,
-): { nodes: Node<DuckleNodeData>[]; edges: Edge[] } {
+): { nodes: Node<QuiltNodeData>[]; edges: Edge[] } {
     const idMap = new Map<string, string>();
     for (const n of clip.nodes) idMap.set(n.id, mkNodeId());
     const nodes = clip.nodes.map(n => ({

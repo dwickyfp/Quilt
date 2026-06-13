@@ -1,7 +1,7 @@
 name: Release
 
 # Tag a version (e.g. `git tag v0.0.5 && git push --tags`) to build the
-# Duckle binary for every OS and attach it directly to a draft GitHub
+# Quilt binary for every OS and attach it directly to a draft GitHub
 # release. We do NOT ship installers (no NSIS / MSI / DMG / DEB / RPM /
 # AppImage). The asset on the release is the raw executable that the
 # user can run.
@@ -34,7 +34,7 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "release $tag already exists"
           else
-            gh release create "$tag" --draft --title "Duckle $tag"
+            gh release create "$tag" --draft --title "Quilt $tag"
           fi
 
   build:
@@ -45,30 +45,30 @@ jobs:
         include:
           # Linux
           - os: ubuntu-24.04
-            binary: duckle
-            asset: Duckle-linux-x64
+            binary: quilt
+            asset: Quilt-linux-x64
           - os: ubuntu-24.04-arm
-            binary: duckle
-            asset: Duckle-linux-arm64
+            binary: quilt
+            asset: Quilt-linux-arm64
           # macOS - both built on the macos-14 (Apple Silicon) runner.
           # The Intel binary is cross-compiled to x86_64-apple-darwin
           # rather than run on a macos-13 runner: GitHub's Intel-mac
           # runners are scarce / being deprecated and routinely leave
           # the job queued for hours, stalling the whole release.
           - os: macos-14
-            binary: duckle
-            asset: Duckle-macos-x64
+            binary: quilt
+            asset: Quilt-macos-x64
             target: x86_64-apple-darwin
           - os: macos-14
-            binary: duckle
-            asset: Duckle-macos-arm64
+            binary: quilt
+            asset: Quilt-macos-arm64
           # Windows
           - os: windows-latest
-            binary: duckle.exe
-            asset: Duckle-windows-x64.exe
+            binary: quilt.exe
+            asset: Quilt-windows-x64.exe
           - os: windows-11-arm
-            binary: duckle.exe
-            asset: Duckle-windows-arm64.exe
+            binary: quilt.exe
+            asset: Quilt-windows-arm64.exe
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -108,27 +108,27 @@ jobs:
             libwebkit2gtk-4.1-dev libgtk-3-dev \
             libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev
 
-      - name: Build duckle-runner + duckle-mcp (bundled into the app)
+      - name: Build quilt-runner + quilt-mcp (bundled into the app)
         shell: bash
         run: |
           set -e
           if [ -n "${{ matrix.target }}" ]; then
-            cargo build --profile release-runner --target "${{ matrix.target }}" -p duckle-runner -p duckle-mcp
+            cargo build --profile release-runner --target "${{ matrix.target }}" -p quilt-runner -p quilt-mcp
             base="target/${{ matrix.target }}/release-runner"
           else
-            cargo build --profile release-runner -p duckle-runner -p duckle-mcp
+            cargo build --profile release-runner -p quilt-runner -p quilt-mcp
             base="target/release-runner"
           fi
           mkdir -p apps/desktop/bin
           if [ "${{ runner.os }}" = "Windows" ]; then
-            cp "$base/duckle-runner.exe" apps/desktop/bin/duckle-runner.exe
-            cp "$base/duckle-mcp.exe" apps/desktop/bin/duckle-mcp.exe
+            cp "$base/quilt-runner.exe" apps/desktop/bin/quilt-runner.exe
+            cp "$base/quilt-mcp.exe" apps/desktop/bin/quilt-mcp.exe
           else
-            cp "$base/duckle-runner" apps/desktop/bin/duckle-runner
-            cp "$base/duckle-mcp" apps/desktop/bin/duckle-mcp
+            cp "$base/quilt-runner" apps/desktop/bin/quilt-runner
+            cp "$base/quilt-mcp" apps/desktop/bin/quilt-mcp
           fi
 
-      - name: Build raw Duckle binary
+      - name: Build raw Quilt binary
         shell: bash
         run: |
           set -e
@@ -153,7 +153,7 @@ jobs:
           # The standalone desktop binary, named exactly as before so the
           # in-app update check (apps/desktop/src/update_check.rs) and the
           # README download table keep matching it. Single file, double-click.
-          # The duckle-runner is embedded into this binary at compile time
+          # The quilt-runner is embedded into this binary at compile time
           # (no separate with-runner asset needed).
           cp "$src" "_release/${{ matrix.asset }}"
 

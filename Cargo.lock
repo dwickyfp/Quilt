@@ -2085,225 +2085,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f678cf4a922c215c63e0de95eb1ff08a958a81d47e485cf9da1e27bf6305cfa5"
 
 [[package]]
-name = "duckle-connectors"
-version = "0.0.1"
-dependencies = [
- "async-trait",
- "csv",
- "duckle-metadata",
- "duckle-plugin-sdk",
- "encoding_rs",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "duckle-desktop"
-version = "0.0.1"
-dependencies = [
- "aes-gcm",
- "base64 0.22.1",
- "chrono",
- "duckle-connectors",
- "duckle-duckdb-engine",
- "duckle-metadata",
- "duckle-plugin-sdk",
- "duckle-runtime",
- "duckle-scheduler",
- "flate2",
- "getrandom 0.2.17",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tar",
- "tauri",
- "tauri-build",
- "tauri-plugin-clipboard-manager",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-opener",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "ureq",
- "zip",
-]
-
-[[package]]
-name = "duckle-duckdb-engine"
-version = "0.0.1"
-dependencies = [
- "adbc_core",
- "apache-avro",
- "arboard",
- "arrow-array",
- "arrow-schema",
- "async-nats",
- "base64 0.22.1",
- "boa_engine",
- "chrono",
- "duckle-metadata",
- "duckle-plugin-sdk",
- "flate2",
- "futures-util",
- "hmac",
- "imap",
- "jsonwebtoken",
- "lapin",
- "lettre",
- "mail-parser",
- "mongodb",
- "oracle",
- "parquet",
- "quick-xml 0.36.2",
- "rand 0.8.6",
- "redis",
- "regex",
- "rsa",
- "rskafka",
- "russh",
- "russh-sftp",
- "rustls 0.23.40",
- "rustls-connector 0.21.11",
- "rustls-native-certs 0.7.3",
- "rustls-pemfile 2.2.0",
- "scylla",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2",
- "suppaftp",
- "tempfile",
- "thiserror 1.0.69",
- "tiberius",
- "tokio",
- "tokio-util",
- "toml 0.8.2",
- "ureq",
- "wasmi",
- "wat",
- "webpki-roots 0.26.11",
-]
-
-[[package]]
-name = "duckle-execution-core"
-version = "0.0.1"
-dependencies = [
- "async-trait",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "duckle-mcp"
-version = "0.0.1"
-dependencies = [
- "duckle-duckdb-engine",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "duckle-metadata"
-version = "0.0.1"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "uuid",
-]
-
-[[package]]
-name = "duckle-plugin-sdk"
-version = "0.0.1"
-dependencies = [
- "async-trait",
- "duckle-metadata",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "duckle-runner"
-version = "0.0.1"
-dependencies = [
- "aes-gcm",
- "base64 0.22.1",
- "duckle-duckdb-engine",
- "getrandom 0.2.17",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "zip",
-]
-
-[[package]]
-name = "duckle-runtime"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "serde",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "duckle-scheduler"
-version = "0.0.1"
-dependencies = [
- "chrono",
- "cron",
- "duckle-duckdb-engine",
- "notify",
- "notify-debouncer-mini",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "duckle-slothdb-engine"
-version = "0.0.1"
-dependencies = [
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "duckle-stream-engine"
-version = "0.0.1"
-dependencies = [
- "futures",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "duckle-transform-engine"
-version = "0.0.1"
-dependencies = [
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "duckle-workflow-engine"
-version = "0.0.1"
-dependencies = [
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6113,6 +5894,218 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdcc8dd4e2f670d309a5f0e83fe36dfdc05af317008fea29144da1a2ac858e5e"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "quilt-connectors"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "csv",
+ "encoding_rs",
+ "quilt-metadata",
+ "quilt-plugin-sdk",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "quilt-desktop"
+version = "0.0.1"
+dependencies = [
+ "aes-gcm",
+ "base64 0.22.1",
+ "chrono",
+ "flate2",
+ "getrandom 0.2.17",
+ "quilt-connectors",
+ "quilt-duckdb-engine",
+ "quilt-metadata",
+ "quilt-plugin-sdk",
+ "quilt-runtime",
+ "quilt-scheduler",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tar",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-clipboard-manager",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-opener",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "ureq",
+ "zip",
+]
+
+[[package]]
+name = "quilt-duckdb-engine"
+version = "0.0.1"
+dependencies = [
+ "adbc_core",
+ "apache-avro",
+ "arboard",
+ "arrow-array",
+ "arrow-schema",
+ "async-nats",
+ "base64 0.22.1",
+ "boa_engine",
+ "chrono",
+ "flate2",
+ "futures-util",
+ "hmac",
+ "imap",
+ "jsonwebtoken",
+ "lapin",
+ "lettre",
+ "mail-parser",
+ "mongodb",
+ "oracle",
+ "parquet",
+ "quick-xml 0.36.2",
+ "quilt-metadata",
+ "quilt-plugin-sdk",
+ "rand 0.8.6",
+ "redis",
+ "regex",
+ "rsa",
+ "rskafka",
+ "russh",
+ "russh-sftp",
+ "rustls 0.23.40",
+ "rustls-connector 0.21.11",
+ "rustls-native-certs 0.7.3",
+ "rustls-pemfile 2.2.0",
+ "scylla",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "suppaftp",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tiberius",
+ "tokio",
+ "tokio-util",
+ "toml 0.8.2",
+ "ureq",
+ "wasmi",
+ "wat",
+ "webpki-roots 0.26.11",
+]
+
+[[package]]
+name = "quilt-execution-core"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "quilt-mcp"
+version = "0.0.1"
+dependencies = [
+ "quilt-duckdb-engine",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "quilt-metadata"
+version = "0.0.1"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "quilt-plugin-sdk"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "quilt-metadata",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "quilt-runner"
+version = "0.0.1"
+dependencies = [
+ "aes-gcm",
+ "base64 0.22.1",
+ "getrandom 0.2.17",
+ "quilt-duckdb-engine",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "zip",
+]
+
+[[package]]
+name = "quilt-runtime"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "serde",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "quilt-scheduler"
+version = "0.0.1"
+dependencies = [
+ "chrono",
+ "cron",
+ "notify",
+ "notify-debouncer-mini",
+ "quilt-duckdb-engine",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "quilt-stream-engine"
+version = "0.0.1"
+dependencies = [
+ "futures",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "quilt-transform-engine"
+version = "0.0.1"
+dependencies = [
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "quilt-workflow-engine"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -8,7 +8,7 @@ assignees: ''
 
 ## The problem
 
-<!-- What are you trying to do that Duckle does not support today? -->
+<!-- What are you trying to do that Quilt does not support today? -->
 
 ## Proposed solution
 

@@ -1,6 +1,7 @@
 import type { Node } from '@xyflow/react';
-import type { DuckleNodeData } from './pipeline-types';
-import type { ContextPayload, RepoItem, RoutinePayload } from './repo-types';
+import type { QuiltNodeData } from './pipeline-types';
+import type { ConnectionPayload, ContextPayload, RepoItem, RoutinePayload } from './repo-types';
+import { SECRET_CONNECTION_KEYS } from './repo-types';
 
 /**
  * Resolve a pipeline's nodes for execution:
@@ -10,6 +11,10 @@ import type { ContextPayload, RepoItem, RoutinePayload } from './repo-types';
  *   3. Map a child-pipeline reference (Run Job / Iterate / Foreach / Try)
  *      stored as a workspace pipeline id to its on-disk file path, which
  *      is what the engine reads.
+ *   4. Inject a referenced connection's secret fields (password / access
+ *      keys) from the decrypted in-memory connection. These are never stored
+ *      on the node (so they can't leak into the unencrypted pipeline file or
+ *      git); they live only in the transient run copy produced here.
  *
  * Run on the working nodes right before they're sent to the engine, so
  * the canvas keeps the un-substituted, editable values.
@@ -64,15 +69,18 @@ function substituteDeep(value: unknown, vars: Record<string, string>): unknown {
 }
 
 export function resolveForRun(
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     repo: RepoItem[],
     workspacePath?: string | null,
-): Node<DuckleNodeData>[] {
+): Node<QuiltNodeData>[] {
     const vars = buildContextVars(repo);
     const sqlRoutines = new Map<string, string>();
     // Map a workspace pipeline id (or name) to its on-disk file path so a
     // dropdown-stored id resolves to something the engine can read.
     const pipelinePaths = new Map<string, string>();
+    // Map a connection id to its (decrypted, in-memory) payload so a node's
+    // `connectionRef` can have its secret fields injected at run time.
+    const connections = new Map<string, ConnectionPayload>();
     for (const item of repo) {
         if (item.type === 'routine') {
             const payload = item.payload as RoutinePayload | undefined;
@@ -84,6 +92,8 @@ export function resolveForRun(
             const file = joinPath(workspacePath, 'pipelines', `${item.id}.json`);
             pipelinePaths.set(item.id, file);
             pipelinePaths.set(item.name, file);
+        } else if (item.type === 'connection' && item.payload) {
+            connections.set(item.id, item.payload as ConnectionPayload);
         }
     }
     const hasVars = Object.keys(vars).length > 0;
@@ -103,6 +113,24 @@ export function resolveForRun(
         const resolved = hasVars
             ? (substituteDeep(props, vars) as Record<string, unknown>)
             : props;
+
+        // Inject connection secrets from the saved connection. The node only
+        // stores `connectionRef`; secret fields are filled in here for the run
+        // and never written back to the node. A field the user typed inline on
+        // the node (not empty) wins, so an explicit per-node override still
+        // works.
+        const ref = typeof resolved.connectionRef === 'string' ? resolved.connectionRef : '';
+        if (ref && connections.has(ref)) {
+            const conn = connections.get(ref)!;
+            for (const key of SECRET_CONNECTION_KEYS) {
+                const existing = resolved[key];
+                const hasInline = typeof existing === 'string' && existing !== '';
+                const secret = conn[key];
+                if (!hasInline && secret !== undefined && secret !== '') {
+                    resolved[key] = secret;
+                }
+            }
+        }
 
         // Resolve child-pipeline ids to file paths. A value that isn't a
         // known pipeline id/name (a hand-typed literal path from before the

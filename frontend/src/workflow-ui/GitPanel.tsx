@@ -38,7 +38,7 @@ type Props = {
 /**
  * In-app Git panel for the user's workspace folder. Status + commit +
  * push + pull + branches + remote / PAT setup, so the user never leaves
- * Duckle for routine operations.
+ * Quilt for routine operations.
  */
 export default function GitPanel({ workspacePath, onClose }: Props) {
     const [status, setStatus] = useState<GitStatus | null>(null);

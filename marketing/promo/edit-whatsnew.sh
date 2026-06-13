@@ -15,7 +15,7 @@ ROOT="$(cd ../.. && pwd)"
 SRC="C:/Users/Sourav Roy/Downloads/Quack+LOC60.mp4"
 OUT="C:/Users/Sourav Roy/Downloads/Quack+LOC60-marketed.mp4"
 LOGO="$ROOT/apps/desktop/icons/icon-source.png"
-TMP="C:/Users/SOURAV~1/AppData/Local/Temp/duckle-vid"
+TMP="C:/Users/SOURAV~1/AppData/Local/Temp/quilt-vid"
 mkdir -p "$TMP"
 
 W=1920
@@ -36,7 +36,7 @@ $FF -f lavfi -i "color=c=${BG}:s=${W}x${H}:r=${FPS}:d=3" \
     -filter_complex "
       [2:v]scale=320:320[lg];
       [0:v][lg]overlay=(W-w)/2:(H-h)/2-120,
-      drawtext=fontfile=font-bold.ttf:text='Duckle v0.1.0':fontcolor=${TEXT}:fontsize=88:x=(w-tw)/2:y=h/2+150,
+      drawtext=fontfile=font-bold.ttf:text='Quilt v0.1.0':fontcolor=${TEXT}:fontsize=88:x=(w-tw)/2:y=h/2+150,
       drawtext=fontfile=font-reg.ttf:text='What is new':fontcolor=${MUTED}:fontsize=38:x=(w-tw)/2:y=h/2+260,
       fade=t=in:st=0:d=0.4,fade=t=out:st=2.5:d=0.5[v]
     " -map "[v]" -map 1:a -t 3 -shortest \
@@ -59,7 +59,7 @@ $FF -i "$SRC" \
       drawtext=fontfile=font-reg.ttf:text='Commit, push, pull. GitHub plus GitLab.':fontcolor=${MUTED}:fontsize=26:x=70:y=h-42:enable='between(t,11.0,14.0)',
       drawtext=fontfile=font-bold.ttf:text='60 UI languages':fontcolor=${TEXT}:fontsize=44:x=70:y=h-90:enable='between(t,14.0,30.4)',
       drawtext=fontfile=font-reg.ttf:text='Arabic. Mandarin. Hindi. Right-to-left ready.':fontcolor=${MUTED}:fontsize=26:x=70:y=h-42:enable='between(t,14.0,30.4)',
-      drawtext=fontfile=font-bold.ttf:text='Duckle':fontcolor=${ACCENT}:fontsize=22:x=w-tw-30:y=30
+      drawtext=fontfile=font-bold.ttf:text='Quilt':fontcolor=${ACCENT}:fontsize=22:x=w-tw-30:y=30
     " -c:v libx264 -pix_fmt yuv420p -preset medium -crf 18 \
     -c:a aac -b:a 128k -ar ${SR} -ac 2 "$TMP/body.mp4"
 
@@ -70,9 +70,9 @@ $FF -f lavfi -i "color=c=${BG}:s=${W}x${H}:r=${FPS}:d=4" \
     -filter_complex "
       [2:v]scale=260:260[lg];
       [0:v][lg]overlay=(W-w)/2:(H-h)/2-200,
-      drawtext=fontfile=font-bold.ttf:text='Duckle':fontcolor=${TEXT}:fontsize=80:x=(w-tw)/2:y=h/2+90,
+      drawtext=fontfile=font-bold.ttf:text='Quilt':fontcolor=${TEXT}:fontsize=80:x=(w-tw)/2:y=h/2+90,
       drawtext=fontfile=font-reg.ttf:text='Free  /  Open source  /  Local-first':fontcolor=${MUTED}:fontsize=32:x=(w-tw)/2:y=h/2+200,
-      drawtext=fontfile=font-bold.ttf:text='github.com/SouravRoy-ETL/duckle':fontcolor=${ACCENT}:fontsize=40:x=(w-tw)/2:y=h/2+280,
+      drawtext=fontfile=font-bold.ttf:text='github.com/dwickyfp/Quilt':fontcolor=${ACCENT}:fontsize=40:x=(w-tw)/2:y=h/2+280,
       fade=t=in:st=0:d=0.4,fade=t=out:st=3.5:d=0.5[v]
     " -map "[v]" -map 1:a -t 4 -shortest \
     -c:v libx264 -pix_fmt yuv420p -preset medium -crf 18 \

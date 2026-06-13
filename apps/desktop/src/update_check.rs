@@ -1,13 +1,13 @@
-//! "Update available" check against Duckle's own GitHub releases.
+//! "Update available" check against Quilt's own GitHub releases.
 //!
-//! The binary is stamped at build time with `DUCKLE_BUILD_EPOCH` (see
+//! The binary is stamped at build time with `QUILT_BUILD_EPOCH` (see
 //! build.rs). On launch the frontend calls `check_for_update`, which fetches
 //! the most recent release carrying this OS/arch asset and compares that
 //! asset's upload time to the running build. A newer asset (by more than a
 //! margin that covers the build->upload delay) means a re-roll or a new tag is
 //! out, so the frontend shows a dismissible "upgrade" banner with a download
 //! link. This catches BOTH new release tags AND re-uploaded binaries on the
-//! same tag (Duckle re-rolls assets onto the hotfix tag without moving it).
+//! same tag (Quilt re-rolls assets onto the hotfix tag without moving it).
 //!
 //! Distribution is raw executables (no installer / signed-update channel), so
 //! this is a check-and-prompt, not a silent self-replacing updater - the user
@@ -16,9 +16,9 @@
 use serde::Serialize;
 use std::time::Duration;
 
-/// Duckle's own repository - the source of releases to check against (NOT the
+/// Quilt's own repository - the source of releases to check against (NOT the
 /// user's workspace remote).
-const REPO: &str = "SouravRoy-ETL/duckle";
+const REPO: &str = "dwickyfp/Quilt";
 
 /// An asset must be newer than the running build by at least this much to count
 /// as an update. The release job runs ~14 min before its asset is uploaded, so
@@ -67,12 +67,12 @@ impl UpdateInfo {
 /// .github/workflows/release.yml.
 fn os_asset() -> Option<&'static str> {
     match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("windows", "x86_64") => Some("Duckle-windows-x64.exe"),
-        ("windows", "aarch64") => Some("Duckle-windows-arm64.exe"),
-        ("macos", "x86_64") => Some("Duckle-macos-x64"),
-        ("macos", "aarch64") => Some("Duckle-macos-arm64"),
-        ("linux", "x86_64") => Some("Duckle-linux-x64"),
-        ("linux", "aarch64") => Some("Duckle-linux-arm64"),
+        ("windows", "x86_64") => Some("Quilt-windows-x64.exe"),
+        ("windows", "aarch64") => Some("Quilt-windows-arm64.exe"),
+        ("macos", "x86_64") => Some("Quilt-macos-x64"),
+        ("macos", "aarch64") => Some("Quilt-macos-arm64"),
+        ("linux", "x86_64") => Some("Quilt-linux-x64"),
+        ("linux", "aarch64") => Some("Quilt-linux-arm64"),
         _ => None,
     }
 }
@@ -80,7 +80,7 @@ fn os_asset() -> Option<&'static str> {
 /// Build time stamped by build.rs (0 when un-stamped, e.g. older binaries or a
 /// dev build that never re-ran the script).
 fn build_epoch() -> i64 {
-    option_env!("DUCKLE_BUILD_EPOCH")
+    option_env!("QUILT_BUILD_EPOCH")
         .and_then(|s| s.parse().ok())
         .unwrap_or(0)
 }
@@ -111,9 +111,9 @@ pub fn check() -> UpdateInfo {
     // List releases (newest first) rather than /releases/latest so prereleases
     // and same-tag re-rolls are both visible.
     let url = format!("https://api.github.com/repos/{REPO}/releases?per_page=10");
-    let resp = duckle_duckdb_engine::tls::http_agent()
+    let resp = quilt_duckdb_engine::tls::http_agent()
         .get(&url)
-        .set("User-Agent", "duckle-app")
+        .set("User-Agent", "quilt-app")
         .set("Accept", "application/vnd.github+json")
         .timeout(Duration::from_secs(8))
         .call();

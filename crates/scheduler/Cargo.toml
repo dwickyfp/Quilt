@@ -1,6 +1,6 @@
 [package]
-name = "duckle-scheduler"
-description = "Time- and event-driven pipeline scheduling for Duckle."
+name = "quilt-scheduler"
+description = "Time- and event-driven pipeline scheduling for Quilt."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -19,7 +19,7 @@ uuid = { workspace = true }
 tracing = { workspace = true }
 notify = "8"
 notify-debouncer-mini = "0.6"
-duckle-duckdb-engine = { workspace = true }
+quilt-duckdb-engine = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.10"

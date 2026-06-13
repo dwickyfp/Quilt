@@ -1,4 +1,4 @@
-//! Tool, resource and prompt implementations for the Duckle MCP server.
+//! Tool, resource and prompt implementations for the Quilt MCP server.
 //!
 //! Tools return their structured result as a single pretty-printed JSON text
 //! content block (the universally supported MCP content type); a tool failure
@@ -6,14 +6,14 @@
 //! can read and react to it.
 
 use crate::catalog;
-use duckle_duckdb_engine::{compile_pipeline_sql, DuckdbEngine, PipelineDoc};
+use quilt_duckdb_engine::{compile_pipeline_sql, DuckdbEngine, PipelineDoc};
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Sent to the client on initialize: a compact operating guide.
 pub const INSTRUCTIONS: &str = "\
-Duckle MCP: generate, validate, run and build Duckle ETL pipelines.
+Quilt MCP: generate, validate, run and build Quilt ETL pipelines.
 
 A pipeline is JSON: { \"name\", \"nodes\": [...], \"edges\": [...] }.
 - node: { \"id\": \"n1\", \"type\": \"source|transform|sink\", \"position\": {\"x\":0,\"y\":0}, \
@@ -26,7 +26,7 @@ component's property keys, then create_pipeline (it validates before writing). U
 validate_pipeline to compile-check without running and run_pipeline to execute headlessly. \
 Never hardcode secrets: use ${ENV:KEY} placeholders in properties and supply the value via \
 the environment at run time. run_pipeline and build_pipeline need a DuckDB binary \
-(DUCKLE_DUCKDB_BIN env or a 'duckdb' arg); build_pipeline also needs the duckle-runner binary.";
+(QUILT_DUCKDB_BIN env or a 'duckdb' arg); build_pipeline also needs the quilt-runner binary.";
 
 // ---------------------------------------------------------------------------
 // tools/list
@@ -35,7 +35,7 @@ the environment at run time. run_pipeline and build_pipeline need a DuckDB binar
 pub fn list_tools() -> Value {
     json!([
         tool("list_components",
-            "List Duckle components (sources, transforms, sinks, control, quality, custom code). Optionally filter by kind or a search query.",
+            "List Quilt components (sources, transforms, sinks, control, quality, custom code). Optionally filter by kind or a search query.",
             json!({ "type": "object", "properties": {
                 "kind": { "type": "string", "enum": ["source","transform","sink","control","quality","custom"], "description": "Filter to one kind." },
                 "query": { "type": "string", "description": "Case-insensitive substring over id/label/summary." }
@@ -65,7 +65,7 @@ pub fn list_tools() -> Value {
             json!({ "type": "object", "properties": {
                 "pipeline": { "type": "object" },
                 "path": { "type": "string" },
-                "duckdb": { "type": "string", "description": "Path to the DuckDB CLI. Defaults to DUCKLE_DUCKDB_BIN or 'duckdb' on PATH." },
+                "duckdb": { "type": "string", "description": "Path to the DuckDB CLI. Defaults to QUILT_DUCKDB_BIN or 'duckdb' on PATH." },
                 "workspace": { "type": "string", "description": "Workspace root for run logs + child-job resolution." }
             }})),
         tool("list_pipelines",
@@ -87,13 +87,13 @@ pub fn list_tools() -> Value {
                 "tail": { "type": "integer", "description": "Number of trailing lines. Default 100." }
             }, "required": ["pipelineName"] })),
         tool("build_pipeline",
-            "Build a pipeline into ONE self-contained executable for server deployment (the Talend Build Job equivalent). Needs the duckle-runner binary (DUCKLE_RUNNER_BIN or on PATH).",
+            "Build a pipeline into ONE self-contained executable for server deployment (the Talend Build Job equivalent). Needs the quilt-runner binary (QUILT_RUNNER_BIN or on PATH).",
             json!({ "type": "object", "properties": {
                 "pipeline": { "type": "object" },
                 "path": { "type": "string" },
                 "name": { "type": "string", "description": "Display/file name for the artifact." },
                 "out": { "type": "string", "description": "Output artifact file path." },
-                "secrets": { "type": "string", "enum": ["env","passphrase"], "description": "Secret delivery mode. Default env. Passphrase needs DUCKLE_BUNDLE_PASSPHRASE." },
+                "secrets": { "type": "string", "enum": ["env","passphrase"], "description": "Secret delivery mode. Default env. Passphrase needs QUILT_BUNDLE_PASSPHRASE." },
                 "duckdb": { "type": "string" }
             }, "required": ["out"] })),
         tool("list_connections",
@@ -231,11 +231,11 @@ fn t_run_pipeline(args: &Value) -> Result<Value, String> {
     let (v, name) = load_pipeline_value(args)?;
     let doc = to_doc(&v)?;
     let duckdb = resolve_duckdb(arg_str(args, "duckdb"))
-        .ok_or("no DuckDB binary found; set DUCKLE_DUCKDB_BIN or pass 'duckdb'")?;
-    std::env::set_var("DUCKLE_DUCKDB_BIN", &duckdb);
+        .ok_or("no DuckDB binary found; set QUILT_DUCKDB_BIN or pass 'duckdb'")?;
+    std::env::set_var("QUILT_DUCKDB_BIN", &duckdb);
     if let Some(ws) = arg_str(args, "workspace") {
-        std::env::set_var("DUCKLE_WORKSPACE", ws);
-        std::env::set_var("DUCKLE_LOG_DIR", std::path::Path::new(ws).join("logs"));
+        std::env::set_var("QUILT_WORKSPACE", ws);
+        std::env::set_var("QUILT_LOG_DIR", std::path::Path::new(ws).join("logs"));
     }
 
     let engine = DuckdbEngine::new(duckdb);
@@ -320,12 +320,12 @@ fn t_build_pipeline(args: &Value) -> Result<Value, String> {
     let name = arg_str(args, "name").unwrap_or(&default_name).to_string();
 
     let runner = resolve_runner().ok_or(
-        "duckle-runner binary not found; set DUCKLE_RUNNER_BIN or put duckle-runner on PATH / next to duckle-mcp",
+        "quilt-runner binary not found; set QUILT_RUNNER_BIN or put quilt-runner on PATH / next to quilt-mcp",
     )?;
 
-    // Synthesize the minimal workspace layout `duckle-runner build` understands.
+    // Synthesize the minimal workspace layout `quilt-runner build` understands.
     let ws = std::env::temp_dir().join(format!(
-        "duckle-mcp-build-{}-{}",
+        "quilt-mcp-build-{}-{}",
         sanitize_filename(&name),
         std::process::id()
     ));
@@ -362,7 +362,7 @@ fn t_build_pipeline(args: &Value) -> Result<Value, String> {
     if let Some(d) = arg_str(args, "duckdb") {
         cmd.arg("--duckdb").arg(d);
     }
-    let output = cmd.output().map_err(|e| format!("spawn duckle-runner: {e}"))?;
+    let output = cmd.output().map_err(|e| format!("spawn quilt-runner: {e}"))?;
     let _ = std::fs::remove_dir_all(&ws);
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -371,7 +371,7 @@ fn t_build_pipeline(args: &Value) -> Result<Value, String> {
         Ok(json!({ "ok": true, "out": out, "secrets": secrets, "log": stderr.trim() }))
     } else {
         let detail = if stderr.trim().is_empty() { stdout } else { stderr };
-        Err(format!("duckle-runner build failed: {}", detail.trim()))
+        Err(format!("quilt-runner build failed: {}", detail.trim()))
     }
 }
 
@@ -441,8 +441,8 @@ fn t_create_connection(args: &Value) -> Result<Value, String> {
 
 pub fn list_resources() -> Value {
     json!([
-        { "uri": "duckle://catalog", "name": "Component catalog", "description": "All Duckle components with property schemas + ports.", "mimeType": "application/json" },
-        { "uri": "duckle://pipeline-format", "name": "Pipeline JSON format", "description": "The shape of a Duckle pipeline file.", "mimeType": "text/markdown" }
+        { "uri": "quilt://catalog", "name": "Component catalog", "description": "All Quilt components with property schemas + ports.", "mimeType": "application/json" },
+        { "uri": "quilt://pipeline-format", "name": "Pipeline JSON format", "description": "The shape of a Quilt pipeline file.", "mimeType": "text/markdown" }
     ])
 }
 
@@ -452,18 +452,18 @@ pub fn read_resource(params: Value) -> Result<Value, (i64, String)> {
         .and_then(|v| v.as_str())
         .ok_or((-32602, "missing 'uri'".to_string()))?;
     let (text, mime) = match uri {
-        "duckle://catalog" => (
+        "quilt://catalog" => (
             serde_json::to_string_pretty(catalog::full()).unwrap_or_else(|_| "{}".to_string()),
             "application/json",
         ),
-        "duckle://pipeline-format" => (PIPELINE_FORMAT_DOC.to_string(), "text/markdown"),
+        "quilt://pipeline-format" => (PIPELINE_FORMAT_DOC.to_string(), "text/markdown"),
         other => return Err((-32602, format!("unknown resource: {other}"))),
     };
     Ok(json!({ "contents": [ { "uri": uri, "mimeType": mime, "text": text } ] }))
 }
 
 const PIPELINE_FORMAT_DOC: &str = "\
-# Duckle pipeline format
+# Quilt pipeline format
 
 ```json
 {
@@ -496,7 +496,7 @@ const PIPELINE_FORMAT_DOC: &str = "\
 
 pub fn list_prompts() -> Value {
     json!([
-        { "name": "generate_pipeline", "description": "Generate a Duckle pipeline from a plain-English goal.",
+        { "name": "generate_pipeline", "description": "Generate a Quilt pipeline from a plain-English goal.",
           "arguments": [ { "name": "goal", "description": "What the pipeline should do.", "required": true } ] }
     ])
 }
@@ -515,7 +515,7 @@ pub fn get_prompt(params: Value) -> Result<Value, (i64, String)> {
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let text = format!(
-        "Build a Duckle pipeline that: {goal}\n\nFirst call list_components and \
+        "Build a Quilt pipeline that: {goal}\n\nFirst call list_components and \
 get_component_schema to choose components and property keys. Then call create_pipeline \
 to write and validate it. Keep credentials as ${{ENV:KEY}} placeholders. {INSTRUCTIONS}"
     );
@@ -576,7 +576,7 @@ fn resolve_duckdb(explicit: Option<&str>) -> Option<PathBuf> {
             return Some(pb);
         }
     }
-    if let Ok(env) = std::env::var("DUCKLE_DUCKDB_BIN") {
+    if let Ok(env) = std::env::var("QUILT_DUCKDB_BIN") {
         let pb = PathBuf::from(env);
         if pb.exists() {
             return Some(pb);
@@ -596,7 +596,7 @@ fn resolve_duckdb(explicit: Option<&str>) -> Option<PathBuf> {
 }
 
 fn resolve_runner() -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("DUCKLE_RUNNER_BIN") {
+    if let Ok(p) = std::env::var("QUILT_RUNNER_BIN") {
         let pb = PathBuf::from(p);
         if pb.exists() {
             return Some(pb);
@@ -604,7 +604,7 @@ fn resolve_runner() -> Option<PathBuf> {
     }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            for c in ["duckle-runner", "duckle-runner.exe"] {
+            for c in ["quilt-runner", "quilt-runner.exe"] {
                 let pb = dir.join(c);
                 if pb.exists() {
                     return Some(pb);
@@ -613,9 +613,9 @@ fn resolve_runner() -> Option<PathBuf> {
         }
     }
     Some(PathBuf::from(if cfg!(windows) {
-        "duckle-runner.exe"
+        "quilt-runner.exe"
     } else {
-        "duckle-runner"
+        "quilt-runner"
     }))
 }
 

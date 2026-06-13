@@ -2639,7 +2639,7 @@
                 "key": "oracleRuntimeNote",
                 "label": "Heads-up",
                 "kind": "text",
-                "description": "Oracle support is built into Duckle. Users only need Oracle Instant Client (libclntsh.so / OCI.dll / libclntsh.dylib) on the library path at runtime. If it is missing the executor surfaces a clear loader error."
+                "description": "Oracle support is built into Quilt. Users only need Oracle Instant Client (libclntsh.so / OCI.dll / libclntsh.dylib) on the library path at runtime. If it is missing the executor surfaces a clear loader error."
               }
             ]
           }
@@ -5660,7 +5660,7 @@
                 "key": "groupId",
                 "label": "Consumer group",
                 "kind": "text",
-                "placeholder": "duckle-group"
+                "placeholder": "quilt-group"
               },
               {
                 "key": "offset",
@@ -5827,7 +5827,7 @@
                 "key": "groupId",
                 "label": "Consumer group",
                 "kind": "text",
-                "placeholder": "duckle-group"
+                "placeholder": "quilt-group"
               },
               {
                 "key": "offset",
@@ -5994,7 +5994,7 @@
                 "key": "groupId",
                 "label": "Consumer group",
                 "kind": "text",
-                "placeholder": "duckle-group"
+                "placeholder": "quilt-group"
               },
               {
                 "key": "offset",
@@ -6161,7 +6161,7 @@
                 "key": "groupId",
                 "label": "Consumer group",
                 "kind": "text",
-                "placeholder": "duckle-group"
+                "placeholder": "quilt-group"
               },
               {
                 "key": "offset",
@@ -6328,7 +6328,7 @@
                 "key": "groupId",
                 "label": "Consumer group",
                 "kind": "text",
-                "placeholder": "duckle-group"
+                "placeholder": "quilt-group"
               },
               {
                 "key": "offset",
@@ -6495,7 +6495,7 @@
                 "key": "groupId",
                 "label": "Consumer group",
                 "kind": "text",
-                "placeholder": "duckle-group"
+                "placeholder": "quilt-group"
               },
               {
                 "key": "offset",
@@ -6662,7 +6662,7 @@
                 "key": "groupId",
                 "label": "Consumer group",
                 "kind": "text",
-                "placeholder": "duckle-group"
+                "placeholder": "quilt-group"
               },
               {
                 "key": "offset",
@@ -6829,7 +6829,7 @@
                 "key": "groupId",
                 "label": "Consumer group",
                 "kind": "text",
-                "placeholder": "duckle-group"
+                "placeholder": "quilt-group"
               },
               {
                 "key": "offset",
@@ -26291,7 +26291,7 @@
                 "key": "oracleRuntimeNote",
                 "label": "Heads-up",
                 "kind": "text",
-                "description": "Oracle support is built into Duckle. Users only need Oracle Instant Client (libclntsh.so / OCI.dll / libclntsh.dylib) on the library path at runtime. If it is missing the executor surfaces a clear loader error."
+                "description": "Oracle support is built into Quilt. Users only need Oracle Instant Client (libclntsh.so / OCI.dll / libclntsh.dylib) on the library path at runtime. If it is missing the executor surfaces a clear loader error."
               }
             ]
           }
@@ -32312,7 +32312,7 @@
                 "kind": "text",
                 "required": true,
                 "placeholder": "Processed {rows} rows",
-                "description": "Use {rows} for the upstream row count. Written to the workspace run log (logs/duckle.jsonl)."
+                "description": "Use {rows} for the upstream row count. Written to the workspace run log (logs/quilt.jsonl)."
               }
             ]
           }
@@ -32373,7 +32373,7 @@
                 "kind": "text",
                 "required": true,
                 "placeholder": "Unexpected {rows} rows",
-                "description": "Use {rows} for the upstream row count. Written to the workspace run log (logs/duckle.jsonl)."
+                "description": "Use {rows} for the upstream row count. Written to the workspace run log (logs/quilt.jsonl)."
               }
             ]
           }
@@ -34255,7 +34255,7 @@
       "label": "dbt",
       "kind": "transform",
       "availability": "available",
-      "summary": "Run dbt against the pipeline's DuckDB database. Either write one inline model right here (reference the upstream node as {{ var('duckle_input') }}), or set `projectDir` to an existing dbt project (folder with dbt_project.yml). The engine generates the dbt-duckdb profiles.yml automatically, so models read upstream node tables and downstream nodes read the models dbt builds. Set `command` (default `run`); optional `outputModel` reads a built model back as the node output. dbt is set up automatically on first launch, so no manual install is needed.",
+      "summary": "Run dbt against the pipeline's DuckDB database. Either write one inline model right here (reference the upstream node as {{ var('quilt_input') }}), or set `projectDir` to an existing dbt project (folder with dbt_project.yml). The engine generates the dbt-duckdb profiles.yml automatically, so models read upstream node tables and downstream nodes read the models dbt builds. Set `command` (default `run`); optional `outputModel` reads a built model back as the node output. dbt is set up automatically on first launch, so no manual install is needed.",
       "ports": {
         "inputs": [
           {
@@ -34282,7 +34282,7 @@
         "id": "xf.dbt",
         "kind": "transform",
         "label": "dbt",
-        "description": "Run dbt against the pipeline's DuckDB database. Either write one inline model right here (reference the upstream node as {{ var('duckle_input') }}), or set `projectDir` to an existing dbt project (folder with dbt_project.yml). The engine generates the dbt-duckdb profiles.yml automatically, so models read upstream node tables and downstream nodes read the models dbt builds. Set `command` (default `run`); optional `outputModel` reads a built model back as the node output. dbt is set up automatically on first launch, so no manual install is needed.",
+        "description": "Run dbt against the pipeline's DuckDB database. Either write one inline model right here (reference the upstream node as {{ var('quilt_input') }}), or set `projectDir` to an existing dbt project (folder with dbt_project.yml). The engine generates the dbt-duckdb profiles.yml automatically, so models read upstream node tables and downstream nodes read the models dbt builds. Set `command` (default `run`); optional `outputModel` reads a built model back as the node output. dbt is set up automatically on first launch, so no manual install is needed.",
         "schemaSource": "autodetect",
         "sections": [
           {
@@ -34293,14 +34293,14 @@
                 "label": "Model SQL",
                 "kind": "textarea",
                 "rows": 8,
-                "placeholder": "select country, sum(amount) as revenue\nfrom {{ var('duckle_input') }}\ngroup by country",
-                "description": "Write one dbt model right here - no external project needed. Reference the upstream node with {{ var('duckle_input') }}. The engine scaffolds an ephemeral dbt project and runs it. Leave empty to use an existing project below instead."
+                "placeholder": "select country, sum(amount) as revenue\nfrom {{ var('quilt_input') }}\ngroup by country",
+                "description": "Write one dbt model right here - no external project needed. Reference the upstream node with {{ var('quilt_input') }}. The engine scaffolds an ephemeral dbt project and runs it. Leave empty to use an existing project below instead."
               },
               {
                 "key": "modelName",
                 "label": "Model name",
                 "kind": "text",
-                "defaultValue": "duckle_model",
+                "defaultValue": "quilt_model",
                 "description": "Name of the inline model and its output table."
               }
             ]

@@ -1,5 +1,5 @@
 @echo off
-REM Produce a packaged Duckle build: compiles the frontend, bundles it
+REM Produce a packaged Quilt build: compiles the frontend, bundles it
 REM INTO the app (no localhost / Vite dependency), and emits the
 REM installer + standalone exe under
 REM   apps\desktop\target\release\bundle\

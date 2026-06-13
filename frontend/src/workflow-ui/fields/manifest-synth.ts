@@ -1022,7 +1022,7 @@ function synthDbSource(comp: ComponentDef): ComponentManifest {
                         key: 'oracleRuntimeNote',
                         label: 'Heads-up',
                         kind: 'text',
-                        description: 'Oracle support is built into Duckle. Users only need Oracle Instant Client (libclntsh.so / OCI.dll / libclntsh.dylib) on the library path at runtime. If it is missing the executor surfaces a clear loader error.',
+                        description: 'Oracle support is built into Quilt. Users only need Oracle Instant Client (libclntsh.so / OCI.dll / libclntsh.dylib) on the library path at runtime. If it is missing the executor surfaces a clear loader error.',
                     },
                 ],
             },
@@ -1075,7 +1075,7 @@ function synthDbSource(comp: ComponentDef): ComponentManifest {
 
 function synthDbSink(comp: ComponentDef): ComponentManifest {
     // Embedded file databases (SQLite / DuckDB). These attach a local file as
-    // duckle_dst and write a table into it - they have no host/account, so the
+    // quilt_dst and write a table into it - they have no host/account, so the
     // generic network-DB fallback below would show the wrong fields. The engine
     // (build_db_sink) supports overwrite / append / upsert here, so surface the
     // full upsert mode picker, not just overwrite (issue #19).
@@ -1137,7 +1137,7 @@ function synthDbSink(comp: ComponentDef): ComponentManifest {
                         key: 'oracleRuntimeNote',
                         label: 'Heads-up',
                         kind: 'text',
-                        description: 'Oracle support is built into Duckle. Users only need Oracle Instant Client (libclntsh.so / OCI.dll / libclntsh.dylib) on the library path at runtime. If it is missing the executor surfaces a clear loader error.',
+                        description: 'Oracle support is built into Quilt. Users only need Oracle Instant Client (libclntsh.so / OCI.dll / libclntsh.dylib) on the library path at runtime. If it is missing the executor surfaces a clear loader error.',
                     },
                 ],
             },
@@ -1734,7 +1734,7 @@ function synthStreamingSource(comp: ComponentDef): ComponentManifest {
                     placeholder: 'broker1:9092,broker2:9092',
                 },
                 { key: 'topic', label: 'Topic', kind: 'text', required: true },
-                { key: 'groupId', label: 'Consumer group', kind: 'text', placeholder: 'duckle-group' },
+                { key: 'groupId', label: 'Consumer group', kind: 'text', placeholder: 'quilt-group' },
                 {
                     key: 'offset',
                     label: 'Initial offset',
@@ -3623,7 +3623,7 @@ function synthLoggingControl(comp: ComponentDef): ComponentManifest {
                         kind: 'text',
                         required: true,
                         placeholder: isWarn ? 'Unexpected {rows} rows' : 'Processed {rows} rows',
-                        description: 'Use {rows} for the upstream row count. Written to the workspace run log (logs/duckle.jsonl).',
+                        description: 'Use {rows} for the upstream row count. Written to the workspace run log (logs/quilt.jsonl).',
                     },
                 ],
             },
@@ -4505,14 +4505,14 @@ function synthDbt(comp: ComponentDef): ComponentManifest {
                     kind: 'textarea',
                     rows: 8,
                     placeholder:
-                        "select country, sum(amount) as revenue\nfrom {{ var('duckle_input') }}\ngroup by country",
-                    description: "Write one dbt model right here - no external project needed. Reference the upstream node with {{ var('duckle_input') }}. The engine scaffolds an ephemeral dbt project and runs it. Leave empty to use an existing project below instead.",
+                        "select country, sum(amount) as revenue\nfrom {{ var('quilt_input') }}\ngroup by country",
+                    description: "Write one dbt model right here - no external project needed. Reference the upstream node with {{ var('quilt_input') }}. The engine scaffolds an ephemeral dbt project and runs it. Leave empty to use an existing project below instead.",
                 },
                 {
                     key: 'modelName',
                     label: 'Model name',
                     kind: 'text',
-                    defaultValue: 'duckle_model',
+                    defaultValue: 'quilt_model',
                     description: 'Name of the inline model and its output table.',
                 },
             ],

@@ -1,20 +1,20 @@
 [package]
-name = "duckle-runner"
+name = "quilt-runner"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
-# Lean, no-GUI headless runner: executes a Duckle pipeline file through the
+# Lean, no-GUI headless runner: executes a Quilt pipeline file through the
 # DuckDB engine. Bundled into "Build Pipeline" artifacts so a pipeline runs
 # standalone on a server (cron / systemd / Task Scheduler), no desktop app.
 [[bin]]
-name = "duckle-runner"
+name = "quilt-runner"
 path = "src/main.rs"
 
 [dependencies]
-duckle-duckdb-engine = { workspace = true }
+quilt-duckdb-engine = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 regex = "1"

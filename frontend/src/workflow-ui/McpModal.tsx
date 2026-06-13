@@ -14,11 +14,11 @@ import {
 type Busy = null | 'claude_code' | 'claude_desktop' | 'cursor';
 
 // A simple read-only prompt the user can paste to confirm the connection.
-const SAMPLE_PROMPT = 'Use duckle to list the available components';
+const SAMPLE_PROMPT = 'Use quilt to list the available components';
 
 /**
- * Compact popup that connects Duckle to an MCP-capable AI (Claude Code,
- * Claude Desktop, Cursor, etc.). It bundles the duckle-mcp server with the
+ * Compact popup that connects Quilt to an MCP-capable AI (Claude Code,
+ * Claude Desktop, Cursor, etc.). It bundles the quilt-mcp server with the
  * real resolved paths filled in: one-click connect buttons per client, with
  * the raw command + config tucked into collapsible sections.
  */
@@ -80,7 +80,7 @@ export function McpModal({ onClose }: { onClose: () => void }) {
                 <div className="modal-header">
                     <div className="modal-title">
                         <ClaudeIcon size={16} className="claude-icon claude-icon-glow" />
-                        <span style={{ marginLeft: 8 }}>Connect Duckle to Claude</span>
+                        <span style={{ marginLeft: 8 }}>Connect Quilt to Claude</span>
                     </div>
                     <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
                         <X size={16} />
@@ -95,7 +95,7 @@ export function McpModal({ onClose }: { onClose: () => void }) {
                     ) : (
                         <>
                             <p className="mcp-muted">
-                                Duckle ships a Model Context Protocol (MCP) server, so Claude can
+                                Quilt ships a Model Context Protocol (MCP) server, so Claude can
                                 generate, validate, run and build your pipelines for you - right in
                                 this workspace.
                             </p>
@@ -103,7 +103,7 @@ export function McpModal({ onClose }: { onClose: () => void }) {
                             {!info.bundled && (
                                 <p className="mcp-warn">
                                     This build does not bundle the MCP server. Build it with
-                                    <code> cargo build -p duckle-mcp --release</code> and point your client at it.
+                                    <code> cargo build -p quilt-mcp --release</code> and point your client at it.
                                 </p>
                             )}
                             {info.bundled && !info.duckdbFound && (
@@ -179,7 +179,7 @@ export function McpModal({ onClose }: { onClose: () => void }) {
                                         {copied === 'json' ? <><Check size={12} /> Copied</> : <><Clipboard size={12} /> Copy config</>}
                                     </button>
                                 </div>
-                                <p className="mcp-hint">Adds a "duckle" entry to the client's config. For any other client, copy the config.</p>
+                                <p className="mcp-hint">Adds a "quilt" entry to the client's config. For any other client, copy the config.</p>
                                 <details className="mcp-disclose">
                                     <summary>Show config</summary>
                                     <pre className="mcp-code mcp-pre">{info.configJson}</pre>

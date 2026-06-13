@@ -19,7 +19,7 @@ pub(crate) fn strip_reject_suffix(s: &str) -> &str {
 pub(crate) fn derive_output_columns(
     component_id: Option<&str>,
     props: Option<&JsonValue>,
-    declared: Option<&[duckle_metadata::Column]>,
+    declared: Option<&[quilt_metadata::Column]>,
     upstream: Option<&HashSet<String>>,
 ) -> Option<HashSet<String>> {
     // A source contributes its declared schema (if the user set one
@@ -585,7 +585,7 @@ pub(crate) fn canonical_port(p: &str) -> &str {
 /// xf.dbt is multi-input: every wired upstream source is materialized as a
 /// real table named by its node id, and the dbt project reads them all via
 /// `sources` (cross-system modeling). The first edge is also exposed as
-/// var('duckle_input') for the single-source / inline case.
+/// var('quilt_input') for the single-source / inline case.
 pub(crate) fn is_multi_main_component(component_id: &str) -> bool {
     matches!(
         component_id,

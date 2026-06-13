@@ -25,11 +25,11 @@ it is safe to paste). For a connector issue, the target type matters
 
 ## Environment
 
-- Duckle version / release tag:
+- Quilt version / release tag:
 - OS + architecture (e.g. Windows 11 x64, macOS arm64):
 - For a database connector: which DB and version (e.g. Oracle 21c XE, SQL Server 2022):
 
 ## Logs / error text
 
 <!-- Paste the full error. For a hung run, the contents of any
-%TEMP%/duckle-*.log file help. -->
+%TEMP%/quilt-*.log file help. -->

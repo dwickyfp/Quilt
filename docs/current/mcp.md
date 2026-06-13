@@ -1,8 +1,8 @@
-# MCP server (connect any LLM to Duckle)
+# MCP server (connect any LLM to Quilt)
 
-`duckle-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
+`quilt-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
 server. It lets any MCP client - Claude Desktop, Claude Code, or any other LLM
-agent that speaks MCP - drive Duckle directly: browse the component catalog,
+agent that speaks MCP - drive Quilt directly: browse the component catalog,
 generate a pipeline straight into a folder you choose, validate it, run it, read
 existing pipelines and their run logs, build a standalone artifact, and manage
 saved connections.
@@ -15,25 +15,25 @@ in-process, so there is no GUI and no Node runtime involved at run time.
 ## 1. Build it
 
 ```bash
-cargo build -p duckle-mcp --release
-# binary at target/release/duckle-mcp (.exe on Windows)
+cargo build -p quilt-mcp --release
+# binary at target/release/quilt-mcp (.exe on Windows)
 ```
 
 The server has no network dependencies and embeds the full component catalog at
 build time. To run and build pipelines it needs two binaries it locates at run
 time:
 
-- **DuckDB CLI** - for `run_pipeline` and `build_pipeline`. Point `DUCKLE_DUCKDB_BIN`
+- **DuckDB CLI** - for `run_pipeline` and `build_pipeline`. Point `QUILT_DUCKDB_BIN`
   at it (or pass `duckdb` per call, or have `duckdb` on PATH).
-- **duckle-runner** - for `build_pipeline` only. Point `DUCKLE_RUNNER_BIN` at a
-  `duckle-runner` binary (or have it on PATH / next to `duckle-mcp`). Use a
+- **quilt-runner** - for `build_pipeline` only. Point `QUILT_RUNNER_BIN` at a
+  `quilt-runner` binary (or have it on PATH / next to `quilt-mcp`). Use a
   release-profile runner so built artifacts stay small.
 
 ---
 
 ## 2. Connect a client
 
-**Easiest:** in Duckle, click the **MCP** button (robot icon) in the designer
+**Easiest:** in Quilt, click the **MCP** button (robot icon) in the designer
 top bar. The popup bundles the server, fills in the real paths, and offers a
 one-click **Connect to Claude Code** plus copy buttons for the command and the
 mcpServers config. The steps below are the manual equivalent (or for a server
@@ -42,14 +42,14 @@ built from source).
 ### Claude Code
 
 ```bash
-claude mcp add duckle -- /path/to/duckle-mcp
+claude mcp add quilt -- /path/to/quilt-mcp
 ```
 
 Set the engine paths in the environment Claude Code launches the server with, or
 inline:
 
 ```bash
-claude mcp add duckle --env DUCKLE_DUCKDB_BIN=/path/to/duckdb --env DUCKLE_RUNNER_BIN=/path/to/duckle-runner -- /path/to/duckle-mcp
+claude mcp add quilt --env QUILT_DUCKDB_BIN=/path/to/duckdb --env QUILT_RUNNER_BIN=/path/to/quilt-runner -- /path/to/quilt-mcp
 ```
 
 ### Claude Desktop (and other clients using the standard config)
@@ -59,11 +59,11 @@ Add to the client's `mcpServers` config:
 ```json
 {
   "mcpServers": {
-    "duckle": {
-      "command": "/path/to/duckle-mcp",
+    "quilt": {
+      "command": "/path/to/quilt-mcp",
       "env": {
-        "DUCKLE_DUCKDB_BIN": "/path/to/duckdb",
-        "DUCKLE_RUNNER_BIN": "/path/to/duckle-runner"
+        "QUILT_DUCKDB_BIN": "/path/to/duckdb",
+        "QUILT_RUNNER_BIN": "/path/to/quilt-runner"
       }
     }
   }
@@ -88,8 +88,8 @@ Add to the client's `mcpServers` config:
 | `list_connections` | List the workspace's saved connections (secret fields masked). |
 | `create_connection` | Create a saved connection JSON so pipelines can reference its fields. |
 
-Also exposed: resources `duckle://catalog` (the full catalog) and
-`duckle://pipeline-format`, and a `generate_pipeline` prompt.
+Also exposed: resources `quilt://catalog` (the full catalog) and
+`quilt://pipeline-format`, and a `generate_pipeline` prompt.
 
 ---
 
@@ -134,7 +134,7 @@ then a `secrets.env` file, then an encrypted `secrets.enc`. See
 ## 5. Regenerating the catalog
 
 The component catalog the server embeds is exported from the frontend manifest
-(the single source of truth) into `crates/duckle-mcp/catalog.json`:
+(the single source of truth) into `crates/quilt-mcp/catalog.json`:
 
 ```bash
 npm --prefix frontend run export-catalog

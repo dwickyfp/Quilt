@@ -1,7 +1,7 @@
 //! Structured, component-level run logging for external observability
 //! (Splunk / Dynatrace), at log4j-style depth.
 //!
-//! When `DUCKLE_LOG_DIR` is set (the desktop points it at the user's
+//! When `QUILT_LOG_DIR` is set (the desktop points it at the user's
 //! `<workspace>/logs`), every pipeline run appends NDJSON lines to
 //! `<pipeline name>/runtime.log` under that directory - one JSON object per
 //! line, which is exactly what log shippers expect, so a user can tail the
@@ -33,7 +33,7 @@ pub(crate) struct NodeMeta {
     pub label: String,
 }
 
-/// Appends structured run events to `$DUCKLE_LOG_DIR/duckle.jsonl`. A no-op
+/// Appends structured run events to `$QUILT_LOG_DIR/quilt.jsonl`. A no-op
 /// when the env var is unset (tests, headless runs without a workspace).
 pub(crate) struct RunLog {
     file: Option<File>,
@@ -43,17 +43,17 @@ pub(crate) struct RunLog {
 
 impl RunLog {
     /// Open the run log for one run. `pipeline_name` names the per-pipeline
-    /// subfolder (`<DUCKLE_LOG_DIR>/<name>/runtime.log`); `run_id` ties a
+    /// subfolder (`<QUILT_LOG_DIR>/<name>/runtime.log`); `run_id` ties a
     /// run's lines together; `nodes` maps node id -> component identity for
     /// enrichment. Returns a disabled logger (writes nothing) when
-    /// `DUCKLE_LOG_DIR` is absent or the file can't be opened.
+    /// `QUILT_LOG_DIR` is absent or the file can't be opened.
     pub(crate) fn open(
         pipeline_name: Option<&str>,
         run_id: String,
         nodes: HashMap<String, NodeMeta>,
     ) -> Self {
         let folder = sanitize_segment(pipeline_name.unwrap_or("pipeline"));
-        let file = std::env::var("DUCKLE_LOG_DIR")
+        let file = std::env::var("QUILT_LOG_DIR")
             .ok()
             .filter(|d| !d.is_empty())
             .and_then(|dir| {

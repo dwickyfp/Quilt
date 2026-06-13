@@ -49,6 +49,18 @@ export type ConnectionPayload = {
     notes?: string;
 };
 
+/// Secret-bearing connection fields. These are NEVER persisted into a pipeline
+/// node's properties (which are written unencrypted to pipelines/*.json and may
+/// be committed to git). A node stores only the `connectionRef` id; these
+/// fields are injected at run time from the decrypted saved connection. Keep in
+/// sync with SENSITIVE_KEYS in apps/desktop/src/secrets.rs.
+export const SECRET_CONNECTION_KEYS = [
+    'password',
+    'accessKey',
+    'secretKey',
+    'accountKey',
+] as const satisfies readonly (keyof ConnectionPayload)[];
+
 export type ContextVariable = {
     key: string;
     value: string;

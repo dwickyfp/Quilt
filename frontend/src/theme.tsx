@@ -14,7 +14,7 @@ const ThemeContext = createContext<ThemeContextValue>({
     set: () => {},
 });
 
-const STORAGE_KEY = 'duckle:theme';
+const STORAGE_KEY = 'quilt:theme';
 
 function readInitialTheme(): Theme {
     if (typeof window === 'undefined') return 'dark';

@@ -1,6 +1,6 @@
 # Scheduler & Automation
 
-Duckle includes a visual scheduling panel to automatically run pipelines at specific times, set intervals, or in response to local file modifications.
+Quilt includes a visual scheduling panel to automatically run pipelines at specific times, set intervals, or in response to local file modifications.
 
 ---
 
@@ -28,12 +28,12 @@ You can configure three visual trigger types:
 
 ### Interval Trigger
 * **Setup**: Select your frequency value (e.g., `15`) and choose a time unit dropdown (Seconds, Minutes, Hours, Days).
-* **Cadence**: Duckle schedules the next execution by adding your frequency value to the completion time of the previous run.
+* **Cadence**: Quilt schedules the next execution by adding your frequency value to the completion time of the previous run.
 
 ### File Watch Trigger
 * **Setup**: Enter an absolute path to a folder or file on your disk (e.g., `/Users/username/data/inbox`).
-* **Recursive Checkbox**: Check this box if you want Duckle to watch subdirectories.
-* **Debounce Buffer**: When changes are detected, Duckle waits **2 seconds** before triggering. This ensures that large files are fully written by other programs before the pipeline begins processing.
+* **Recursive Checkbox**: Check this box if you want Quilt to watch subdirectories.
+* **Debounce Buffer**: When changes are detected, Quilt waits **2 seconds** before triggering. This ensures that large files are fully written by other programs before the pipeline begins processing.
 
 ---
 
@@ -51,7 +51,7 @@ The Schedule Editor displays a list of saved automation configurations and their
 
 ## 4. Running Pipelines on a Server (Headless)
 
-The in-app scheduler above runs while Duckle is open. To run a pipeline on a server with no desktop app, use one of two headless paths.
+The in-app scheduler above runs while Quilt is open. To run a pipeline on a server with no desktop app, use one of two headless paths.
 
 ### Build Pipeline (single self-contained file)
 
@@ -63,7 +63,7 @@ There is no folder to copy, no `run.sh`, and no separate runner download: the de
 * **Context**: pick a context at build time; its non-secret variables are baked into the pipeline.
 * **Secrets**: choose how credentials travel:
   * **Environment**: secret values are replaced with `${ENV:KEY}` placeholders. Set the environment variables on the server, or place a `secrets.env` (KEY=VALUE lines) next to the file before running. Nothing sensitive is written into the file.
-  * **Passphrase**: secrets are encrypted inside the file. The runner decrypts them at run time from the `DUCKLE_BUNDLE_PASSPHRASE` environment variable.
+  * **Passphrase**: secrets are encrypted inside the file. The runner decrypts them at run time from the `QUILT_BUNDLE_PASSPHRASE` environment variable.
 
 Run it:
 
@@ -76,7 +76,7 @@ Run it:
 The same headless runner can also execute a single already-built pipeline JSON directly from a workspace, resolving the context the same way the app does:
 
 ```bash
-duckle-runner --pipeline "/path/to/pipeline.json" [--workspace "/path/to/workspace"] [--duckdb "/path/to/duckdb"]
+quilt-runner --pipeline "/path/to/pipeline.json" [--workspace "/path/to/workspace"] [--duckdb "/path/to/duckdb"]
 ```
 
 There is no `run` subcommand: pass the pipeline with `--pipeline` (or as a bare positional path). It exits `0` on success and non-zero on failure, and writes the same NDJSON run logs under `logs/` for Splunk / Dynatrace ingestion.
@@ -87,14 +87,14 @@ Point your operating system's scheduler at the single file directly:
 
 ```cron
 # Linux cron - run the file every day at 02:00
-0 2 * * * /opt/duckle/my_pipeline >> /var/log/my_pipeline.log 2>&1
+0 2 * * * /opt/quilt/my_pipeline >> /var/log/my_pipeline.log 2>&1
 ```
 
 ```ini
 # Linux systemd timer (my_pipeline.service + my_pipeline.timer)
 [Service]
 Type=oneshot
-ExecStart=/opt/duckle/my_pipeline
+ExecStart=/opt/quilt/my_pipeline
 ```
 
-On Windows, create a **Task Scheduler** task that runs `my_pipeline.exe`; on macOS, a **launchd** plist that runs the file. For Environment secret mode, set the secret env vars (or drop a `secrets.env` beside the file); for Passphrase mode, set `DUCKLE_BUNDLE_PASSPHRASE`.
+On Windows, create a **Task Scheduler** task that runs `my_pipeline.exe`; on macOS, a **launchd** plist that runs the file. For Environment secret mode, set the secret env vars (or drop a `secrets.env` beside the file); for Passphrase mode, set `QUILT_BUNDLE_PASSPHRASE`.

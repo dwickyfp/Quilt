@@ -8,15 +8,15 @@ import {
 import { metaFor, type ConnectionType } from './connection-types';
 import { useRunStatus } from './run-status-context';
 
-export type DuckleEdgeData = {
+export type QuiltEdgeData = {
     connectionType: ConnectionType;
     label?: string;
     condition?: string;
 };
 
-export type DuckleEdgeType = Edge<DuckleEdgeData, 'duckle'>;
+export type QuiltEdgeType = Edge<QuiltEdgeData, 'quilt'>;
 
-export default function DuckleEdge(props: EdgeProps<DuckleEdgeType>) {
+export default function QuiltEdge(props: EdgeProps<QuiltEdgeType>) {
     const {
         id,
         source,
@@ -62,7 +62,7 @@ export default function DuckleEdge(props: EdgeProps<DuckleEdgeType>) {
                 path={path}
                 markerEnd={markerEnd}
                 className={
-                    'duckle-edge' +
+                    'quilt-edge' +
                     (isFlowing ? ' is-flowing' : '') +
                     (isCompleted ? ' is-completed' : '')
                 }

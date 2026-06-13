@@ -4,7 +4,7 @@
 //!
 //!   [ stub runner bytes ][ zip payload bytes ][ 16-byte trailer ]
 //!
-//! The stub is a clean, trailer-free copy of the headless `duckle-runner`.
+//! The stub is a clean, trailer-free copy of the headless `quilt-runner`.
 //! The zip payload carries everything the pipeline needs to run offline
 //! (resolved pipeline JSON, contexts, routines, duckdb, extensions, secret
 //! files, manifest). The 16-byte trailer at EOF lets the runner detect, at
@@ -12,7 +12,7 @@
 //! the payload begins.
 //!
 //! Trailer (exactly 16 bytes at EOF):
-//!   bytes 0..8  = MAGIC = b"DUCKLE01"
+//!   bytes 0..8  = MAGIC = b"QUILT001"
 //!   bytes 8..16 = u64 little-endian = length of the ZIP PAYLOAD ONLY
 //!                 (excludes the stub, excludes the 16 trailer bytes).
 //!
@@ -40,8 +40,8 @@ use std::path::{Path, PathBuf};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
-/// 8-byte constant that marks a Duckle self-extracting artifact.
-pub const MAGIC: [u8; 8] = *b"DUCKLE01";
+/// 8-byte constant that marks a Quilt self-extracting artifact.
+pub const MAGIC: [u8; 8] = *b"QUILT001";
 
 /// Total trailer size: 8-byte magic + 8-byte little-endian payload length.
 const TRAILER_LEN: u64 = 16;
@@ -172,8 +172,8 @@ pub fn has_trailer(exe: &Path) -> Result<bool, String> {
 /// runs of the same (or different) artifacts do not collide.
 ///
 /// Idempotency + concurrency: the cache dir is "ready" only when it contains
-/// a `.duckle-ok` marker. A run that finds the marker returns immediately. A
-/// run that does not unpacks into a unique temp dir, writes `.duckle-ok`
+/// a `.quilt-ok` marker. A run that finds the marker returns immediately. A
+/// run that does not unpacks into a unique temp dir, writes `.quilt-ok`
 /// LAST, then atomically renames the temp dir into place. If the rename
 /// loses a race (another process already populated the dir), the marker is
 /// re-checked and the loser's temp dir is discarded.
@@ -183,16 +183,28 @@ pub fn has_trailer(exe: &Path) -> Result<bool, String> {
 /// repeatedly reuses its extraction instantly.
 pub fn extract_to_cache(payload: &[u8]) -> Result<PathBuf, String> {
     let key = hex(&Sha256::digest(payload));
-    let root = std::env::temp_dir().join(format!("duckle-artifact-{key}"));
-    let ok = root.join(".duckle-ok");
+    // Extract under a per-user PRIVATE cache dir, not the world-writable system
+    // temp dir. On a shared machine the old `temp_dir()/quilt-artifact-<hash>`
+    // path was predictable and writable by any local user, who could pre-create
+    // it with a malicious `bin/duckdb` + `.quilt-ok` marker and have us execute
+    // it. A per-user dir (owned only by us) removes that vector.
+    let base = cache_root();
+    let _ = std::fs::create_dir_all(&base);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&base, std::fs::Permissions::from_mode(0o700));
+    }
+    let root = base.join(format!("artifact-{key}"));
+    let ok = root.join(".quilt-ok");
     if ok.exists() {
         return Ok(root);
     }
 
     let mut rand = [0u8; 8];
     getrandom::getrandom(&mut rand).map_err(|e| format!("rand: {}", e))?;
-    let tmp = std::env::temp_dir().join(format!(
-        "duckle-artifact-{key}-tmp-{}-{}",
+    let tmp = base.join(format!(
+        "artifact-{key}-tmp-{}-{}",
         std::process::id(),
         hex(&rand)
     ));
@@ -206,7 +218,7 @@ pub fn extract_to_cache(payload: &[u8]) -> Result<PathBuf, String> {
         return Err(e);
     }
     // Marker written LAST so a half-written dir is never seen as ready.
-    std::fs::write(tmp.join(".duckle-ok"), b"ok")
+    std::fs::write(tmp.join(".quilt-ok"), b"ok")
         .map_err(|e| format!("write ok marker: {}", e))?;
 
     match std::fs::rename(&tmp, &root) {
@@ -222,6 +234,38 @@ pub fn extract_to_cache(payload: &[u8]) -> Result<PathBuf, String> {
             }
         }
     }
+}
+
+/// A per-user, private base directory for the extraction cache. Prefers the
+/// platform's user cache location (owned by the current user and not writable
+/// by other local users); falls back to the system temp dir only when no
+/// per-user location can be resolved.
+fn cache_root() -> PathBuf {
+    #[cfg(windows)]
+    {
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            if !local.is_empty() {
+                return PathBuf::from(local).join("quilt").join("artifacts");
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        if let Ok(xdg) = std::env::var("XDG_CACHE_HOME") {
+            if !xdg.is_empty() {
+                return PathBuf::from(xdg).join("quilt").join("artifacts");
+            }
+        }
+        if let Ok(home) = std::env::var("HOME") {
+            if !home.is_empty() {
+                return PathBuf::from(home)
+                    .join(".cache")
+                    .join("quilt")
+                    .join("artifacts");
+            }
+        }
+    }
+    std::env::temp_dir().join("quilt-artifacts")
 }
 
 /// Unzip a payload into `dest`, sanitizing entry names (reject absolute

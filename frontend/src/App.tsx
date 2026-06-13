@@ -18,7 +18,6 @@ import LanguageSelector from './i18n/LanguageSelector';
 import { UpdateBanner } from './UpdateBanner';
 import EditorTabs from './workflow-ui/EditorTabs';
 import EditorHeader, { type Job } from './workflow-ui/EditorHeader';
-import EngineSelector, { type EngineId } from './workflow-ui/EngineSelector';
 import { useTheme } from './theme';
 import { loadPersisted, savePersisted } from './persistence';
 import { resolveOutputSchema } from './schema-resolve';
@@ -36,7 +35,7 @@ import BackfillModal from './workflow-ui/BackfillModal';
 import BuildPipelineModal from './workflow-ui/BuildPipelineModal';
 import { McpModal } from './workflow-ui/McpModal';
 import { ClaudeIcon } from './workflow-ui/ClaudeIcon';
-import { DuckleLogo } from './workflow-ui/DuckleLogo';
+import { QuiltLogo } from './workflow-ui/QuiltLogo';
 import EngineSetupModal from './workflow-ui/EngineSetupModal';
 import ChatPanel from './workflow-ui/ChatPanel';
 import GitPanel from './workflow-ui/GitPanel';
@@ -85,7 +84,7 @@ import type {
     RoutinePayload,
 } from './repo-types';
 import { getDefaults, getManifest } from './workflow-ui/fields/component-manifests';
-import type { DuckleNodeData } from './pipeline-types';
+import type { QuiltNodeData } from './pipeline-types';
 import type { DropPosition, NodeAction, PaneAction } from './canvas/Canvas';
 import { useUndoRedo, type CanvasSnapshot } from './useUndoRedo';
 import type { RepoItem } from './repo-types';
@@ -93,11 +92,11 @@ import type { RepoItem } from './repo-types';
 type RuntimeState = 'connecting' | 'ready' | 'offline';
 
 type PipelineState = {
-    nodes: Node<DuckleNodeData>[];
+    nodes: Node<QuiltNodeData>[];
     edges: Edge[];
 };
 
-const SAMPLE_NODES: Node<DuckleNodeData>[] = [
+const SAMPLE_NODES: Node<QuiltNodeData>[] = [
     {
         id: 's1',
         type: 'source',
@@ -140,7 +139,7 @@ const SAMPLE_EDGES: Edge[] = [
         sourceHandle: 'main',
         target: 't1',
         targetHandle: 'main',
-        type: 'duckle',
+        type: 'quilt',
         data: { connectionType: 'main' },
     },
     {
@@ -149,7 +148,7 @@ const SAMPLE_EDGES: Edge[] = [
         sourceHandle: 'main',
         target: 'k1',
         targetHandle: 'main',
-        type: 'duckle',
+        type: 'quilt',
         data: { connectionType: 'main' },
     },
 ];
@@ -161,7 +160,7 @@ const INITIAL_PIPELINE_DATA: Record<string, PipelineState> = {
 };
 
 const INITIAL_REPO: RepoItem[] = [
-    { id: 'root', name: 'Duckle Project', type: 'project' },
+    { id: 'root', name: 'Quilt Project', type: 'project' },
     { id: 'pipelines', name: 'Pipelines', type: 'folder', parentId: 'root' },
     { id: 'connections', name: 'Connections', type: 'folder', parentId: 'root' },
     { id: 'contexts', name: 'Contexts', type: 'folder', parentId: 'root' },
@@ -201,9 +200,6 @@ export default function App() {
     const { t } = useTranslation();
     const { theme, toggle: toggleTheme } = useTheme();
     const [runtime, setRuntime] = useState<RuntimeState>('connecting');
-    const [engine, setEngine] = useState<EngineId>(() =>
-        loadPersisted<EngineId>('engine', 'duckdb'),
-    );
     const [pipelineData, setPipelineData] = useState<Record<string, PipelineState>>(() =>
         loadPersisted('pipelines', INITIAL_PIPELINE_DATA),
     );
@@ -269,7 +265,6 @@ export default function App() {
         loadWorkspace(workspacePathState).then(state => {
             if (cancelled) return;
             if (state) {
-                if (state.engine) setEngine(state.engine as EngineId);
                 if (state.pipelineData)
                     setPipelineData(state.pipelineData as Record<string, PipelineState>);
                 if (state.repo) setRepo(state.repo as RepoItem[]);
@@ -292,10 +287,10 @@ export default function App() {
         if (!workspaceReady || !isInTauri() || !workspacePathState) return;
         const ws = workspacePathState;
         const t = setTimeout(() => {
-            void saveMetadata(ws, { engine, jobs, activeJobId });
+            void saveMetadata(ws, { jobs, activeJobId });
         }, 200);
         return () => clearTimeout(t);
-    }, [workspaceReady, workspacePathState, engine, jobs, activeJobId]);
+    }, [workspaceReady, workspacePathState, jobs, activeJobId]);
 
     useEffect(() => {
         if (!workspaceReady || !isInTauri() || !workspacePathState) return;
@@ -367,7 +362,6 @@ export default function App() {
             savePersisted('jobs', jobs);
             savePersisted('active-job', activeJobId);
             savePersisted('active-context', activeContextId);
-            savePersisted('engine', engine);
         }, 250);
         return () => clearTimeout(t);
     }, [
@@ -378,7 +372,6 @@ export default function App() {
         jobs,
         activeJobId,
         activeContextId,
-        engine,
     ]);
 
     // Ctrl/Cmd+S: flush the active pipeline + repo + metadata to disk now.
@@ -395,13 +388,13 @@ export default function App() {
                 const active = pipelineData[activeJobId];
                 if (active) await savePipelineFile(ws, activeJobId, active);
                 await saveRepository(ws, repo as unknown as Array<Record<string, unknown>>);
-                await saveMetadata(ws, { engine, jobs, activeJobId });
+                await saveMetadata(ws, { jobs, activeJobId });
                 setJobs(js => js.map(j => (j.id === activeJobId ? { ...j, dirty: false } : j)));
             })();
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [workspacePathState, pipelineData, activeJobId, repo, engine, jobs]);
+    }, [workspacePathState, pipelineData, activeJobId, repo, jobs]);
 
     // Suppress the native webview right-click menu (Back / Reload / Print ...)
     // in the desktop app - it looks out of place on the header, footer and
@@ -505,10 +498,10 @@ export default function App() {
     );
 
     const setNodes = useCallback(
-        (updater: Node<DuckleNodeData>[] | ((ns: Node<DuckleNodeData>[]) => Node<DuckleNodeData>[])) => {
+        (updater: Node<QuiltNodeData>[] | ((ns: Node<QuiltNodeData>[]) => Node<QuiltNodeData>[])) => {
             updateActive(s => ({
                 ...s,
-                nodes: typeof updater === 'function' ? (updater as (ns: Node<DuckleNodeData>[]) => Node<DuckleNodeData>[])(s.nodes) : updater,
+                nodes: typeof updater === 'function' ? (updater as (ns: Node<QuiltNodeData>[]) => Node<QuiltNodeData>[])(s.nodes) : updater,
             }));
         },
         [updateActive],
@@ -546,7 +539,7 @@ export default function App() {
 
     const handleNodesChange = useCallback(
         (changes: NodeChange[]) => {
-            setNodes(ns => applyNodeChanges(changes, ns) as Node<DuckleNodeData>[]);
+            setNodes(ns => applyNodeChanges(changes, ns) as Node<QuiltNodeData>[]);
         },
         [setNodes],
     );
@@ -564,7 +557,7 @@ export default function App() {
                 addEdge(
                     {
                         ...connection,
-                        type: 'duckle',
+                        type: 'quilt',
                         data: { connectionType: type },
                     },
                     es,
@@ -621,7 +614,7 @@ export default function App() {
                     e.id === edgeId
                         ? {
                               ...e,
-                              type: 'duckle',
+                              type: 'quilt',
                               data: { ...(e.data ?? {}), connectionType: newType },
                           }
                         : e,
@@ -728,7 +721,7 @@ export default function App() {
     }, []);
 
     const handleUpdateNode = useCallback(
-        (id: string, patch: Partial<DuckleNodeData>) => {
+        (id: string, patch: Partial<QuiltNodeData>) => {
             setNodes(ns =>
                 ns.map(n => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)),
             );
@@ -856,7 +849,7 @@ export default function App() {
                     nodes: {},
                     preview: [],
                     error:
-                        'Pipeline execution is only available in the desktop app. Launch with `cargo run -p duckle-desktop`.',
+                        'Pipeline execution is only available in the desktop app. Launch with `cargo run -p quilt-desktop`.',
                 });
             }
         },
@@ -960,9 +953,9 @@ export default function App() {
             const active = pipelineData[activeJobId];
             if (active) await savePipelineFile(ws, activeJobId, active);
             await saveRepository(ws, repo as unknown as Array<Record<string, unknown>>);
-            await saveMetadata(ws, { engine, jobs, activeJobId });
+            await saveMetadata(ws, { jobs, activeJobId });
         })();
-    }, [activeJobId, workspacePathState, pipelineData, repo, engine, jobs]);
+    }, [activeJobId, workspacePathState, pipelineData, repo, jobs]);
 
     const activeJobName = useMemo(
         () => jobs.find(j => j.id === activeJobId)?.name ?? 'pipeline',
@@ -994,7 +987,7 @@ export default function App() {
         const text = await buildSqlText();
         if (!text) {
             await copyText(
-                '-- SQL compilation requires the desktop app (cargo run -p duckle-desktop).',
+                '-- SQL compilation requires the desktop app (cargo run -p quilt-desktop).',
             );
             return;
         }
@@ -1018,9 +1011,9 @@ export default function App() {
             exportedAt: new Date().toISOString(),
         };
         await saveTextFile(
-            `${activeJobName}.duckle.json`,
+            `${activeJobName}.quilt.json`,
             JSON.stringify(payload, null, 2),
-            [{ name: 'Duckle pipeline', extensions: ['json'] }],
+            [{ name: 'Quilt pipeline', extensions: ['json'] }],
         );
     }, [nodes, edges, activeJobName]);
 
@@ -1046,16 +1039,45 @@ export default function App() {
                 console.error('Pipeline import: invalid JSON', err);
                 return;
             }
-            const importedNodes = parsed.nodes;
-            if (!Array.isArray(importedNodes) || importedNodes.length === 0) {
+            // Validate the shape before trusting it. An imported file is
+            // untrusted input that flows into the engine, so accept only nodes
+            // and edges that carry the minimal React Flow structure and drop
+            // anything malformed rather than passing it through.
+            const rawNodes = parsed.nodes;
+            if (!Array.isArray(rawNodes) || rawNodes.length === 0) {
                 console.error('Pipeline import: missing or empty nodes array');
                 return;
             }
-            const importedEdges = Array.isArray(parsed.edges) ? parsed.edges : [];
+            const isObj = (v: unknown): v is Record<string, unknown> =>
+                typeof v === 'object' && v !== null;
+            const isValidNode = (n: unknown): boolean =>
+                isObj(n) &&
+                typeof n.id === 'string' &&
+                n.id !== '' &&
+                isObj(n.position) &&
+                typeof (n.position as Record<string, unknown>).x === 'number' &&
+                typeof (n.position as Record<string, unknown>).y === 'number' &&
+                isObj(n.data) &&
+                typeof (n.data as Record<string, unknown>).componentId === 'string';
+            const importedNodes = rawNodes.filter(isValidNode);
+            if (importedNodes.length === 0) {
+                console.error('Pipeline import: no structurally valid nodes');
+                return;
+            }
+            const nodeIds = new Set(importedNodes.map(n => (n as { id: string }).id));
+            const isValidEdge = (e: unknown): boolean =>
+                isObj(e) &&
+                typeof e.id === 'string' &&
+                typeof e.source === 'string' &&
+                typeof e.target === 'string' &&
+                nodeIds.has(e.source) &&
+                nodeIds.has(e.target);
+            const rawEdges = Array.isArray(parsed.edges) ? parsed.edges : [];
+            const importedEdges = rawEdges.filter(isValidEdge);
             const id = freshId('p');
             const baseName =
                 (typeof parsed.name === 'string' && parsed.name.trim()) ||
-                suggestedName.replace(/\.duckle\.json$|\.json$/, '') ||
+                suggestedName.replace(/\.quilt\.json$|\.json$/, '') ||
                 'imported_pipeline';
             const name = uniquePipelineName(baseName);
             const parent = repo.find(i => i.id === 'pipelines')
@@ -1085,7 +1107,7 @@ export default function App() {
                 const picked = await open({
                     multiple: false,
                     filters: [
-                        { name: 'Duckle pipeline', extensions: ['json', 'duckle.json'] },
+                        { name: 'Quilt pipeline', extensions: ['json', 'quilt.json'] },
                         { name: 'All files', extensions: ['*'] },
                     ],
                 });
@@ -1101,7 +1123,7 @@ export default function App() {
         // Browser fallback - file input.
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.json,.duckle.json,application/json';
+        input.accept = '.json,.quilt.json,application/json';
         input.onchange = async () => {
             const file = input.files?.[0];
             if (!file) return;
@@ -1125,7 +1147,7 @@ export default function App() {
             const id = freshId('n');
             const manifest = getManifest(component.id);
             const flowType = paletteKindToFlowType(component.kind);
-            const newNode: Node<DuckleNodeData> = {
+            const newNode: Node<QuiltNodeData> = {
                 id,
                 type: flowType,
                 position,
@@ -1189,7 +1211,7 @@ export default function App() {
 
                 case 'duplicate': {
                     const dupId = freshId('n');
-                    const copy: Node<DuckleNodeData> = {
+                    const copy: Node<QuiltNodeData> = {
                         ...node,
                         id: dupId,
                         position: { x: node.position.x + 40, y: node.position.y + 40 },
@@ -1462,7 +1484,7 @@ export default function App() {
                 edges?: Array<{ id?: string; source?: string; target?: string }>;
             };
             if (!Array.isArray(obj.nodes)) return;
-            const nodes: Node<DuckleNodeData>[] = obj.nodes.map((n, i) => ({
+            const nodes: Node<QuiltNodeData>[] = obj.nodes.map((n, i) => ({
                 id: n.id ?? `n${i + 1}`,
                 type: nodeKindFromComponent(n.type ?? 'src.csv'),
                 position: { x: 80 + i * 260, y: 160 },
@@ -1470,7 +1492,7 @@ export default function App() {
                     label: n.data?.label ?? (n.type ?? 'Node').replace(/^[^.]+\./, ''),
                     componentId: n.type ?? 'src.csv',
                     props: (n.data?.props as Record<string, unknown> | undefined) ?? {},
-                } as DuckleNodeData,
+                } as QuiltNodeData,
             }));
             const edges: Edge[] = (obj.edges ?? []).map((e, i) => ({
                 id: e.id ?? `e${i + 1}`,
@@ -1478,7 +1500,7 @@ export default function App() {
                 target: e.target ?? '',
                 sourceHandle: 'main',
                 targetHandle: 'main',
-                type: 'duckle',
+                type: 'quilt',
             }));
             setPipelineData(d => ({ ...d, [activeJobId]: { nodes, edges } }));
             setJobs(js => js.map(j => (j.id === activeJobId ? { ...j, dirty: true } : j)));
@@ -1614,11 +1636,9 @@ export default function App() {
                 data-tauri-drag-region
             >
                 <div className="brand" data-tauri-drag-region>
-                    <DuckleLogo size={24} className="brand-logo" />
-                    Duckle
+                    <QuiltLogo size={24} className="brand-logo" />
+                    Quilt
                 </div>
-                <div className="topbar-sep" aria-hidden="true" />
-                <EngineSelector value={engine} onChange={setEngine} />
                 <div className="topbar-spacer" data-tauri-drag-region />
                 {workspaceFolderName ? (
                     <button
@@ -1658,7 +1678,7 @@ export default function App() {
                     className="topbar-theme-toggle"
                     onClick={() => setShowMcpModal(true)}
                     title="Connect to Claude"
-                    aria-label="Connect Duckle to Claude"
+                    aria-label="Connect Quilt to Claude"
                 >
                     <ClaudeIcon size={14} className="claude-icon claude-icon-glow" />
                 </button>
@@ -1740,7 +1760,6 @@ export default function App() {
                         onImportJson={handleImportJson}
                     />
                     <EditorTabs
-                        engine={engine}
                         nodes={nodes}
                         edges={edges}
                         runResult={runResult}
@@ -1784,7 +1803,6 @@ export default function App() {
             />
 
             <StatusBar
-                engine={engine}
                 runtime={runtime}
                 nodeCount={nodes.length}
                 edgeCount={edges.length}

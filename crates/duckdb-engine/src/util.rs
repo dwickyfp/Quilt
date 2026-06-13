@@ -22,19 +22,19 @@ pub fn is_secret_prop_key(key: &str) -> bool {
 
 /// A secret found in the pipeline: its plaintext VALUE and the named
 /// placeholder that stands in for it in exported SQL (e.g. value
-/// "sup3r" under prop key "password" -> placeholder "${DUCKLE_PASSWORD}").
+/// "sup3r" under prop key "password" -> placeholder "${QUILT_PASSWORD}").
 pub(crate) struct Secret {
     value: String,
     placeholder: String,
 }
 
 /// Turn a secret prop key into an env-style placeholder name, e.g.
-/// "password" -> "${DUCKLE_PASSWORD}", "client_secret" ->
-/// "${DUCKLE_CLIENT_SECRET}", "apiKey" -> "${DUCKLE_API_KEY}". Non
+/// "password" -> "${QUILT_PASSWORD}", "client_secret" ->
+/// "${QUILT_CLIENT_SECRET}", "apiKey" -> "${QUILT_API_KEY}". Non
 /// alphanumeric characters become underscores; camelCase boundaries are
 /// split so the result reads as a conventional env var.
 pub(crate) fn secret_placeholder(key: &str) -> String {
-    let mut out = String::from("DUCKLE_");
+    let mut out = String::from("QUILT_");
     let mut prev_lower = false;
     for ch in key.chars() {
         if ch.is_ascii_uppercase() && prev_lower {
@@ -79,10 +79,10 @@ pub(crate) fn collect_secrets(doc: &PipelineDoc) -> Vec<Secret> {
 }
 
 /// Replace each known secret value in `sql` with its named placeholder
-/// (e.g. ${DUCKLE_PASSWORD}), so the exported script stays structurally
+/// (e.g. ${QUILT_PASSWORD}), so the exported script stays structurally
 /// valid and is safe to share - the user substitutes the real value at
 /// run time. The export path can opt out of this entirely to emit raw
-/// credentials (DUCKLE_EXPORT_INCLUDE_SECRETS=1).
+/// credentials (QUILT_EXPORT_INCLUDE_SECRETS=1).
 pub(crate) fn redact_secret_values(sql: &str, secrets: &[Secret]) -> String {
     let mut out = sql.to_string();
     for secret in secrets {
@@ -125,32 +125,32 @@ pub(crate) fn procedural_note(s: &plan::Stage) -> String {
     } else if cid.starts_with("snk.") {
         match s.from.as_deref() {
             Some(from) => format!(
-                "sink: '{}' connector writes rows from \"{}\" (runs in the Duckle runtime, no DuckDB SQL)",
+                "sink: '{}' connector writes rows from \"{}\" (runs in the Quilt runtime, no DuckDB SQL)",
                 cid, from
             ),
             None => format!(
-                "sink: '{}' connector (runs in the Duckle runtime, no DuckDB SQL)",
+                "sink: '{}' connector (runs in the Quilt runtime, no DuckDB SQL)",
                 cid
             ),
         }
     } else if cid.starts_with("src.") {
         format!(
-            "source: '{}' connector fetches rows and materializes them as \"{}\" (runs in the Duckle runtime, no DuckDB SQL)",
+            "source: '{}' connector fetches rows and materializes them as \"{}\" (runs in the Quilt runtime, no DuckDB SQL)",
             cid, s.node_id
         )
     } else if cid.starts_with("code.") {
         format!(
-            "code step: '{}' transforms rows in the Duckle runtime (no DuckDB SQL)",
+            "code step: '{}' transforms rows in the Quilt runtime (no DuckDB SQL)",
             cid
         )
     } else if cid.starts_with("xf.ai.") {
         format!(
-            "AI step: '{}' processes rows in the Duckle runtime (no DuckDB SQL)",
+            "AI step: '{}' processes rows in the Quilt runtime (no DuckDB SQL)",
             cid
         )
     } else {
         format!(
-            "'{}' runs in the Duckle runtime (no DuckDB SQL)",
+            "'{}' runs in the Quilt runtime (no DuckDB SQL)",
             cid
         )
     };

@@ -16,7 +16,7 @@ use crate::context::{self, substitute_deep};
 use aes_gcm::aead::Aead;
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
 use base64::Engine as _;
-use duckle_duckdb_engine::{is_secret_prop_key, PipelineDoc};
+use quilt_duckdb_engine::{is_secret_prop_key, PipelineDoc};
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use sha2::{Digest, Sha256};
@@ -24,9 +24,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Default DuckDB binary location used when neither --duckdb nor
-/// DUCKLE_DUCKDB_BIN is given.
+/// QUILT_DUCKDB_BIN is given.
 const DEFAULT_DUCKDB: &str =
-    "C:/Users/Sourav Roy/AppData/Roaming/io.duckle.app/engines/duckdb/duckdb.exe";
+    "C:/Users/Sourav Roy/AppData/Roaming/io.quilt.app/engines/duckdb/duckdb.exe";
 
 /// Minimum length for a string to be treated as a secret. Below this we
 /// risk corrupting structural tokens (a 1-3 char "secret" could be a
@@ -67,7 +67,7 @@ fn parse_build_args() -> Result<BuildArgs, String> {
     let mut stub = None;
     let mut duckdb = None;
 
-    // Skip "duckle-runner" and "build".
+    // Skip "quilt-runner" and "build".
     let mut it = std::env::args().skip(2);
     while let Some(arg) = it.next() {
         let mut take = |label: &str| it.next().ok_or_else(|| format!("{} needs a value", label));
@@ -102,7 +102,7 @@ fn parse_build_args() -> Result<BuildArgs, String> {
 
 /// Turn a prop/var key into an UPPER_SNAKE env KEY. Mirrors the engine's
 /// secret_placeholder normalization (camelCase split, non-alnum -> `_`)
-/// but emits the bare uppercased name (no `${...}` wrapper, no DUCKLE_
+/// but emits the bare uppercased name (no `${...}` wrapper, no QUILT_
 /// prefix). e.g. apiKey -> API_KEY, client_secret -> CLIENT_SECRET.
 fn key_namer(key: &str) -> String {
     let mut out = String::new();
@@ -381,12 +381,12 @@ fn set_exec(_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Resolve the duckdb source binary: --duckdb > DUCKLE_DUCKDB_BIN > default.
+/// Resolve the duckdb source binary: --duckdb > QUILT_DUCKDB_BIN > default.
 fn resolve_duckdb_src(flag: &Option<PathBuf>) -> Option<PathBuf> {
     if let Some(p) = flag {
         return if p.exists() { Some(p.clone()) } else { None };
     }
-    if let Ok(env) = std::env::var("DUCKLE_DUCKDB_BIN") {
+    if let Ok(env) = std::env::var("QUILT_DUCKDB_BIN") {
         let p = PathBuf::from(env);
         if p.exists() {
             return Some(p);
@@ -472,7 +472,7 @@ pub fn run() -> Result<(), String> {
     // Stage the artifact contents in a temp dir, then pack them into the
     // single-file payload. --out is the FINAL artifact path (written exactly).
     let staging = std::env::temp_dir().join(format!(
-        "duckle-build-{}-{}",
+        "quilt-build-{}-{}",
         sanitize_name(&name),
         std::process::id()
     ));
@@ -544,16 +544,16 @@ pub fn run() -> Result<(), String> {
                     // extension set.
                 } else {
                     eprintln!(
-                        "duckle-runner build: extension dir not found ({}); connectors needing extensions will fail offline",
+                        "quilt-runner build: extension dir not found ({}); connectors needing extensions will fail offline",
                         ext_src.display()
                     );
                 }
             } else {
-                eprintln!("duckle-runner build: cannot resolve user home; skipping extensions");
+                eprintln!("quilt-runner build: cannot resolve user home; skipping extensions");
             }
         }
     } else {
-        eprintln!("duckle-runner build: no duckdb binary found; bundle will need a duckdb on PATH");
+        eprintln!("quilt-runner build: no duckdb binary found; bundle will need a duckdb on PATH");
     }
 
     // --- pipeline/<name>.json (redacted, leak-guarded) ---
@@ -652,7 +652,7 @@ pub fn run() -> Result<(), String> {
     crate::selfextract::write_artifact(&stub, &payload, out_file)?;
     let _ = std::fs::remove_dir_all(root);
 
-    eprintln!("duckle-runner build: wrote {}", out_file.display());
+    eprintln!("quilt-runner build: wrote {}", out_file.display());
     Ok(())
 }
 
@@ -667,7 +667,7 @@ fn resolve_stub(flag: &Option<PathBuf>) -> Result<Vec<u8>, String> {
             let exe = std::env::current_exe().map_err(|e| format!("current_exe: {}", e))?;
             if crate::selfextract::has_trailer(&exe)? {
                 return Err(
-                    "this duckle-runner is itself a built artifact; pass --stub <clean-runner> to build"
+                    "this quilt-runner is itself a built artifact; pass --stub <clean-runner> to build"
                         .to_string(),
                 );
             }
@@ -781,7 +781,7 @@ fn copy_extensions(
     for want in needed.iter() {
         if !found.contains(want) {
             eprintln!(
-                "duckle-runner build: needed extension '{}' not found in {}; it will autoload at run time if the target has network",
+                "quilt-runner build: needed extension '{}' not found in {}; it will autoload at run time if the target has network",
                 want, src.display()
             );
         }
@@ -864,14 +864,14 @@ fn secrets_env_example(key_map: &[(String, String)]) -> String {
 }
 
 /// Build the plaintext KEY=VALUE blob (sorted by KEY, trailing newline),
-/// then AES-256-GCM encrypt under SHA-256(DUCKLE_BUNDLE_PASSPHRASE) with a
+/// then AES-256-GCM encrypt under SHA-256(QUILT_BUNDLE_PASSPHRASE) with a
 /// fresh random nonce prepended; return base64.
 fn encrypt_secrets(key_map: &[(String, String)]) -> Result<String, String> {
-    let passphrase = std::env::var("DUCKLE_BUNDLE_PASSPHRASE")
+    let passphrase = std::env::var("QUILT_BUNDLE_PASSPHRASE")
         .ok()
         .filter(|p| !p.is_empty())
         .ok_or_else(|| {
-            "--secrets passphrase requires DUCKLE_BUNDLE_PASSPHRASE in the environment".to_string()
+            "--secrets passphrase requires QUILT_BUNDLE_PASSPHRASE in the environment".to_string()
         })?;
 
     let mut pairs: Vec<&(String, String)> = key_map.iter().collect();
@@ -917,7 +917,7 @@ fn render_manifest(
     m.insert(
         "note".into(),
         JsonValue::String(
-            "Single-file artifact: a clean duckle-runner stub with a zip payload + 16-byte trailer appended. The payload self-extracts at run time. The artifact is unsigned; appending the payload invalidates any code signature, so do not codesign/Authenticode-sign it.".to_string(),
+            "Single-file artifact: a clean quilt-runner stub with a zip payload + 16-byte trailer appended. The payload self-extracts at run time. The artifact is unsigned; appending the payload invalidates any code signature, so do not codesign/Authenticode-sign it.".to_string(),
         ),
     );
     m.insert(

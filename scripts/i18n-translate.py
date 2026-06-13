@@ -65,7 +65,7 @@ def translate_one(text: str, target: str, retries: int = 3) -> str:
     last_err = None
     for attempt in range(retries):
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'duckle-i18n/1.0'})
+            req = urllib.request.Request(url, headers={'User-Agent': 'quilt-i18n/1.0'})
             with urllib.request.urlopen(req, timeout=20) as resp:
                 payload = json.loads(resp.read().decode('utf-8'))
             t = payload.get('responseData', {}).get('translatedText', '')

@@ -10,7 +10,7 @@ import {
     X,
     Zap,
 } from 'lucide-react';
-import type { Column, DataType, DuckleNodeData } from '../pipeline-types';
+import type { Column, DataType, QuiltNodeData } from '../pipeline-types';
 import { DATA_TYPES } from '../pipeline-types';
 import type { Node, Edge } from '@xyflow/react';
 import { resolveInputPortSchemas } from '../schema-resolve';
@@ -40,7 +40,7 @@ export type MapperState = {
 type Props = {
     nodeId: string;
     nodeLabel: string;
-    nodes: Node<DuckleNodeData>[];
+    nodes: Node<QuiltNodeData>[];
     edges: Edge[];
     initialState: MapperState;
     onSave: (state: MapperState, derivedSchema: Column[]) => void;
@@ -191,14 +191,14 @@ export default function VisualMapperModal({
         col: Column,
     ) => {
         const ref = refFor(portId, col.name);
-        e.dataTransfer.setData('application/duckle-mapper-ref', ref);
+        e.dataTransfer.setData('application/quilt-mapper-ref', ref);
         e.dataTransfer.setData('text/plain', ref);
         e.dataTransfer.effectAllowed = 'copy';
     };
 
     const handleExpressionDrop = (e: React.DragEvent<HTMLTextAreaElement>, rowId: string) => {
         const ref =
-            e.dataTransfer.getData('application/duckle-mapper-ref') ||
+            e.dataTransfer.getData('application/quilt-mapper-ref') ||
             e.dataTransfer.getData('text/plain');
         if (!ref) return;
         e.preventDefault();
@@ -221,7 +221,7 @@ export default function VisualMapperModal({
 
     const handleExpressionDragOver = (e: React.DragEvent<HTMLTextAreaElement>) => {
         if (
-            e.dataTransfer.types.includes('application/duckle-mapper-ref') ||
+            e.dataTransfer.types.includes('application/quilt-mapper-ref') ||
             e.dataTransfer.types.includes('text/plain')
         ) {
             e.preventDefault();

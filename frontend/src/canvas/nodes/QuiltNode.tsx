@@ -10,7 +10,7 @@ import {
     type NodeProps,
 } from '@xyflow/react';
 import { AlertCircle, CheckCircle2, Loader2, XCircle } from 'lucide-react';
-import type { DuckleNodeData } from '../../pipeline-types';
+import type { QuiltNodeData } from '../../pipeline-types';
 import { getManifest } from '../../workflow-ui/fields/component-manifests';
 import { metaFor } from '../connection-types';
 import type { PortDef } from '../../workflow-ui/fields/types';
@@ -20,9 +20,9 @@ import { deriveNodeSubtitle } from '../../node-subtitle';
 import ComponentIcon from '../../workflow-ui/ComponentIcon';
 import type { NodeKind } from '../../workflow-ui/palette-data';
 
-export type DuckleFlowNode = Node<DuckleNodeData>;
+export type QuiltFlowNode = Node<QuiltNodeData>;
 
-export default function DuckleNode({ id, data, selected, type }: NodeProps<DuckleFlowNode>) {
+export default function QuiltNode({ id, data, selected, type }: NodeProps<QuiltFlowNode>) {
     const { t } = useTranslation();
     const kind = type ?? 'transform';
     const manifest = getManifest(data.componentId);
@@ -30,7 +30,7 @@ export default function DuckleNode({ id, data, selected, type }: NodeProps<Duckl
     const inputs = ports?.inputs ?? [];
     const outputs = ports?.outputs ?? [];
 
-    const allNodes = useNodes() as Node<DuckleNodeData>[];
+    const allNodes = useNodes() as Node<QuiltNodeData>[];
     const allEdges = useEdges();
 
     // Parallelize branches are unlimited: instead of a fixed set of output

@@ -1,6 +1,6 @@
 [package]
-name = "duckle-plugin-sdk"
-description = "Public Rust SDK for building Duckle connectors, transforms, and engines."
+name = "quilt-plugin-sdk"
+description = "Public Rust SDK for building Quilt connectors, transforms, and engines."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,4 +13,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
-duckle-metadata = { workspace = true }
+quilt-metadata = { workspace = true }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Build the Duckle promo video (silent, 1080p, ~30s).
+# Build the Quilt promo video (silent, 1080p, ~30s).
 # Inputs: existing logo PNG + 4 real screenshots from docs/assets.
-# Output: marketing/promo/out/duckle-promo.mp4
+# Output: marketing/promo/out/quilt-promo.mp4
 #
 # Run from anywhere; the script cd's into its own dir so ffmpeg filter
 # strings can reference fonts by bare filename (avoids colon-in-path
@@ -42,7 +42,7 @@ $FF -f lavfi -i "color=c=#07090f:s=${W}x${H}:r=${FPS}:d=4" \
     -filter_complex "
       [1:v]scale=420:420[lg];
       [0:v][lg]overlay=(W-w)/2:(H-h)/2-120:enable='between(t,0.2,4)',
-      drawtext=fontfile=${FB}:text='Duckle':fontcolor=${TEXT}:fontsize=120:x=(w-tw)/2:y=h/2+180:alpha='if(lt(t,0.8),0,if(lt(t,1.6),(t-0.8)/0.8,1))',
+      drawtext=fontfile=${FB}:text='Quilt':fontcolor=${TEXT}:fontsize=120:x=(w-tw)/2:y=h/2+180:alpha='if(lt(t,0.8),0,if(lt(t,1.6),(t-0.8)/0.8,1))',
       drawtext=fontfile=${FR}:text='Open-source ETL that runs locally':fontcolor=${MUTED}:fontsize=40:x=(w-tw)/2:y=h/2+330:alpha='if(lt(t,1.4),0,if(lt(t,2.2),(t-1.4)/0.8,1))',
       fade=t=out:st=3.5:d=0.5
     " -c:v libx264 -pix_fmt yuv420p -preset medium -crf 18 "$SCENES/01_logo.mp4"
@@ -97,9 +97,9 @@ $FF -f lavfi -i "color=c=#07090f:s=${W}x${H}:r=${FPS}:d=6" \
     -filter_complex "
       [1:v]scale=300:300[lg];
       [0:v][lg]overlay=(W-w)/2:(H-h)/2-220,
-      drawtext=fontfile=${FB}:text='Duckle':fontcolor=${TEXT}:fontsize=92:x=(w-tw)/2:y=h/2+120,
+      drawtext=fontfile=${FB}:text='Quilt':fontcolor=${TEXT}:fontsize=92:x=(w-tw)/2:y=h/2+120,
       drawtext=fontfile=${FR}:text='Free  /  Open source  /  30 MB single binary':fontcolor=${MUTED}:fontsize=36:x=(w-tw)/2:y=h/2+240,
-      drawtext=fontfile=${FB}:text='github.com/SouravRoy-ETL/duckle':fontcolor=${ACCENT}:fontsize=44:x=(w-tw)/2:y=h/2+320,
+      drawtext=fontfile=${FB}:text='github.com/dwickyfp/Quilt':fontcolor=${ACCENT}:fontsize=44:x=(w-tw)/2:y=h/2+320,
       fade=t=in:st=0:d=0.5,fade=t=out:st=5.5:d=0.5
     " -c:v libx264 -pix_fmt yuv420p -preset medium -crf 18 "$SCENES/06_end.mp4"
 
@@ -113,7 +113,7 @@ file '05_git.mp4'
 file '06_end.mp4'
 EOF
 
-$FF -f concat -safe 0 -i "$SCENES/concat.txt" -c copy "$OUTDIR/duckle-promo.mp4"
+$FF -f concat -safe 0 -i "$SCENES/concat.txt" -c copy "$OUTDIR/quilt-promo.mp4"
 
-echo "Done: $OUTDIR/duckle-promo.mp4"
-ls -lh "$OUTDIR/duckle-promo.mp4"
+echo "Done: $OUTDIR/quilt-promo.mp4"
+ls -lh "$OUTDIR/quilt-promo.mp4"

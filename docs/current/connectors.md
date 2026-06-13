@@ -1,6 +1,6 @@
 # Connectors: Sources & Sinks
 
-Duckle provides over 290+ visual connectors to read data from (Sources) and write data to (Sinks) files, databases, object storage, cloud warehouses, and API streams.
+Quilt provides over 290+ visual connectors to read data from (Sources) and write data to (Sinks) files, databases, object storage, cloud warehouses, and API streams.
 
 ---
 
@@ -21,7 +21,7 @@ To avoid entering sensitive passwords or credentials repeatedly, manage them cen
 1. Click the **Key icon** in the top toolbar to open the **Connection Manager Modal**.
 2. Click **"New Connection"** and choose a template (e.g., *PostgreSQL*, *AWS S3*, *Snowflake*).
 3. Type in your host details, usernames, and passwords.
-4. Click **"Save"**. Duckle automatically encrypts your passwords before writing them to your workspace folder.
+4. Click **"Save"**. Quilt automatically encrypts your passwords before writing them to your workspace folder.
 5. In your canvas, select a node (e.g., a *PostgreSQL Sink*), click the **Connection** dropdown in the Properties Panel, and select your saved connection.
 
 ---

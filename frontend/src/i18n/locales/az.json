@@ -43,9 +43,9 @@
     "copySqlDesc": "DuckDB SQL-ə tərtib edin, panoya kopyalayın",
     "exportSql": ".sql kimi ixrac edin",
     "exportSqlDesc": "Tərtib edilmiş SQL-i fayl kimi yükləyin",
-    "exportJson": ".duckle.json kimi ixrac edin",
+    "exportJson": ".quilt.json kimi ixrac edin",
     "exportJsonDesc": "Düyünləri + kənarları portativ JSON kimi endirin",
-    "importJson": ".duckle.json faylını idxal edin...",
+    "importJson": ".quilt.json faylını idxal edin...",
     "importJsonDesc": "Portativ JSON-u yeni boru kəməri kimi açın"
   },
   "palette": {
@@ -113,7 +113,7 @@
     "localTag": "yerli",
     "checking": "AI mühərriki yoxlanılır...",
     "installTitle": "Duckie AI köməkçisini quraşdırın",
-    "installBody": "Duckle kiçik yerli modeli (~1,1 GB) endirir, beləliklə, köməkçi tamamilə sizin maşınınızda işləyir - API düymələri yoxdur, bulud zəngləri yoxdur.",
+    "installBody": "Quilt kiçik yerli modeli (~1,1 GB) endirir, beləliklə, köməkçi tamamilə sizin maşınınızda işləyir - API düymələri yoxdur, bulud zəngləri yoxdur.",
     "installCta": "Quraşdırma (~1,1 GB)",
     "installFailedTitle": "Quraşdırma uğursuz oldu",
     "retry": "Yenidən cəhd edin",

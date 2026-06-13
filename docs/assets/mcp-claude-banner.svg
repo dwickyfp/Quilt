@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 470" width="900" height="470" role="img" aria-label="Connect Duckle to Claude via MCP">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 470" width="900" height="470" role="img" aria-label="Connect Quilt to Claude via MCP">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#eef2fb"/>
@@ -11,7 +11,7 @@
 
   <rect width="900" height="470" fill="url(#bg)"/>
 
-  <!-- Left: Duckle "D." mark -->
+  <!-- Left: Quilt "D." mark -->
   <g transform="translate(60,151) scale(0.65625)">
     <circle cx="128" cy="128" r="120" fill="#1B1F2A" filter="url(#soft)"/>
     <g fill="#FFD000">

@@ -1,10 +1,10 @@
 //! Encryption at rest for saved connection secrets and the cached git PAT.
 //!
 //! Sensitive connection fields (passwords, tokens, keys) are encrypted with a
-//! per-workspace AES-256-GCM key kept at `<workspace>/.duckle/keys/secret.key`
+//! per-workspace AES-256-GCM key kept at `<workspace>/.quilt/keys/secret.key`
 //! (owner-only on unix, excluded from version control). The connection JSON in
 //! `<workspace>/connections/` therefore holds ciphertext for those fields, so
-//! the folder is safe to commit or share as long as `.duckle/keys/` is not.
+//! the folder is safe to commit or share as long as `.quilt/keys/` is not.
 //! `${...}` placeholders are never encrypted - they resolve from the
 //! environment at run time.
 
@@ -30,7 +30,7 @@ const SENSITIVE_KEYS: &[&str] = &[
 ];
 
 fn key_path(workspace: &Path) -> PathBuf {
-    workspace.join(".duckle").join("keys").join("secret.key")
+    workspace.join(".quilt").join("keys").join("secret.key")
 }
 
 /// Load the workspace key. With `create`, a fresh random 32-byte key is
@@ -60,6 +60,9 @@ pub(crate) fn workspace_key(workspace: &Path, create: bool) -> Result<[u8; 32], 
         use std::os::unix::fs::PermissionsExt;
         let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
     }
+    // Make sure the key (and the PAT secrets dir) can never be committed, even
+    // if the user encrypts a connection before ever touching the git panel.
+    crate::workspace_git::write_gitignore_safety(workspace);
     Ok(k)
 }
 
@@ -170,7 +173,7 @@ mod tests {
 
     #[test]
     fn round_trip_encrypts_only_sensitive_fields() {
-        let dir = std::env::temp_dir().join(format!("duckle_sec_{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("quilt_sec_{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let ws = dir.to_string_lossy().to_string();
 
@@ -191,7 +194,7 @@ mod tests {
 
     #[test]
     fn env_placeholders_are_not_encrypted() {
-        let dir = std::env::temp_dir().join(format!("duckle_sec_env_{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("quilt_sec_env_{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let ws = dir.to_string_lossy().to_string();
         let payload = r#"{"password":"${ENV:PGPASSWORD}"}"#;

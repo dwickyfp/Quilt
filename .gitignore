@@ -23,8 +23,8 @@ dist/
 .yarn/
 
 # Editor / OS
-# Claude Code local-user settings - keep out of version control
-.claude/settings.local.json
+# Claude Code local config - keep out of version control
+.claude/
 .vscode/*
 !.vscode/settings.json.example
 !.vscode/extensions.json
@@ -48,10 +48,10 @@ coverage/
 *.profraw
 
 # Embedded engines downloaded at runtime
-.duckle/cache/
-.duckle/engines/
+.quilt/cache/
+.quilt/engines/
 
-# Local DuckDB CLI for tests (DUCKLE_DUCKDB_BIN)
+# Local DuckDB CLI for tests (QUILT_DUCKDB_BIN)
 .duckdb-cli/
 
 # stray sink test outputs

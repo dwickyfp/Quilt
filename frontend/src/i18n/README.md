@@ -1,4 +1,4 @@
-# Duckle UI translations
+# Quilt UI translations
 
 35 languages ship in `locales/`. English (`en.json`) is the source of truth; every other locale is generated from it.
 

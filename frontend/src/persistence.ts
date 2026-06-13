@@ -1,4 +1,4 @@
-const KEY_PREFIX = 'duckle:v1:';
+const KEY_PREFIX = 'quilt:v1:';
 
 export function loadPersisted<T>(key: string, fallback: T): T {
     try {

@@ -1,16 +1,16 @@
-//! Duckle desktop shell.
+//! Quilt desktop shell.
 //!
-//! Boots the Tauri runtime, wires it to `duckle-runtime`, and exposes
+//! Boots the Tauri runtime, wires it to `quilt-runtime`, and exposes
 //! invoke commands to the frontend.
 
-use duckle_connectors::CsvConnector;
-use duckle_duckdb_engine::{
+use quilt_connectors::CsvConnector;
+use quilt_duckdb_engine::{
     append_run_record, compile_pipeline_sql, load_run_history, DuckdbEngine, PipelineDoc,
     PipelineEvent, RunRecord, RunResult, StageSql,
 };
-use duckle_metadata::Schema;
-use duckle_plugin_sdk::{InspectError, SchemaInspector};
-use duckle_scheduler::{Schedule, Scheduler};
+use quilt_metadata::Schema;
+use quilt_plugin_sdk::{InspectError, SchemaInspector};
+use quilt_scheduler::{Schedule, Scheduler};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use std::path::PathBuf;
@@ -29,17 +29,17 @@ mod workspace_git;
 use engine_manager::{EngineStatus, InstallProgress};
 use llama_chat::{ChatEvent, ChatMessage};
 
-/// The headless duckle-runner, embedded at compile time (apps/desktop/build.rs
-/// stages a freshly built runner and points DUCKLE_EMBEDDED_RUNNER at it).
+/// The headless quilt-runner, embedded at compile time (apps/desktop/build.rs
+/// stages a freshly built runner and points QUILT_EMBEDDED_RUNNER at it).
 /// "Build Pipeline" writes these bytes to a temp stub and uses it both as the
 /// builder and as the artifact stub, so no separate runner download or
 /// compile-on-click is needed.
-const EMBEDDED_RUNNER: &[u8] = include_bytes!(env!("DUCKLE_EMBEDDED_RUNNER"));
+const EMBEDDED_RUNNER: &[u8] = include_bytes!(env!("QUILT_EMBEDDED_RUNNER"));
 
-/// The duckle-mcp server, embedded at compile time when staged. Empty when this
+/// The quilt-mcp server, embedded at compile time when staged. Empty when this
 /// build did not bundle it (see build.rs embed_mcp). Written to a stable
 /// app-data path on demand so an MCP client config can point at it.
-const EMBEDDED_MCP: &[u8] = include_bytes!(env!("DUCKLE_EMBEDDED_MCP"));
+const EMBEDDED_MCP: &[u8] = include_bytes!(env!("QUILT_EMBEDDED_MCP"));
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -47,7 +47,7 @@ pub fn run() {
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .init();
 
-    tracing::info!("duckle starting");
+    tracing::info!("quilt starting");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -60,18 +60,18 @@ pub fn run() {
             // (first run installs it via the setup screen); the engine
             // just errors clearly until then.
             //
-            // ALSO publish the path as DUCKLE_DUCKDB_BIN. The engine's
+            // ALSO publish the path as QUILT_DUCKDB_BIN. The engine's
             // primary execution path takes the binary as a constructor
             // arg, but rest_source_apply (used by REST-shaped sources:
             // Oracle, SQL Server, Snowflake, Databricks, Synapse,
             // BigQuery, and the various SaaS aliases that materialize
             // their inline result set) is a free helper that reads the
             // env var directly. Without this set, those sources fail
-            // with "DUCKLE_DUCKDB_BIN not set" while plain file flows
+            // with "QUILT_DUCKDB_BIN not set" while plain file flows
             // work fine. See issue #2.
             if let Ok(dir) = app.path().app_data_dir() {
                 let bin = engine_manager::duckdb_path(&dir);
-                std::env::set_var("DUCKLE_DUCKDB_BIN", &bin);
+                std::env::set_var("QUILT_DUCKDB_BIN", &bin);
                 let _ = DUCKDB_BIN.set(bin);
 
                 // dbt for the xf.dbt node. Publishing an already-provisioned
@@ -169,7 +169,7 @@ pub fn run() {
             mcp_inject_config
         ])
         .run(tauri::generate_context!())
-        .expect("error while running duckle");
+        .expect("error while running quilt");
 }
 
 /// Liveness probe. Returns the string `"pong"`.
@@ -347,8 +347,8 @@ fn run_history(workspace_path: String, pipeline_id: String) -> Result<Vec<RunRec
 fn watermark_list(
     workspace_path: String,
     pipeline_name: String,
-) -> Result<Vec<duckle_duckdb_engine::watermark::WatermarkEntry>, String> {
-    Ok(duckle_duckdb_engine::watermark::list(
+) -> Result<Vec<quilt_duckdb_engine::watermark::WatermarkEntry>, String> {
+    Ok(quilt_duckdb_engine::watermark::list(
         std::path::Path::new(&workspace_path),
         &pipeline_name,
     ))
@@ -372,10 +372,10 @@ fn watermark_set(
             .trim()
             .parse()
             .map_err(|_| format!("snapshot id must be a number, got '{}'", value))?;
-        duckle_duckdb_engine::watermark::set_snapshot(ws, &pipeline_name, &node_id, id)
+        quilt_duckdb_engine::watermark::set_snapshot(ws, &pipeline_name, &node_id, id)
             .map_err(|e| e.to_string())
     } else {
-        duckle_duckdb_engine::watermark::set_incremental(
+        quilt_duckdb_engine::watermark::set_incremental(
             ws,
             &pipeline_name,
             &node_id,
@@ -393,7 +393,7 @@ fn watermark_clear(
     pipeline_name: String,
     node_id: String,
 ) -> Result<(), String> {
-    duckle_duckdb_engine::watermark::clear(
+    quilt_duckdb_engine::watermark::clear(
         std::path::Path::new(&workspace_path),
         &pipeline_name,
         &node_id,
@@ -441,13 +441,13 @@ fn schedule_set_workspace(path: String) -> Result<(), String> {
     // scheduled runs that never pass through the frontend. Called whenever
     // the workspace changes, so this stays in sync.
     if path.is_empty() {
-        std::env::remove_var("DUCKLE_WORKSPACE");
-        std::env::remove_var("DUCKLE_LOG_DIR");
+        std::env::remove_var("QUILT_WORKSPACE");
+        std::env::remove_var("QUILT_LOG_DIR");
     } else {
-        std::env::set_var("DUCKLE_WORKSPACE", &path);
+        std::env::set_var("QUILT_WORKSPACE", &path);
         // Universal, component-level run logging lands in the user's chosen
         // workspace under logs/ (NDJSON) for Splunk / Dynatrace ingestion.
-        std::env::set_var("DUCKLE_LOG_DIR", PathBuf::from(&path).join("logs"));
+        std::env::set_var("QUILT_LOG_DIR", PathBuf::from(&path).join("logs"));
     }
     let p = if path.is_empty() {
         None
@@ -488,7 +488,7 @@ fn engine_status(app: tauri::AppHandle) -> Result<Vec<EngineStatus>, String> {
     Ok(engine_manager::status(&dir))
 }
 
-/// Download + install an engine (duckdb / slothdb / llamacpp) into
+/// Download + install an engine (duckdb / llamacpp) into
 /// app-data, streaming progress.
 #[tauri::command]
 async fn engine_install(
@@ -577,7 +577,7 @@ async fn chat_send(
     .map_err(|e| e.to_string())?
 }
 
-/// Pull a Duckle pipeline JSON out of an assistant message - the
+/// Pull a Quilt pipeline JSON out of an assistant message - the
 /// model is asked to wrap pipelines in ```json fenced code blocks.
 /// Returns the parsed JSON for the frontend to merge into the canvas.
 #[tauri::command]
@@ -587,7 +587,7 @@ fn chat_extract_pipeline(text: String) -> Result<JsonValue, String> {
 
 // ---- In-app Git integration -------------------------------------------
 // Wraps the system git CLI on the user's workspace folder so they can
-// commit / push / pull / branch from inside Duckle. Auth: try without
+// commit / push / pull / branch from inside Quilt. Auth: try without
 // explicit creds first (system credential helper), fall back to a PAT
 // prompt from the frontend on 401.
 
@@ -661,7 +661,7 @@ async fn workspace_ci_status(workspace_path: String) -> Result<ci_status::CiStat
         .map_err(|e| e.to_string())?
 }
 
-/// Check Duckle's GitHub releases for a build newer than this one. Returns a
+/// Check Quilt's GitHub releases for a build newer than this one. Returns a
 /// quiet, non-fatal result (offline -> error field set, update_available
 /// false) so the frontend can show an upgrade banner without ever blocking.
 #[tauri::command]
@@ -671,20 +671,31 @@ async fn check_for_update() -> Result<update_check::UpdateInfo, String> {
         .map_err(|e| e.to_string())
 }
 
-/// Write the embedded duckle-runner bytes to a temp stub file and return the
+/// Write the embedded quilt-runner bytes to a temp stub file and return the
 /// handle. The runner serves as BOTH the builder (run with `build ...`) and
 /// the artifact stub (passed via --stub). The NamedTempFile auto-deletes on
 /// drop, so it must be kept alive until after the build Command has run.
 fn staged_stub() -> Result<PathBuf, String> {
     let suffix = if cfg!(windows) { ".exe" } else { "" };
-    let dir = std::env::temp_dir();
+    // Stage under a per-user PRIVATE dir, not the world-writable system temp
+    // dir. The path is keyed by the embedded runner size for reuse, but on a
+    // shared machine a predictable, world-writable temp path let any local user
+    // pre-create a same-size malicious stub that we'd then execute. A per-user
+    // dir (owned only by us, 0700 on unix) removes that poisoning vector.
+    let dir = private_stage_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+    }
     // Cache path keyed by the embedded runner size, so repeated builds reuse
     // the same already-on-disk (already AV-scanned) file instead of writing a
     // fresh exe and immediately executing it every time. The executed file
     // must have NO open handle, or Windows CreateProcess fails with
     // ERROR_SHARING_VIOLATION (os error 32) - which is exactly why the old
     // NamedTempFile (kept open during the run) broke.
-    let path = dir.join(format!("duckle-stub-{}{}", EMBEDDED_RUNNER.len(), suffix));
+    let path = dir.join(format!("quilt-stub-{}{}", EMBEDDED_RUNNER.len(), suffix));
     let correct = |p: &std::path::Path| {
         std::fs::metadata(p)
             .map(|m| m.len() as usize == EMBEDDED_RUNNER.len())
@@ -696,7 +707,7 @@ fn staged_stub() -> Result<PathBuf, String> {
     // Write to a unique sibling and rename into place so a concurrent build
     // never executes a half-written stub. std::fs::write closes the handle.
     let tmp = dir.join(format!(
-        "duckle-stub-{}-{}{}",
+        "quilt-stub-{}-{}{}",
         EMBEDDED_RUNNER.len(),
         std::process::id(),
         suffix
@@ -723,8 +734,37 @@ fn staged_stub() -> Result<PathBuf, String> {
     }
 }
 
+/// A per-user, private directory for staging the embedded runner stub. Prefers
+/// the platform's user cache/local-app-data location (owned by the current
+/// user, not writable by other local accounts); falls back to the system temp
+/// dir only when no per-user location can be resolved.
+fn private_stage_dir() -> PathBuf {
+    #[cfg(windows)]
+    {
+        if let Ok(local) = std::env::var("LOCALAPPDATA") {
+            if !local.is_empty() {
+                return PathBuf::from(local).join("quilt").join("stub");
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        if let Ok(xdg) = std::env::var("XDG_CACHE_HOME") {
+            if !xdg.is_empty() {
+                return PathBuf::from(xdg).join("quilt").join("stub");
+            }
+        }
+        if let Ok(home) = std::env::var("HOME") {
+            if !home.is_empty() {
+                return PathBuf::from(home).join(".cache").join("quilt").join("stub");
+            }
+        }
+    }
+    std::env::temp_dir().join("quilt-stub")
+}
+
 /// Build a self-contained, server-runnable single file for a workspace
-/// pipeline using the embedded `duckle-runner build` subcommand. The same
+/// pipeline using the embedded `quilt-runner build` subcommand. The same
 /// embedded runner is used as the builder and as the artifact stub. Returns
 /// the path to the produced single file on success.
 #[tauri::command]
@@ -783,7 +823,7 @@ async fn build_pipeline_bundle(
                 }
             }
             if secrets_mode == "passphrase" {
-                cmd.env("DUCKLE_BUNDLE_PASSPHRASE", passphrase.clone().unwrap_or_default());
+                cmd.env("QUILT_BUNDLE_PASSPHRASE", passphrase.clone().unwrap_or_default());
             }
             cmd.output()
         };
@@ -798,7 +838,7 @@ async fn build_pipeline_bundle(
                     attempt += 1;
                     std::thread::sleep(std::time::Duration::from_millis(200));
                 }
-                Err(e) => return Err(format!("failed to start duckle-runner: {}", e)),
+                Err(e) => return Err(format!("failed to start quilt-runner: {}", e)),
             }
         }
     })
@@ -807,12 +847,12 @@ async fn build_pipeline_bundle(
 
     if !output.status.success() {
         let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(if err.is_empty() { "duckle-runner build failed".to_string() } else { err });
+        return Err(if err.is_empty() { "quilt-runner build failed".to_string() } else { err });
     }
 
-    // The build subcommand prints `duckle-runner build: wrote <path>` to STDERR.
+    // The build subcommand prints `quilt-runner build: wrote <path>` to STDERR.
     let stderr = String::from_utf8_lossy(&output.stderr);
-    const PREFIX: &str = "duckle-runner build: wrote ";
+    const PREFIX: &str = "quilt-runner build: wrote ";
     let file_path = stderr
         .lines()
         .filter_map(|l| l.trim().strip_prefix(PREFIX))
@@ -869,7 +909,7 @@ fn write_if_changed(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> 
     }
     // Put the new file in place. A plain rename over the destination fails on
     // Windows with "Access denied" when the destination .exe is locked - e.g. a
-    // running duckle-mcp/duckle-runner that an MCP client still has open. Windows
+    // running quilt-mcp/quilt-runner that an MCP client still has open. Windows
     // DOES allow renaming a locked file out of the way, so on failure we move the
     // old one aside and retry; the displaced copy is removed best-effort (it goes
     // away on a later run once nothing holds it open).
@@ -907,22 +947,22 @@ fn write_if_changed(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> 
     {
         return Ok(());
     }
-    Err(format!("stage {}: locked (close other Duckle instances)", path.display()))
+    Err(format!("stage {}: locked (close other Quilt instances)", path.display()))
 }
 
 /// Stage the embedded MCP server into a stable app-data dir, with the embedded
-/// runner written alongside it (so duckle-mcp's sibling lookup finds the runner
+/// runner written alongside it (so quilt-mcp's sibling lookup finds the runner
 /// for build_pipeline). Returns (mcp_path, runner_path).
 fn stage_mcp(app_data: &std::path::Path) -> Result<(PathBuf, PathBuf), String> {
     if EMBEDDED_MCP.is_empty() {
-        return Err("This build does not bundle the duckle-mcp server".to_string());
+        return Err("This build does not bundle the quilt-mcp server".to_string());
     }
     let dir = app_data.join("engines").join("mcp");
     std::fs::create_dir_all(&dir).map_err(|e| format!("create {}: {}", dir.display(), e))?;
     let suffix = if cfg!(windows) { ".exe" } else { "" };
-    let mcp = dir.join(format!("duckle-mcp{suffix}"));
+    let mcp = dir.join(format!("quilt-mcp{suffix}"));
     write_if_changed(&mcp, EMBEDDED_MCP)?;
-    let runner = dir.join(format!("duckle-runner{suffix}"));
+    let runner = dir.join(format!("quilt-runner{suffix}"));
     write_if_changed(&runner, EMBEDDED_RUNNER)?;
     Ok((mcp, runner))
 }
@@ -976,17 +1016,17 @@ fn mcp_connection_info(app: tauri::AppHandle) -> Result<McpConnInfo, String> {
     let duckdb_s = duckdb.to_string_lossy().to_string();
 
     let claude_command = format!(
-        "claude mcp add duckle --env {} --env {} -- {}",
-        shell_quote(&format!("DUCKLE_DUCKDB_BIN={}", duckdb_s)),
-        shell_quote(&format!("DUCKLE_RUNNER_BIN={}", runner_s)),
+        "claude mcp add quilt --env {} --env {} -- {}",
+        shell_quote(&format!("QUILT_DUCKDB_BIN={}", duckdb_s)),
+        shell_quote(&format!("QUILT_RUNNER_BIN={}", runner_s)),
         shell_quote(&mcp_s),
     );
 
     let config = serde_json::json!({
         "mcpServers": {
-            "duckle": {
+            "quilt": {
                 "command": mcp_s,
-                "env": { "DUCKLE_DUCKDB_BIN": duckdb_s, "DUCKLE_RUNNER_BIN": runner_s }
+                "env": { "QUILT_DUCKDB_BIN": duckdb_s, "QUILT_RUNNER_BIN": runner_s }
             }
         }
     });
@@ -1004,7 +1044,7 @@ fn mcp_connection_info(app: tauri::AppHandle) -> Result<McpConnInfo, String> {
     })
 }
 
-/// Run `claude mcp add duckle ...` so the user is connected to Claude Code in
+/// Run `claude mcp add quilt ...` so the user is connected to Claude Code in
 /// one click. Returns the CLI output on success; errors (with a hint to copy
 /// the command) when the CLI is missing or the add fails.
 #[tauri::command]
@@ -1026,7 +1066,7 @@ async fn connect_claude_code(app: tauri::AppHandle) -> Result<String, String> {
             // raw_arg so cmd resolves the claude.cmd npm shim and our quoting
             // survives; each path is wrapped so spaces do not split args.
             let line = format!(
-                "/C claude mcp add duckle --env \"DUCKLE_DUCKDB_BIN={}\" --env \"DUCKLE_RUNNER_BIN={}\" -- \"{}\"",
+                "/C claude mcp add quilt --env \"QUILT_DUCKDB_BIN={}\" --env \"QUILT_RUNNER_BIN={}\" -- \"{}\"",
                 duckdb_s, runner_s, mcp_s
             );
             std::process::Command::new("cmd")
@@ -1039,11 +1079,11 @@ async fn connect_claude_code(app: tauri::AppHandle) -> Result<String, String> {
             std::process::Command::new("claude")
                 .arg("mcp")
                 .arg("add")
-                .arg("duckle")
+                .arg("quilt")
                 .arg("--env")
-                .arg(format!("DUCKLE_DUCKDB_BIN={}", duckdb_s))
+                .arg(format!("QUILT_DUCKDB_BIN={}", duckdb_s))
                 .arg("--env")
-                .arg(format!("DUCKLE_RUNNER_BIN={}", runner_s))
+                .arg(format!("QUILT_RUNNER_BIN={}", runner_s))
                 .arg("--")
                 .arg(&mcp_s)
                 .output()
@@ -1058,7 +1098,7 @@ async fn connect_claude_code(app: tauri::AppHandle) -> Result<String, String> {
             let err = String::from_utf8_lossy(&o.stderr);
             let msg = format!("{} {}", out.trim(), err.trim());
             Ok(if msg.trim().is_empty() {
-                "Added the duckle MCP server to Claude Code.".to_string()
+                "Added the quilt MCP server to Claude Code.".to_string()
             } else {
                 msg.trim().to_string()
             })
@@ -1117,7 +1157,7 @@ fn mcp_client_config_path(app: &tauri::AppHandle, client: &str) -> Result<PathBu
     }
 }
 
-/// Inject (merge) a "duckle" entry into a desktop MCP client's config file,
+/// Inject (merge) a "quilt" entry into a desktop MCP client's config file,
 /// preserving any existing servers. Returns the written config path. These are
 /// per-user config files (no elevation needed); on a permission/parse failure
 /// the error tells the user to retry elevated or copy the config manually.
@@ -1140,7 +1180,7 @@ fn mcp_inject_config(app: tauri::AppHandle, client: String) -> Result<String, St
         } else {
             serde_json::from_str(&text).map_err(|e| {
                 format!(
-                    "{} is not valid JSON ({}); add the duckle entry manually instead",
+                    "{} is not valid JSON ({}); add the quilt entry manually instead",
                     target.display(),
                     e
                 )
@@ -1161,13 +1201,13 @@ fn mcp_inject_config(app: tauri::AppHandle, client: String) -> Result<String, St
             .as_object_mut()
             .ok_or_else(|| "mcpServers is not a JSON object".to_string())?;
         servers.insert(
-            "duckle".to_string(),
+            "quilt".to_string(),
             serde_json::json!({
                 "command": mcp_path.to_string_lossy(),
                 "args": [],
                 "env": {
-                    "DUCKLE_DUCKDB_BIN": duckdb.to_string_lossy(),
-                    "DUCKLE_RUNNER_BIN": runner_path.to_string_lossy()
+                    "QUILT_DUCKDB_BIN": duckdb.to_string_lossy(),
+                    "QUILT_RUNNER_BIN": runner_path.to_string_lossy()
                 }
             }),
         );
@@ -1179,7 +1219,7 @@ fn mcp_inject_config(app: tauri::AppHandle, client: String) -> Result<String, St
     let pretty = serde_json::to_string_pretty(&root).map_err(|e| e.to_string())?;
     std::fs::write(&target, pretty).map_err(|e| {
         format!(
-            "could not write {} ({}). If this needs elevated permissions, run Duckle as administrator and retry, or copy the config manually.",
+            "could not write {} ({}). If this needs elevated permissions, run Quilt as administrator and retry, or copy the config manually.",
             target.display(),
             e
         )

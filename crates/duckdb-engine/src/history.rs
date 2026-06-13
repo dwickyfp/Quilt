@@ -79,9 +79,9 @@ pub fn append_run_record(
 }
 
 /// Export run state for every pipeline as an OpenMetrics/Prometheus textfile
-/// at `<workspace>/logs/duckle_metrics.prom`, suitable for node_exporter's
+/// at `<workspace>/logs/quilt_metrics.prom`, suitable for node_exporter's
 /// textfile collector (or Grafana Alloy) - monitoring integration with no
-/// HTTP server and no agent inside Duckle, which keeps headless and
+/// HTTP server and no agent inside Quilt, which keeps headless and
 /// air-gapped deployments covered.
 ///
 /// All series are gauges derived from the retained run history (a rolling
@@ -91,7 +91,7 @@ pub fn append_run_record(
 pub fn write_metrics_textfile(workspace: &Path) -> std::io::Result<()> {
     let runs_dir = workspace.join("runs");
     let mut out = String::new();
-    out.push_str("# HELP duckle_run_last_status 1 when the pipeline's most recent run succeeded, 0 when it failed or was cancelled.\n# TYPE duckle_run_last_status gauge\n");
+    out.push_str("# HELP quilt_run_last_status 1 when the pipeline's most recent run succeeded, 0 when it failed or was cancelled.\n# TYPE quilt_run_last_status gauge\n");
     let mut last_status = String::new();
     let mut last_duration = String::new();
     let mut last_rows = String::new();
@@ -116,21 +116,21 @@ pub fn write_metrics_textfile(workspace: &Path) -> std::io::Result<()> {
         let label = escape_label(pipeline_id);
         let ok = if last.status == "ok" { 1 } else { 0 };
         last_status.push_str(&format!(
-            "duckle_run_last_status{{pipeline=\"{}\"}} {}\n",
+            "quilt_run_last_status{{pipeline=\"{}\"}} {}\n",
             label, ok
         ));
         last_duration.push_str(&format!(
-            "duckle_run_last_duration_seconds{{pipeline=\"{}\"}} {}\n",
+            "quilt_run_last_duration_seconds{{pipeline=\"{}\"}} {}\n",
             label,
             last.duration_ms as f64 / 1000.0
         ));
         last_rows.push_str(&format!(
-            "duckle_run_last_rows{{pipeline=\"{}\"}} {}\n",
+            "quilt_run_last_rows{{pipeline=\"{}\"}} {}\n",
             label, last.rows
         ));
         if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(&last.at) {
             last_ts.push_str(&format!(
-                "duckle_run_last_timestamp_seconds{{pipeline=\"{}\"}} {}\n",
+                "quilt_run_last_timestamp_seconds{{pipeline=\"{}\"}} {}\n",
                 label,
                 ts.timestamp()
             ));
@@ -138,26 +138,26 @@ pub fn write_metrics_textfile(workspace: &Path) -> std::io::Result<()> {
         for status in ["ok", "error", "cancelled"] {
             let n = records.iter().filter(|r| r.status == status).count();
             window_runs.push_str(&format!(
-                "duckle_runs_window{{pipeline=\"{}\",status=\"{}\"}} {}\n",
+                "quilt_runs_window{{pipeline=\"{}\",status=\"{}\"}} {}\n",
                 label, status, n
             ));
         }
     }
 
     out.push_str(&last_status);
-    out.push_str("# HELP duckle_run_last_duration_seconds Wall-clock duration of the most recent run.\n# TYPE duckle_run_last_duration_seconds gauge\n");
+    out.push_str("# HELP quilt_run_last_duration_seconds Wall-clock duration of the most recent run.\n# TYPE quilt_run_last_duration_seconds gauge\n");
     out.push_str(&last_duration);
-    out.push_str("# HELP duckle_run_last_rows Rows written across all sinks in the most recent run.\n# TYPE duckle_run_last_rows gauge\n");
+    out.push_str("# HELP quilt_run_last_rows Rows written across all sinks in the most recent run.\n# TYPE quilt_run_last_rows gauge\n");
     out.push_str(&last_rows);
-    out.push_str("# HELP duckle_run_last_timestamp_seconds Unix time the most recent run started.\n# TYPE duckle_run_last_timestamp_seconds gauge\n");
+    out.push_str("# HELP quilt_run_last_timestamp_seconds Unix time the most recent run started.\n# TYPE quilt_run_last_timestamp_seconds gauge\n");
     out.push_str(&last_ts);
-    out.push_str("# HELP duckle_runs_window Runs by status within the retained history window (not a lifetime counter).\n# TYPE duckle_runs_window gauge\n");
+    out.push_str("# HELP quilt_runs_window Runs by status within the retained history window (not a lifetime counter).\n# TYPE quilt_runs_window gauge\n");
     out.push_str(&window_runs);
 
     let logs_dir = workspace.join("logs");
     std::fs::create_dir_all(&logs_dir)?;
-    let final_path = logs_dir.join("duckle_metrics.prom");
-    let tmp_path = logs_dir.join("duckle_metrics.prom.tmp");
+    let final_path = logs_dir.join("quilt_metrics.prom");
+    let tmp_path = logs_dir.join("quilt_metrics.prom.tmp");
     std::fs::write(&tmp_path, &out)?;
     std::fs::rename(&tmp_path, &final_path)
 }
@@ -192,15 +192,15 @@ mod tests {
         append_run_record(ws.path(), "other", record("ok", 100, 7)).unwrap();
 
         let text =
-            std::fs::read_to_string(ws.path().join("logs").join("duckle_metrics.prom")).unwrap();
-        assert!(text.contains("duckle_run_last_status{pipeline=\"orders_etl\"} 0"));
-        assert!(text.contains("duckle_run_last_status{pipeline=\"other\"} 1"));
-        assert!(text.contains("duckle_run_last_duration_seconds{pipeline=\"orders_etl\"} 0.9"));
-        assert!(text.contains("duckle_runs_window{pipeline=\"orders_etl\",status=\"ok\"} 1"));
-        assert!(text.contains("duckle_runs_window{pipeline=\"orders_etl\",status=\"error\"} 1"));
-        assert!(text.contains("# TYPE duckle_run_last_rows gauge"));
+            std::fs::read_to_string(ws.path().join("logs").join("quilt_metrics.prom")).unwrap();
+        assert!(text.contains("quilt_run_last_status{pipeline=\"orders_etl\"} 0"));
+        assert!(text.contains("quilt_run_last_status{pipeline=\"other\"} 1"));
+        assert!(text.contains("quilt_run_last_duration_seconds{pipeline=\"orders_etl\"} 0.9"));
+        assert!(text.contains("quilt_runs_window{pipeline=\"orders_etl\",status=\"ok\"} 1"));
+        assert!(text.contains("quilt_runs_window{pipeline=\"orders_etl\",status=\"error\"} 1"));
+        assert!(text.contains("# TYPE quilt_run_last_rows gauge"));
         // No half-written temp file left behind.
-        assert!(!ws.path().join("logs").join("duckle_metrics.prom.tmp").exists());
+        assert!(!ws.path().join("logs").join("quilt_metrics.prom.tmp").exists());
     }
 
     #[test]

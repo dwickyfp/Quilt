@@ -1,8 +1,8 @@
-//! Duckle DuckDB engine adapter - CLI-driven.
+//! Quilt DuckDB engine adapter - CLI-driven.
 //!
 //! Rather than statically linking libduckdb (which bloats the binary to
 //! tens of MB and makes builds glacial), this drives the official DuckDB
-//! **CLI** that Duckle downloads into the app-data dir on first launch.
+//! **CLI** that Quilt downloads into the app-data dir on first launch.
 //! The engine shells out to `duckdb -json -c "<sql>"` and parses the
 //! JSON it prints. SQL generation lives in `plan.rs` and is unchanged;
 //! only execution + inspection talk to the CLI here.
@@ -12,8 +12,8 @@
 //! separate CLI invocations); sinks `COPY` from the upstream table.
 //! Cancellation kills the in-flight child process.
 
-use duckle_metadata::{Column, DataType};
-use duckle_plugin_sdk::{Inspection, InspectError};
+use quilt_metadata::{Column, DataType};
+use quilt_plugin_sdk::{Inspection, InspectError};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use std::path::{Path, PathBuf};
@@ -299,7 +299,7 @@ impl DuckdbEngine {
     /// the azure extension, or ATTACH for a DuckDB file.
     fn source_prelude(&self, format: &str, options: &JsonValue) -> String {
         let mut p = String::new();
-        if let Some(secret) = secret_statement(format, "duckle_inspect", options) {
+        if let Some(secret) = secret_statement(format, "quilt_inspect", options) {
             p.push_str(&secret);
             p.push(' ');
         }
@@ -309,12 +309,12 @@ impl DuckdbEngine {
         if format == "duckdb" {
             if let Some(db) = options.get("database").and_then(JsonValue::as_str) {
                 p.push_str(&format!(
-                    "ATTACH '{}' AS duckle_src (READ_ONLY); ",
+                    "ATTACH '{}' AS quilt_src (READ_ONLY); ",
                     sql_escape(db)
                 ));
             }
         }
-        // DuckLake autodetect: ATTACH the catalog read-only as duckle_src so
+        // DuckLake autodetect: ATTACH the catalog read-only as quilt_src so
         // the inspect SELECT (build_relational_source) resolves (issue #18).
         if format == "ducklake" {
             p.push_str(&plan::ducklake_attach(options, true));
@@ -329,7 +329,7 @@ impl DuckdbEngine {
     }
 
     /// Like [`execute_pipeline`], naming the per-pipeline run-log folder
-    /// (`<DUCKLE_LOG_DIR>/<pipeline_name>/runtime.log`). Used by headless
+    /// (`<QUILT_LOG_DIR>/<pipeline_name>/runtime.log`). Used by headless
     /// runners (the scheduler) that have no event sink but still want the
     /// run logged under the pipeline's name rather than the fallback folder.
     pub fn execute_pipeline_named(&self, doc: &PipelineDoc, pipeline_name: &str) -> RunResult {
@@ -368,7 +368,7 @@ impl DuckdbEngine {
         };
 
         // Component-level run log (Splunk / Dynatrace), gated on
-        // DUCKLE_LOG_DIR. We tee every event through it so BOTH the fast
+        // QUILT_LOG_DIR. We tee every event through it so BOTH the fast
         // batched path and the per-stage path log uniformly, for every run
         // mode (interactive, scheduled, sub-pipeline). The map gives each
         // line its component id + label.
@@ -403,7 +403,7 @@ impl DuckdbEngine {
         // the same clock tick (parallel tests, or concurrent scheduled
         // runs), which would otherwise collide and fight over the file.
         let db_path = std::env::temp_dir().join(format!(
-            "duckle_run_{}_{}_{}.duckdb",
+            "quilt_run_{}_{}_{}.duckdb",
             std::process::id(),
             now_nanos(),
             RUN_SEQ.fetch_add(1, Ordering::Relaxed)
@@ -515,9 +515,9 @@ impl DuckdbEngine {
             // touching every stage. Per-stage settings still override
             // the env defaults.
             //
-            //   DUCKLE_MEMORY_LIMIT - e.g. "4GB", "2048MB" (DuckDB syntax)
-            //   DUCKLE_THREADS      - integer; DuckDB defaults to N cores
-            //   DUCKLE_TEMP_DIR     - spill directory (default: OS temp)
+            //   QUILT_MEMORY_LIMIT - e.g. "4GB", "2048MB" (DuckDB syntax)
+            //   QUILT_THREADS      - integer; DuckDB defaults to N cores
+            //   QUILT_TEMP_DIR     - spill directory (default: OS temp)
             //
             // Plus a fixed performance preset (always on) that flips a
             // handful of DuckDB defaults that hurt typical ETL throughput:
@@ -548,7 +548,7 @@ impl DuckdbEngine {
                      PRAGMA enable_object_cache=true; \
                      PRAGMA enable_progress_bar=false; ",
                 );
-                let env_mem = std::env::var("DUCKLE_MEMORY_LIMIT").ok().filter(|s| !s.is_empty());
+                let env_mem = std::env::var("QUILT_MEMORY_LIMIT").ok().filter(|s| !s.is_empty());
                 let mem = match stage.memory_limit_mb {
                     Some(mb) => Some(format!("{}MB", mb)),
                     None => env_mem,
@@ -556,14 +556,14 @@ impl DuckdbEngine {
                 if let Some(m) = mem {
                     prag.push_str(&format!("PRAGMA memory_limit='{}'; ", m.replace('\'', "''")));
                 }
-                if let Ok(t) = std::env::var("DUCKLE_THREADS") {
+                if let Ok(t) = std::env::var("QUILT_THREADS") {
                     if let Ok(n) = t.trim().parse::<u32>() {
                         if n > 0 {
                             prag.push_str(&format!("PRAGMA threads={}; ", n));
                         }
                     }
                 }
-                if let Ok(d) = std::env::var("DUCKLE_TEMP_DIR") {
+                if let Ok(d) = std::env::var("QUILT_TEMP_DIR") {
                     let d = d.trim();
                     if !d.is_empty() {
                         let escaped = d.replace('\'', "''").replace('\\', "/");
@@ -1098,7 +1098,7 @@ impl DuckdbEngine {
         let mut was_cancelled = false;
 
         let marker_dir = std::env::temp_dir().join(format!(
-            "duckle_marks_{}_{}_{}",
+            "quilt_marks_{}_{}_{}",
             std::process::id(),
             now_nanos(),
             RUN_SEQ.fetch_add(1, Ordering::Relaxed),
@@ -1165,7 +1165,7 @@ impl DuckdbEngine {
              PRAGMA enable_object_cache=true;\n\
              PRAGMA enable_progress_bar=false;\n",
         );
-        if let Ok(m) = std::env::var("DUCKLE_MEMORY_LIMIT") {
+        if let Ok(m) = std::env::var("QUILT_MEMORY_LIMIT") {
             let m = m.trim();
             if !m.is_empty() {
                 batched_sql.push_str(&format!(
@@ -1174,14 +1174,14 @@ impl DuckdbEngine {
                 ));
             }
         }
-        if let Ok(t) = std::env::var("DUCKLE_THREADS") {
+        if let Ok(t) = std::env::var("QUILT_THREADS") {
             if let Ok(n) = t.trim().parse::<u32>() {
                 if n > 0 {
                     batched_sql.push_str(&format!("PRAGMA threads={};\n", n));
                 }
             }
         }
-        if let Ok(d) = std::env::var("DUCKLE_TEMP_DIR") {
+        if let Ok(d) = std::env::var("QUILT_TEMP_DIR") {
             let d = d.trim();
             if !d.is_empty() {
                 batched_sql.push_str(&format!(
@@ -1227,8 +1227,8 @@ impl DuckdbEngine {
             // ATTACH view; the binder bug above otherwise aborts the
             // batch.
             let count_target = count_target.filter(|t| !extension_node_ids.contains(t));
-            // Marker shape is just `SELECT COUNT(*) AS _duckle_r FROM <t>`
-            // (or `SELECT NULL AS _duckle_r` when there's no countable
+            // Marker shape is just `SELECT COUNT(*) AS _quilt_r FROM <t>`
+            // (or `SELECT NULL AS _quilt_r` when there's no countable
             // target). No string-literal projected alongside the
             // aggregate: DuckDB's binder repeatedly tripped on
             // `SELECT 'literal' AS x, COUNT(*) AS y FROM <foreign>`
@@ -1239,12 +1239,12 @@ impl DuckdbEngine {
             // need it inside the payload.
             match count_target {
                 Some(t) => batched_sql.push_str(&format!(
-                    "COPY (SELECT COUNT(*) AS _duckle_r FROM {}) TO '{}' (FORMAT 'json', ARRAY false);\n",
+                    "COPY (SELECT COUNT(*) AS _quilt_r FROM {}) TO '{}' (FORMAT 'json', ARRAY false);\n",
                     plan::quote_ident(t),
                     path_to_sql(&marker),
                 )),
                 None => batched_sql.push_str(&format!(
-                    "COPY (SELECT NULL AS _duckle_r) TO '{}' (FORMAT 'json', ARRAY false);\n",
+                    "COPY (SELECT NULL AS _quilt_r) TO '{}' (FORMAT 'json', ARRAY false);\n",
                     path_to_sql(&marker),
                 )),
             }
@@ -1631,7 +1631,7 @@ enum MarkerState {
 
 /// Read the single-row NDJSON marker the batched executor emits at each
 /// stage boundary. Returns [`MarkerState::Pending`] until the file is a
-/// complete, parseable JSON object carrying `_duckle_r`.
+/// complete, parseable JSON object carrying `_quilt_r`.
 fn read_marker(path: &Path) -> MarkerState {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
@@ -1648,7 +1648,7 @@ fn read_marker(path: &Path) -> MarkerState {
         Ok(v) => v,
         Err(_) => return MarkerState::Pending,
     };
-    match v.get("_duckle_r") {
+    match v.get("_quilt_r") {
         None => MarkerState::Pending,
         Some(JsonValue::Null) => MarkerState::Ready(None),
         Some(x) => {
@@ -1970,7 +1970,7 @@ fn unique_rest_tmp_path(node_id: &str) -> PathBuf {
     let tid = format!("{:?}", std::thread::current().id())
         .replace(|c: char| !c.is_ascii_alphanumeric(), "");
     std::env::temp_dir().join(format!(
-        "duckle-rest-{}-{}-{}-{}.json",
+        "quilt-rest-{}-{}-{}-{}.json",
         node_id,
         std::process::id(),
         nanos,
@@ -2046,7 +2046,7 @@ fn materialize_typed_arrayrows(
 
 /// Run a single SQL statement against `db` using the engine's own DuckDB
 /// binary. `bin` is threaded down from `&self.bin` so this never depends on
-/// the DUCKLE_DUCKDB_BIN environment variable being set - the engine can be
+/// the QUILT_DUCKDB_BIN environment variable being set - the engine can be
 /// constructed with a valid binary and still materialize results even when
 /// the process env is empty (tests, embedded hosts).
 fn apply_duckdb_sql(bin: &Path, db: &Path, sql: &str) -> Result<(), EngineError> {
@@ -3287,11 +3287,11 @@ pub struct StageSql {
 
 pub fn compile_pipeline_sql(doc: &PipelineDoc) -> Result<Vec<StageSql>, EngineError> {
     // By default the exported / displayed SQL has its secret values
-    // replaced with named placeholders. Setting DUCKLE_EXPORT_INCLUDE_SECRETS
+    // replaced with named placeholders. Setting QUILT_EXPORT_INCLUDE_SECRETS
     // to a truthy value (1/true/yes/on) opts in to emitting the real
     // credentials so the script runs unchanged against the source (issue
     // #9). The value is then live and the output must be handled with care.
-    let include_secrets = std::env::var("DUCKLE_EXPORT_INCLUDE_SECRETS")
+    let include_secrets = std::env::var("QUILT_EXPORT_INCLUDE_SECRETS")
         .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
         .unwrap_or(false);
     compile_pipeline_sql_opts(doc, include_secrets)
@@ -3322,7 +3322,7 @@ pub fn compile_pipeline_sql_opts(
         .into_iter()
         .map(|s| {
             // Driver-backed and control-flow stages carry no DuckDB SQL
-            // (they run in the Duckle runtime via Rust connectors / hooks).
+            // (they run in the Quilt runtime via Rust connectors / hooks).
             // For the SQL export we annotate them so the exported script
             // reflects the WHOLE pipeline order, not just the parts that
             // lower to SQL - issue #7.
@@ -3356,10 +3356,10 @@ mod tests {
     fn secret_placeholder_derives_env_style_name() {
         // Issue #9: secret values are replaced with a named placeholder so
         // the exported SQL stays valid; the name comes from the prop key.
-        assert_eq!(secret_placeholder("password"), "${DUCKLE_PASSWORD}");
-        assert_eq!(secret_placeholder("client_secret"), "${DUCKLE_CLIENT_SECRET}");
-        assert_eq!(secret_placeholder("apiKey"), "${DUCKLE_API_KEY}");
-        assert_eq!(secret_placeholder("connectionString"), "${DUCKLE_CONNECTION_STRING}");
+        assert_eq!(secret_placeholder("password"), "${QUILT_PASSWORD}");
+        assert_eq!(secret_placeholder("client_secret"), "${QUILT_CLIENT_SECRET}");
+        assert_eq!(secret_placeholder("apiKey"), "${QUILT_API_KEY}");
+        assert_eq!(secret_placeholder("connectionString"), "${QUILT_CONNECTION_STRING}");
     }
 
     #[test]
@@ -3439,17 +3439,17 @@ mod tests {
         // produced "0 rows written despite RUN SUCCEEDED".
         assert_eq!(marker_state(read_marker(&write("empty.json", ""))), None);
         // Partially written JSON -> Pending.
-        assert_eq!(marker_state(read_marker(&write("partial.json", "{\"_duckle_"))), None);
+        assert_eq!(marker_state(read_marker(&write("partial.json", "{\"_quilt_"))), None);
         // Object without the key -> Pending.
         assert_eq!(marker_state(read_marker(&write("nokey.json", "{\"x\":1}"))), None);
         // Complete count -> Ready(Some(n)), including large counts.
         assert_eq!(
-            marker_state(read_marker(&write("full.json", "{\"_duckle_r\":2000000}"))),
+            marker_state(read_marker(&write("full.json", "{\"_quilt_r\":2000000}"))),
             Some(Some(2_000_000))
         );
         // Legitimate count-less marker (ctl.switch / xf.assert) -> Ready(None).
         assert_eq!(
-            marker_state(read_marker(&write("null.json", "{\"_duckle_r\":null}"))),
+            marker_state(read_marker(&write("null.json", "{\"_quilt_r\":null}"))),
             Some(None)
         );
     }

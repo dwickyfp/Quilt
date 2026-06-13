@@ -32,12 +32,12 @@ import {
     Trash2,
     Undo2,
 } from 'lucide-react';
-import DuckleNode from './nodes/DuckleNode';
-import DuckleEdge from './DuckleEdge';
+import QuiltNode from './nodes/QuiltNode';
+import QuiltEdge from './QuiltEdge';
 import ConnectionTypePicker from './ConnectionTypePicker';
 import { QuickAddSearch } from './QuickAddSearch';
 import { CONNECTION_TYPES, type ConnectionType } from './connection-types';
-import type { DuckleNodeData } from '../pipeline-types';
+import type { QuiltNodeData } from '../pipeline-types';
 import { readClipboard } from '../clipboard';
 import type { ComponentDef } from '../workflow-ui/palette-data';
 import { useContextMenu, type MenuItem } from '../workflow-ui/ContextMenu';
@@ -47,17 +47,17 @@ import { useTheme } from '../theme';
 const ICON_SIZE = 14;
 
 const nodeTypes = {
-    source: DuckleNode,
-    transform: DuckleNode,
-    sink: DuckleNode,
+    source: QuiltNode,
+    transform: QuiltNode,
+    sink: QuiltNode,
 };
 
 const edgeTypes = {
-    duckle: DuckleEdge,
+    quilt: QuiltEdge,
 };
 
 const DEFAULT_EDGE_OPTIONS = {
-    type: 'duckle' as const,
+    type: 'quilt' as const,
 };
 
 const DELETE_KEYS = ['Delete', 'Backspace'];
@@ -86,7 +86,7 @@ export type PaneAction =
     | 'build';
 
 type Props = {
-    nodes: Node<DuckleNodeData>[];
+    nodes: Node<QuiltNodeData>[];
     edges: Edge[];
     onNodesChange: (changes: NodeChange[]) => void;
     onEdgesChange: (changes: EdgeChange[]) => void;
@@ -129,7 +129,7 @@ function CanvasInner({
     // a default fit. Restore-in-progress is tracked so the programmatic
     // setViewport doesn't immediately overwrite the saved value via onMoveEnd.
     const viewportRestoredFor = useRef<string | null>(null);
-    const viewportKey = (id: string) => `duckle.viewport.${id}`;
+    const viewportKey = (id: string) => `quilt.viewport.${id}`;
     useEffect(() => {
         const id = pipelineId;
         if (!id) return;
@@ -315,8 +315,8 @@ function CanvasInner({
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         if (
-            e.dataTransfer.types.includes('application/duckle-component') ||
-            e.dataTransfer.types.includes('application/duckle-context')
+            e.dataTransfer.types.includes('application/quilt-component') ||
+            e.dataTransfer.types.includes('application/quilt-context')
         ) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
@@ -328,16 +328,16 @@ function CanvasInner({
             e.preventDefault();
             e.stopPropagation();
             // A context dragged from the Project tree sets the active context.
-            const ctxId = e.dataTransfer.getData('application/duckle-context');
+            const ctxId = e.dataTransfer.getData('application/quilt-context');
             if (ctxId) {
                 onSetActiveContext?.(ctxId);
                 return;
             }
-            const raw = e.dataTransfer.getData('application/duckle-component');
+            const raw = e.dataTransfer.getData('application/quilt-component');
             if (!raw) {
                 // Helpful when debugging: types should include our MIME.
                 console.warn(
-                    'Drop received but application/duckle-component data is missing',
+                    'Drop received but application/quilt-component data is missing',
                     Array.from(e.dataTransfer.types),
                 );
                 return;
@@ -354,7 +354,7 @@ function CanvasInner({
     );
 
     const handleNodeContextMenu = useCallback(
-        (e: React.MouseEvent, node: Node<DuckleNodeData>) => {
+        (e: React.MouseEvent, node: Node<QuiltNodeData>) => {
             const isDisabled = node.data.disabled === true;
             const autodetect = nodeAutodetectAvailable(node.id);
             const items: MenuItem[] = [

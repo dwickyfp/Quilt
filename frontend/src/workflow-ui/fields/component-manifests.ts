@@ -414,9 +414,9 @@ export const MANIFESTS: Record<string, ComponentManifest> = {
                         label: 'Advanced: custom SQL',
                         kind: 'expression',
                         rows: 4,
-                        placeholder: 'SELECT * FROM duckle_src.orders WHERE status = ...',
+                        placeholder: 'SELECT * FROM quilt_src.orders WHERE status = ...',
                         description:
-                            'Optional - used only when no table is set above. Reference tables as duckle_src.<table>.',
+                            'Optional - used only when no table is set above. Reference tables as quilt_src.<table>.',
                     },
                 ],
             },

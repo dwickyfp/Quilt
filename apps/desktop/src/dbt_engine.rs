@@ -6,13 +6,13 @@
 //! tax per invocation. The Fusion CLI is free to use (no account, no payment); we
 //! fetch the native binary from dbt's official public CDN at first launch - the
 //! same fetch-not-bundle model we use for DuckDB and uv, so nothing proprietary
-//! is redistributed inside Duckle.
+//! is redistributed inside Quilt.
 //!
 //! FALLBACK: the Apache-2.0 dbt-core line via uv (`uv tool install dbt-core
 //! --with dbt-duckdb`). Used only when Fusion can't be fetched (offline, or an
 //! unsupported OS/arch). uv brings its own standalone Python.
 //!
-//! Whichever engine is provisioned, its `dbt` path is published as DUCKLE_DBT_BIN
+//! Whichever engine is provisioned, its `dbt` path is published as QUILT_DBT_BIN
 //! for the engine's resolve_dbt_bin(). Everything lives under the app-data dir
 //! (`<app_data>/dbt-fusion/` or `<app_data>/dbt/`), isolated from any system dbt.
 
@@ -61,17 +61,17 @@ pub fn is_installed(app_data: &Path) -> bool {
     fusion_present(app_data) || dbt_path(app_data).exists()
 }
 
-/// Publish whichever provisioned dbt the engine should use as DUCKLE_DBT_BIN,
+/// Publish whichever provisioned dbt the engine should use as QUILT_DBT_BIN,
 /// preferring Fusion. Cheap, no network - safe to call on every startup.
 pub fn publish_if_present(app_data: &Path) {
     let f = fusion_path(app_data);
     if f.exists() {
-        std::env::set_var("DUCKLE_DBT_BIN", &f);
+        std::env::set_var("QUILT_DBT_BIN", &f);
         return;
     }
     let c = dbt_path(app_data);
     if c.exists() {
-        std::env::set_var("DUCKLE_DBT_BIN", &c);
+        std::env::set_var("QUILT_DBT_BIN", &c);
     }
 }
 
@@ -249,7 +249,7 @@ fn fusion_version(client: &reqwest::blocking::Client) -> String {
 
 /// Fetch the free dbt Fusion CLI (native Rust, no Python) from dbt's official
 /// public CDN into `<app_data>/dbt-fusion/`. Idempotent. ~94 MB download on the
-/// first call; nothing proprietary is bundled inside Duckle.
+/// first call; nothing proprietary is bundled inside Quilt.
 fn ensure_fusion(app_data: &Path) -> Result<PathBuf, String> {
     let dbt = fusion_path(app_data);
     if dbt.exists() {
@@ -321,18 +321,18 @@ fn ensure_fusion(app_data: &Path) -> Result<PathBuf, String> {
 }
 
 /// Ensure a dbt engine is provisioned (idempotent) and publish it as
-/// DUCKLE_DBT_BIN. Prefers Fusion (Rust, ~50x faster startup); falls back to the
+/// QUILT_DBT_BIN. Prefers Fusion (Rust, ~50x faster startup); falls back to the
 /// Apache dbt-core line via uv if Fusion cannot be fetched (offline / unsupported
 /// arch). Network + time on the first call.
 pub fn ensure(app_data: &Path) -> Result<PathBuf, String> {
     match ensure_fusion(app_data) {
         Ok(p) => {
-            std::env::set_var("DUCKLE_DBT_BIN", &p);
+            std::env::set_var("QUILT_DBT_BIN", &p);
             Ok(p)
         }
         Err(fe) => match ensure_dbt_core(app_data) {
             Ok(p) => {
-                std::env::set_var("DUCKLE_DBT_BIN", &p);
+                std::env::set_var("QUILT_DBT_BIN", &p);
                 Ok(p)
             }
             Err(ce) => Err(format!(

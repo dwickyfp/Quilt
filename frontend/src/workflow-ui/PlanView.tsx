@@ -3,10 +3,10 @@ import { ListTree, Clipboard } from 'lucide-react';
 import type { Edge, Node } from '@xyflow/react';
 import { compilePipelineSql, type StageSql } from '../tauri-bridge';
 import { copyText } from '../tauri-io';
-import type { DuckleNodeData } from '../pipeline-types';
+import type { QuiltNodeData } from '../pipeline-types';
 
 type Props = {
-    nodes: Node<DuckleNodeData>[];
+    nodes: Node<QuiltNodeData>[];
     edges: Edge[];
 };
 

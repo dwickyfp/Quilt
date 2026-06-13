@@ -1,7 +1,7 @@
 //! In-app Git integration for the user's workspace folder.
 //!
 //! Connect a workspace to a remote (GitHub / GitLab),
-//! commit + push + pull from inside Duckle, manage branches, see CI
+//! commit + push + pull from inside Quilt, manage branches, see CI
 //! build status. Wraps the system `git` CLI rather than embedding
 //! libgit2 - same pattern as `src.git` in the engine. Trade-off:
 //! requires `git` on PATH, but no FFI / no large dep, and the user
@@ -13,8 +13,8 @@
 //!   2. On 401 / 403 from the remote, prompt the frontend for a
 //!      Personal Access Token, retry by injecting the token into
 //!      the remote URL: `https://x-token-auth:TOKEN@github.com/...`.
-//!   3. Cache the PAT at `<workspace>/.duckle/secrets/git.json`.
-//!      Auto-write a `.duckle/.gitignore` so the secret file never
+//!   3. Cache the PAT at `<workspace>/.quilt/secrets/git.json`.
+//!      Auto-write a `.quilt/.gitignore` so the secret file never
 //!      ends up committed.
 
 use serde::{Deserialize, Serialize};
@@ -276,21 +276,38 @@ pub fn push(workspace: &Path) -> GitResult<String> {
     Err(format!("push failed: {}", err.trim()))
 }
 
-/// Retry the push with the PAT injected into the remote URL for the
-/// duration of the call. We don't permanently rewrite the remote so
-/// the URL the user sees in `git remote -v` stays clean.
+/// Retry the push with the PAT supplied out-of-band. The token is passed to
+/// git through an environment variable consumed by an inline credential
+/// helper, so it never appears in the process argument list (which is
+/// world-readable via `ps` / `/proc/<pid>/cmdline`). We don't rewrite the
+/// remote, so `git remote -v` stays clean.
 fn push_with_pat(workspace: &Path, token: &str) -> GitResult<String> {
     let url = run_git(workspace, &["config", "--get", "remote.origin.url"])?;
     let url = url.trim();
-    let authed = inject_token(url, token).ok_or_else(|| {
-        "PAT injection only supported for https:// remotes; switch your remote or push from a terminal".to_string()
-    })?;
-    // Push with an explicit URL: `git push <url> <branch>` - this
-    // sends the token but doesn't write it to the config.
+    if !url.to_lowercase().starts_with("https://") {
+        return Err(
+            "PAT auth only supported for https:// remotes; switch your remote or push from a terminal"
+                .to_string(),
+        );
+    }
     let branch = run_git(workspace, &["rev-parse", "--abbrev-ref", "HEAD"])?;
     let branch = branch.trim();
+    // The argv only references $QUILT_GIT_PAT; the secret itself stays in the
+    // environment (readable only by the same user, unlike argv). The leading
+    // empty `credential.helper=` clears any system helper so only ours runs.
+    let helper = "!f() { test \"$1\" = get && printf 'username=x-token-auth\\npassword=%s\\n' \"$QUILT_GIT_PAT\"; }; f";
+    let helper_cfg = format!("credential.helper={}", helper);
     let out = git_cmd(workspace)
-        .args(["push", &authed, branch])
+        .env("QUILT_GIT_PAT", token)
+        .args([
+            "-c",
+            "credential.helper=",
+            "-c",
+            &helper_cfg,
+            "push",
+            "origin",
+            branch,
+        ])
         .output()
         .map_err(|e| format!("spawn git push (PAT): {}", e))?;
     if !out.status.success() {
@@ -324,17 +341,35 @@ pub fn branches(workspace: &Path) -> GitResult<Vec<String>> {
 }
 
 pub fn branch_create(workspace: &Path, name: &str) -> GitResult<()> {
+    reject_option_like(name, "branch name")?;
     run_git(workspace, &["checkout", "-b", name])?;
     Ok(())
 }
 
 pub fn branch_checkout(workspace: &Path, name: &str) -> GitResult<()> {
+    reject_option_like(name, "branch name")?;
     run_git(workspace, &["checkout", name])?;
     Ok(())
 }
 
 pub fn remote_set(workspace: &Path, url: &str) -> GitResult<()> {
-    // Add origin if missing, set-url otherwise.
+    // Reject transports other than https:// and SSH. Git honors `ext::`,
+    // `fd::`, and `file://` "remote helper" URLs that execute an arbitrary
+    // command on the next fetch/push, so an attacker-supplied remote like
+    // `ext::sh -c '...'` would be RCE. Only plain https and SSH remotes are
+    // allowed; anything else is refused.
+    let lower = url.trim().to_lowercase();
+    let is_https = lower.starts_with("https://");
+    // scp-style `git@host:path` or explicit ssh:// URLs.
+    let is_ssh = lower.starts_with("ssh://")
+        || (!lower.contains("://") && url.contains('@') && url.contains(':'));
+    if !(is_https || is_ssh) {
+        return Err(
+            "remote URL must be an https:// or SSH URL (other transports are not allowed)".into(),
+        );
+    }
+    // Add origin if missing, set-url otherwise. The scheme check above already
+    // guarantees the url can't begin with `-`, so it can't be read as an option.
     let exists = run_git(workspace, &["remote", "get-url", "origin"]).is_ok();
     if exists {
         run_git(workspace, &["remote", "set-url", "origin", url])?;
@@ -352,23 +387,25 @@ struct StoredPat {
 }
 
 fn pat_path(workspace: &Path) -> PathBuf {
-    workspace.join(".duckle").join("secrets").join("git.json")
+    workspace.join(".quilt").join("secrets").join("git.json")
 }
 
 /// Persist a PAT for later push retries. The token is encrypted with the
 /// per-workspace key (the same key the connection secrets use), and a
-/// `.duckle/.gitignore` excludes the secrets + keys dirs so neither enters
-/// the user's repo.
+/// `.quilt/.gitignore` excludes the secrets + keys dirs so neither enters
+/// the user's repo. Encryption is mandatory: if the key can't be created or
+/// the token can't be encrypted we refuse to write rather than fall back to
+/// storing the token in plaintext.
 pub fn save_pat(workspace: &Path, token: &str) -> GitResult<()> {
     let path = pat_path(workspace);
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("mkdir {}: {}", parent.display(), e))?;
     }
-    let stored = match crate::secrets::workspace_key(workspace, true) {
-        Ok(key) => crate::secrets::encrypt_value(&key, token).unwrap_or_else(|_| token.to_string()),
-        Err(_) => token.to_string(),
-    };
+    let key = crate::secrets::workspace_key(workspace, true)
+        .map_err(|e| format!("cannot derive workspace key to encrypt PAT: {}", e))?;
+    let stored = crate::secrets::encrypt_value(&key, token)
+        .map_err(|e| format!("cannot encrypt PAT: {}", e))?;
     let body = serde_json::to_string_pretty(&StoredPat { pat: stored }).map_err(|e| e.to_string())?;
     std::fs::write(&path, body).map_err(|e| format!("write {}: {}", path.display(), e))?;
     write_gitignore_safety(workspace);
@@ -404,12 +441,12 @@ pub fn clear_pat(workspace: &Path) -> GitResult<()> {
     Ok(())
 }
 
-/// Ensure `<workspace>/.duckle/.gitignore` excludes the `secrets/` dir (cached
+/// Ensure `<workspace>/.quilt/.gitignore` excludes the `secrets/` dir (cached
 /// PAT) and the `keys/` dir (the connection-secret encryption key). The
 /// encrypted `connections/` files are safe to commit; the key is not.
 /// Idempotent - only adds a line if it is missing.
-fn write_gitignore_safety(workspace: &Path) {
-    let dir = workspace.join(".duckle");
+pub(crate) fn write_gitignore_safety(workspace: &Path) {
+    let dir = workspace.join(".quilt");
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join(".gitignore");
     let mut existing = std::fs::read_to_string(&path).unwrap_or_default();
@@ -429,22 +466,13 @@ fn write_gitignore_safety(workspace: &Path) {
     }
 }
 
-/// Inject a PAT into an HTTPS remote URL. Returns None for ssh:// or
-/// git:// URLs - those use SSH key auth which we don't try to manage.
-fn inject_token(url: &str, token: &str) -> Option<String> {
-    let lower = url.to_lowercase();
-    if !lower.starts_with("https://") {
-        return None;
+/// Reject a value that would be parsed by git as an option (leading `-`).
+/// Guards positional arguments like branch names from option-injection.
+fn reject_option_like(value: &str, label: &str) -> GitResult<()> {
+    if value.trim_start().starts_with('-') {
+        return Err(format!("invalid {}: must not start with '-'", label));
     }
-    let rest = &url["https://".len()..];
-    // Strip any existing user:pass that might already be there.
-    let host_and_path = match rest.find('@') {
-        Some(i) => &rest[i + 1..],
-        None => rest,
-    };
-    // GitHub + GitLab both accept `x-token-auth:TOKEN` or just `TOKEN`
-    // as the user. We use `x-token-auth` to be explicit.
-    Some(format!("https://x-token-auth:{}@{}", token, host_and_path))
+    Ok(())
 }
 
 fn looks_like_auth_failure(stderr: &str) -> bool {
@@ -504,18 +532,11 @@ mod tests {
     }
 
     #[test]
-    fn inject_token_only_wraps_https() {
-        assert_eq!(
-            inject_token("https://github.com/foo/bar.git", "ghp_xxx").as_deref(),
-            Some("https://x-token-auth:ghp_xxx@github.com/foo/bar.git")
-        );
-        // SSH untouched
-        assert_eq!(inject_token("git@github.com:foo/bar.git", "ghp_xxx"), None);
-        // Existing creds get stripped
-        assert_eq!(
-            inject_token("https://oldtoken@gitlab.com/p.git", "newpat").as_deref(),
-            Some("https://x-token-auth:newpat@gitlab.com/p.git")
-        );
+    fn reject_option_like_blocks_dash_prefix() {
+        assert!(reject_option_like("--upload-pack=evil", "branch name").is_err());
+        assert!(reject_option_like("-x", "branch name").is_err());
+        assert!(reject_option_like("feature/ok", "branch name").is_ok());
+        assert!(reject_option_like("main", "branch name").is_ok());
     }
 
     #[test]

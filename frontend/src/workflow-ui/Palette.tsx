@@ -128,7 +128,7 @@ export default function Palette() {
     };
 
     const onDragStart = (e: DragEvent<HTMLDivElement>, c: ComponentDef) => {
-        e.dataTransfer.setData('application/duckle-component', JSON.stringify(c));
+        e.dataTransfer.setData('application/quilt-component', JSON.stringify(c));
         e.dataTransfer.effectAllowed = 'copy';
     };
 

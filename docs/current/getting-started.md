@@ -1,12 +1,12 @@
 # Getting Started Guide
 
-This guide walks you through the visual layout of the Duckle application and helps you build, configure, and execute your first data pipeline using the drag-and-drop editor.
+This guide walks you through the visual layout of the Quilt application and helps you build, configure, and execute your first data pipeline using the drag-and-drop editor.
 
 ---
 
 ## 1. Visual Studio Layout
 
-The Duckle user interface is divided into five main areas:
+The Quilt user interface is divided into five main areas:
 
 ```text
  ┌────────────────────────────────────────────────────────────────────────┐

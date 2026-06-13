@@ -58,9 +58,9 @@ export default function EngineSetupModal({ onReady }: Props) {
                         <Workflow size={28} />
                     </div>
                     <div className="modal-workspace-titles">
-                        <div className="modal-title">Set up Duckle</div>
+                        <div className="modal-title">Set up Quilt</div>
                         <div className="modal-subtitle">
-                            One-time engine install - Duckle stays a tiny download and fetches
+                            One-time engine install - Quilt stays a tiny download and fetches
                             its engine on first run.
                         </div>
                     </div>
@@ -192,7 +192,7 @@ function ProgressLine({ progress }: { progress: InstallProgress }) {
             label = 'Verifying…';
             break;
         case 'installing_extension':
-            // Pre-fetching the extensions Duckle uses so the first
+            // Pre-fetching the extensions Quilt uses so the first
             // Postgres / S3 / Excel touch is instant.
             label = `Installing extensions (${progress.index}/${progress.total}): ${progress.name}`;
             pct = Math.round((progress.index / progress.total) * 100);

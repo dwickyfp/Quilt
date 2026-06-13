@@ -1,6 +1,6 @@
 [package]
-name = "duckle-duckdb-engine"
-description = "DuckDB-backed execution engine for Duckle pipelines."
+name = "quilt-duckdb-engine"
+description = "DuckDB-backed execution engine for Quilt pipelines."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,8 +13,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
-duckle-metadata = { workspace = true }
-duckle-plugin-sdk = { workspace = true }
+quilt-metadata = { workspace = true }
+quilt-plugin-sdk = { workspace = true }
 # Blocking HTTP client for SaaS connectors (snk.webhook, snk.rest,
 # src.rest, vector-DB HTTP APIs). ureq is ~20kb with minimal deps
 # vs ~100kb for reqwest + tokio, and it matches the per-stage CLI

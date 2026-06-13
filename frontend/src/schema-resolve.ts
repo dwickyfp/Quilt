@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
-import type { Column, DataType, DuckleNodeData } from './pipeline-types';
+import type { Column, DataType, QuiltNodeData } from './pipeline-types';
 import { getManifest } from './workflow-ui/fields/component-manifests';
 import type { Aggregation } from './workflow-ui/fields/types';
 
@@ -29,7 +29,7 @@ function aggOutputType(func: string, sourceCol: Column | undefined): DataType {
  */
 export function resolveOutputSchema(
     nodeId: string,
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
     visiting: Set<string> = new Set(),
 ): Column[] {
@@ -45,8 +45,8 @@ export function resolveOutputSchema(
 }
 
 function computeNodeSchema(
-    node: Node<DuckleNodeData>,
-    nodes: Node<DuckleNodeData>[],
+    node: Node<QuiltNodeData>,
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
     visiting: Set<string>,
 ): Column[] {
@@ -207,7 +207,7 @@ function computeNodeSchema(
 
 function mergedUpstream(
     nodeId: string,
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
     visiting: Set<string>,
 ): Column[] {
@@ -232,7 +232,7 @@ function mergedUpstream(
  */
 export function resolveUpstreamSchema(
     nodeId: string | undefined,
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
 ): Column[] {
     if (!nodeId) return [];
@@ -245,7 +245,7 @@ export function resolveUpstreamSchema(
  */
 export function resolveInputPortSchemas(
     nodeId: string,
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
 ): { portId: string; schema: Column[] }[] {
     const incoming = edges.filter(e => e.target === nodeId);
@@ -267,7 +267,7 @@ export function resolveInputPortSchemas(
  */
 export function resolveUpstreamSampleRows(
     nodeId: string | undefined,
-    nodes: Node<DuckleNodeData>[],
+    nodes: Node<QuiltNodeData>[],
     edges: Edge[],
 ): Record<string, unknown>[] {
     if (!nodeId) return [];

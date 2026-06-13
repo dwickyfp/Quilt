@@ -10,7 +10,7 @@ fn main() {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    println!("cargo:rustc-env=DUCKLE_BUILD_EPOCH={epoch}");
+    println!("cargo:rustc-env=QUILT_BUILD_EPOCH={epoch}");
     // Force this script to re-run on EVERY build so the stamped epoch is always
     // the actual build time. Pinning rerun to build.rs alone left local rebuilds
     // carrying the very first build's timestamp, which made the update check
@@ -18,7 +18,7 @@ fn main() {
     // than the release. Referencing a path that never exists makes Cargo treat
     // the script as always-dirty and re-run it.
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=.duckle-always-restamp-build-epoch");
+    println!("cargo:rerun-if-changed=.quilt-always-restamp-build-epoch");
 
     embed_runner();
     embed_mcp();
@@ -26,8 +26,8 @@ fn main() {
     tauri_build::build()
 }
 
-/// Locate a freshly built `duckle-mcp` and expose its bytes to lib.rs via
-/// include_bytes!(env!("DUCKLE_EMBEDDED_MCP")). Unlike the runner (required for
+/// Locate a freshly built `quilt-mcp` and expose its bytes to lib.rs via
+/// include_bytes!(env!("QUILT_EMBEDDED_MCP")). Unlike the runner (required for
 /// Build Pipeline), the MCP server is optional: when it is not staged we embed
 /// an empty file so the desktop still builds, and the in-app MCP popup reports
 /// that this build carries no bundled server. CI / release stage it for real.
@@ -36,9 +36,9 @@ fn embed_mcp() {
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR");
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let name = if target_os == "windows" {
-        "duckle-mcp.exe"
+        "quilt-mcp.exe"
     } else {
-        "duckle-mcp"
+        "quilt-mcp"
     };
 
     let staged = std::path::Path::new(&manifest_dir).join("bin").join(name);
@@ -63,29 +63,29 @@ fn embed_mcp() {
             std::fs::write(&dst, [])
                 .unwrap_or_else(|e| panic!("write empty embedded-mcp: {}", e));
             println!(
-                "cargo:warning=duckle-mcp not staged (apps/desktop/bin/{name}); the in-app MCP popup will report no bundled server. Stage it: cargo build --profile release-runner -p duckle-mcp"
+                "cargo:warning=quilt-mcp not staged (apps/desktop/bin/{name}); the in-app MCP popup will report no bundled server. Stage it: cargo build --profile release-runner -p quilt-mcp"
             );
         }
     }
-    println!("cargo:rustc-env=DUCKLE_EMBEDDED_MCP={}", dst.display());
+    println!("cargo:rustc-env=QUILT_EMBEDDED_MCP={}", dst.display());
     println!(
         "cargo:rerun-if-changed={}",
         std::path::Path::new(&manifest_dir).join("bin").join(name).display()
     );
 }
 
-/// Locate a freshly built `duckle-runner` and expose its bytes to lib.rs via
-/// include_bytes!(env!("DUCKLE_EMBEDDED_RUNNER")). The runner is captured at
-/// desktop-compile time, so developers must build duckle-runner BEFORE (or
+/// Locate a freshly built `quilt-runner` and expose its bytes to lib.rs via
+/// include_bytes!(env!("QUILT_EMBEDDED_RUNNER")). The runner is captured at
+/// desktop-compile time, so developers must build quilt-runner BEFORE (or
 /// alongside) the desktop build. CI stages it to apps/desktop/bin/.
 fn embed_runner() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR");
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let name = if target_os == "windows" {
-        "duckle-runner.exe"
+        "quilt-runner.exe"
     } else {
-        "duckle-runner"
+        "quilt-runner"
     };
 
     // Candidate source order (first existing wins):
@@ -106,7 +106,7 @@ fn embed_runner() {
         p
     } else {
         panic!(
-            "duckle-runner not found for embedding. Build it first: cargo build --profile release-runner -p duckle-runner (CI stages it to apps/desktop/bin/)."
+            "quilt-runner not found for embedding. Build it first: cargo build --profile release-runner -p quilt-runner (CI stages it to apps/desktop/bin/)."
         );
     };
 
@@ -115,7 +115,7 @@ fn embed_runner() {
         panic!("copy {} -> {}: {}", source.display(), dst.display(), e)
     });
 
-    println!("cargo:rustc-env=DUCKLE_EMBEDDED_RUNNER={}", dst.display());
+    println!("cargo:rustc-env=QUILT_EMBEDDED_RUNNER={}", dst.display());
     println!(
         "cargo:rerun-if-changed={}",
         std::path::Path::new(&manifest_dir).join("bin").join(name).display()

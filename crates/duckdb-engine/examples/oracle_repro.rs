@@ -5,7 +5,7 @@
 // first NDJSON line so we can see the real DATE string format.
 //
 //   PATH must include the Instant Client dir, then:
-//   cargo run --release --example oracle_repro -p duckle-duckdb-engine
+//   cargo run --release --example oracle_repro -p quilt-duckdb-engine
 use oracle::sql_type::OracleType;
 use serde_json::{Map, Value};
 
@@ -45,9 +45,9 @@ fn cell_to_json(row: &oracle::Row, i: usize) -> Value {
 
 fn main() {
     let user = std::env::var("ORA_USER").unwrap_or_else(|_| "system".into());
-    let pass = std::env::var("ORA_PASS").unwrap_or_else(|_| "duckle".into());
+    let pass = std::env::var("ORA_PASS").unwrap_or_else(|_| "quilt".into());
     let conn = std::env::var("ORA_CONN").unwrap_or_else(|_| "//localhost:1521/XEPDB1".into());
-    let duckdb = std::env::var("DUCKLE_DUCKDB_BIN")
+    let duckdb = std::env::var("QUILT_DUCKDB_BIN")
         .unwrap_or_else(|_| r".duckdb-cli-v1.5.3\duckdb.exe".into());
 
     let table = std::env::var("ORA_TABLE").unwrap_or_else(|_| "dates".into());

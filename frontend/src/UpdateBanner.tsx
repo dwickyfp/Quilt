@@ -18,7 +18,7 @@ export function UpdateBanner() {
     const [dismissed, setDismissed] = useState(false);
     const [forced, setForced] = useState(
         typeof window !== 'undefined' &&
-            window.localStorage?.getItem('duckle.previewUpdateBanner') === '1',
+            window.localStorage?.getItem('quilt.previewUpdateBanner') === '1',
     );
 
     useEffect(() => {
@@ -55,7 +55,7 @@ export function UpdateBanner() {
         latest_tag: 'v0.1.0-hotfix2',
         latest_date: null,
         asset_name: null,
-        release_url: 'https://github.com/SouravRoy-ETL/duckle/releases',
+        release_url: 'https://github.com/dwickyfp/Quilt/releases',
         download_url: null,
         error: null,
     };
@@ -68,7 +68,7 @@ export function UpdateBanner() {
                 ⬆
             </span>
             <span className="update-banner-text">
-                A newer Duckle build{tag} is available. You're on {display.current_build}.
+                A newer Quilt build{tag} is available. You're on {display.current_build}.
             </span>
             <button
                 type="button"

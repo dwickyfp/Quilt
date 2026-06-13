@@ -1,6 +1,6 @@
 // i18n bootstrap. Bundles all language resources into the JS so the
 // Tauri webview never needs an HTTP backend - the app is offline-first
-// and Duckle workspaces have no server to fetch locales from.
+// and Quilt workspaces have no server to fetch locales from.
 //
 // Adding a language:
 // 1. Add a row to LANGUAGES in ./languages.ts
@@ -154,7 +154,7 @@ void i18n
         detection: {
             order: ['localStorage', 'navigator'],
             caches: ['localStorage'],
-            lookupLocalStorage: 'duckle.lang',
+            lookupLocalStorage: 'quilt.lang',
         },
     });
 

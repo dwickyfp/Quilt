@@ -1591,9 +1591,9 @@
     fn cloud_csv_source_threads_declared_schema() {
         // audit B1: a cloud CSV source must honor a Schema-panel declaration
         // via types= (issue #3 parity), not a bare read_csv_auto.
-        let cols = vec![duckle_metadata::Column {
+        let cols = vec![quilt_metadata::Column {
             name: "amt".into(),
-            data_type: duckle_metadata::DataType::String,
+            data_type: quilt_metadata::DataType::String,
             nullable: true,
             primary_key: None,
             format: None,
@@ -1615,9 +1615,9 @@
         // issue #15: a declared DATE column must yield a reject relation of the
         // rows that fail to parse (raw text), and a tolerant split main that
         // drops exactly those rows. The two predicates must be complementary.
-        let cols = vec![duckle_metadata::Column {
+        let cols = vec![quilt_metadata::Column {
             name: "order_date".into(),
-            data_type: duckle_metadata::DataType::Date,
+            data_type: quilt_metadata::DataType::Date,
             nullable: true,
             primary_key: None,
             format: None,
@@ -1644,9 +1644,9 @@
 
         // No declared schema (or all-text schema) => nothing to reject.
         assert!(build_csv_reject_sql(&props, None, false).is_none());
-        let text_cols = vec![duckle_metadata::Column {
+        let text_cols = vec![quilt_metadata::Column {
             name: "name".into(),
-            data_type: duckle_metadata::DataType::String,
+            data_type: quilt_metadata::DataType::String,
             nullable: true,
             primary_key: None,
             format: None,
@@ -1803,7 +1803,7 @@
             _ => stage.sql.clone(),
         };
         assert!(
-            src_sql.contains("CREATE OR REPLACE SECRET duckle_quack_secret"),
+            src_sql.contains("CREATE OR REPLACE SECRET quilt_quack_secret"),
             "missing SECRET creation: {}",
             src_sql
         );
@@ -1814,10 +1814,10 @@
             "wrong ATTACH URL: {}",
             src_sql
         );
-        assert!(src_sql.contains("AS duckle_src"), "wrong alias: {}", src_sql);
+        assert!(src_sql.contains("AS quilt_src"), "wrong alias: {}", src_sql);
         assert!(src_sql.contains("READ_ONLY"), "missing READ_ONLY: {}", src_sql);
         assert!(
-            src_sql.contains("SELECT * FROM duckle_src"),
+            src_sql.contains("SELECT * FROM quilt_src"),
             "missing SELECT from alias: {}",
             src_sql
         );
@@ -1884,7 +1884,7 @@
         // Issue #25: read_xlsx has no type map, so a declared schema must be
         // applied as an all_varchar read + cast/project wrapper. No declared
         // schema -> unchanged read (all columns, auto-inferred).
-        use duckle_metadata::{Column, DataType};
+        use quilt_metadata::{Column, DataType};
         let col = |name: &str, dt: DataType, fmt: Option<&str>| Column {
             name: name.into(),
             data_type: dt,
@@ -1934,7 +1934,7 @@
         assert_eq!(sanitize_dbt_model_name("my-model"), "my_model");
         assert_eq!(sanitize_dbt_model_name("test.model v2"), "test_model_v2");
         assert_eq!(sanitize_dbt_model_name("--weird--"), "weird");
-        assert_eq!(sanitize_dbt_model_name(""), "duckle_model");
+        assert_eq!(sanitize_dbt_model_name(""), "quilt_model");
         assert_eq!(sanitize_dbt_model_name("ok_name"), "ok_name");
     }
 
@@ -1989,7 +1989,7 @@
     #[test]
     fn dbt_exposes_all_main_inputs() {
         // xf.dbt is multi-main: both upstream tables should land in from_views
-        // (exposed to dbt as var('duckle_inputs')), not just the first.
+        // (exposed to dbt as var('quilt_inputs')), not just the first.
         let doc = pipeline_from_json(
             r#"{"name":"t","nodes":[
                 {"id":"a","type":"source","position":{"x":0,"y":0},"data":{"label":"a","componentId":"src.csv","properties":{"path":"a.csv"}}},

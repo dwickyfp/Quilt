@@ -4,14 +4,14 @@
 //! exercise the real read → transform → write path against temp files
 //! and then read the output back to prove the data actually landed.
 
-use duckle_duckdb_engine::{DuckdbEngine, PipelineDoc};
+use quilt_duckdb_engine::{DuckdbEngine, PipelineDoc};
 use serde_json::{json, Value};
 use std::io::Write;
 use std::path::Path;
 use std::sync::Mutex;
 
-/// Serializes tests that mutate process-global env vars (DUCKLE_WORKSPACE /
-/// DUCKLE_LOG_DIR). `cargo test` runs tests in parallel, so without this two
+/// Serializes tests that mutate process-global env vars (QUILT_WORKSPACE /
+/// QUILT_LOG_DIR). `cargo test` runs tests in parallel, so without this two
 /// such tests would clobber each other's env mid-run. Poison is ignored so a
 /// failing test doesn't cascade into the others.
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -20,11 +20,11 @@ fn env_guard() -> std::sync::MutexGuard<'static, ()> {
     ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// These tests drive the real DuckDB CLI. Point DUCKLE_DUCKDB_BIN at a
+/// These tests drive the real DuckDB CLI. Point QUILT_DUCKDB_BIN at a
 /// `duckdb` binary to run them; otherwise they soft-skip so `cargo test`
 /// stays green in environments without it.
 fn engine() -> Option<DuckdbEngine> {
-    let bin = std::env::var("DUCKLE_DUCKDB_BIN").ok()?;
+    let bin = std::env::var("QUILT_DUCKDB_BIN").ok()?;
     let p = std::path::PathBuf::from(bin);
     p.exists().then(|| DuckdbEngine::new(p))
 }
@@ -34,7 +34,7 @@ macro_rules! engine_or_skip {
         match engine() {
             Some(e) => e,
             None => {
-                eprintln!("skipping: set DUCKLE_DUCKDB_BIN to a duckdb CLI to run");
+                eprintln!("skipping: set QUILT_DUCKDB_BIN to a duckdb CLI to run");
                 return;
             }
         }
@@ -102,7 +102,7 @@ fn lookup_edge(id: &str, source: &str, target: &str) -> Value {
 /// to the same DuckDB CLI (only called after engine_or_skip!, so the
 /// binary is present).
 fn duckdb_json(sql: &str) -> Vec<Value> {
-    let bin = std::env::var("DUCKLE_DUCKDB_BIN").expect("DUCKLE_DUCKDB_BIN set");
+    let bin = std::env::var("QUILT_DUCKDB_BIN").expect("QUILT_DUCKDB_BIN set");
     let out = std::process::Command::new(bin)
         .arg(":memory:")
         .arg("-json")
@@ -117,7 +117,7 @@ fn duckdb_json(sql: &str) -> Vec<Value> {
 /// Run setup SQL against a specific database file (used to seed a
 /// source DB file for the duckdb-source test).
 fn duckdb_exec(db: &str, sql: &str) {
-    let bin = std::env::var("DUCKLE_DUCKDB_BIN").expect("DUCKLE_DUCKDB_BIN set");
+    let bin = std::env::var("QUILT_DUCKDB_BIN").expect("QUILT_DUCKDB_BIN set");
     let out = std::process::Command::new(bin)
         .arg(db)
         .arg("-c")
@@ -859,7 +859,7 @@ fn compiled_sql_redacts_secrets() {
     // secret values with named placeholders. (No engine needed - this is
     // pure compilation.) Issue #9: the placeholder keeps the script
     // structurally valid and shareable.
-    use duckle_duckdb_engine::compile_pipeline_sql_opts;
+    use quilt_duckdb_engine::compile_pipeline_sql_opts;
     let d = doc(
         json!([
             node("s", "src.postgres", json!({
@@ -873,7 +873,7 @@ fn compiled_sql_redacts_secrets() {
         ]),
         json!([]),
     );
-    // Default (include_secrets = false): value replaced by ${DUCKLE_PASSWORD}.
+    // Default (include_secrets = false): value replaced by ${QUILT_PASSWORD}.
     let stages = compile_pipeline_sql_opts(&d, false).expect("compile_pipeline_sql_opts");
     let all_sql = stages
         .iter()
@@ -886,7 +886,7 @@ fn compiled_sql_redacts_secrets() {
         all_sql
     );
     assert!(
-        all_sql.contains("${DUCKLE_PASSWORD}"),
+        all_sql.contains("${QUILT_PASSWORD}"),
         "expected a named placeholder in compiled SQL: {}",
         all_sql
     );
@@ -901,7 +901,7 @@ fn compiled_sql_redacts_secrets() {
         raw_sql
     );
     assert!(
-        !raw_sql.contains("${DUCKLE_PASSWORD}"),
+        !raw_sql.contains("${QUILT_PASSWORD}"),
         "include_secrets should not insert a placeholder: {}",
         raw_sql
     );
@@ -912,7 +912,7 @@ fn compiled_sql_maps_username_to_attach_user() {
     // The UI writes DB login names as `username`, while DuckDB's
     // Postgres/MySQL connection string expects `user=...`.
     // This is pure compilation; no live database is needed.
-    use duckle_duckdb_engine::compile_pipeline_sql_opts;
+    use quilt_duckdb_engine::compile_pipeline_sql_opts;
     let d = doc(
         json!([
             node("s", "src.postgres", json!({
@@ -1090,7 +1090,7 @@ fn duckdb_source_reads_table() {
 fn two_duckdb_sources_same_database() {
     // Regression (GonzoEOZ, v0.3.0): two src.duckdb nodes reading different
     // tables from the SAME DuckDB file failed in batched mode with "database
-    // with name duckle_src already exists" - every attach-backed stage
+    // with name quilt_src already exists" - every attach-backed stage
     // re-ATTACHed the fixed alias inside the one shared connection. Each
     // attach-backed stage now DETACHes the alias so the next can re-attach.
     let engine = engine_or_skip!();
@@ -1568,14 +1568,14 @@ fn merge_streams_concatenates_inputs() {
 /// skip when the test isn't running with a real PG service available
 /// (i.e. anywhere except the CI postgres-integration job).
 fn pg_env() -> Option<(String, u64, String, String, String)> {
-    let host = std::env::var("DUCKLE_PG_HOST").ok()?;
-    let port = std::env::var("DUCKLE_PG_PORT")
+    let host = std::env::var("QUILT_PG_HOST").ok()?;
+    let port = std::env::var("QUILT_PG_PORT")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(5432);
-    let db = std::env::var("DUCKLE_PG_DB").unwrap_or_else(|_| "postgres".into());
-    let user = std::env::var("DUCKLE_PG_USER").unwrap_or_else(|_| "postgres".into());
-    let pass = std::env::var("DUCKLE_PG_PASS").unwrap_or_default();
+    let db = std::env::var("QUILT_PG_DB").unwrap_or_else(|_| "postgres".into());
+    let user = std::env::var("QUILT_PG_USER").unwrap_or_else(|_| "postgres".into());
+    let pass = std::env::var("QUILT_PG_PASS").unwrap_or_default();
     Some((host, port, db, user, pass))
 }
 
@@ -1585,14 +1585,14 @@ fn pg_sink_then_source_roundtrip() {
     let (host, port, db, user, pass) = match pg_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_PG_HOST to run against a real PostgreSQL");
+            eprintln!("skipping: set QUILT_PG_HOST to run against a real PostgreSQL");
             return;
         }
     };
     let tmp = tempfile::tempdir().unwrap();
     let csv = write_file(tmp.path(), "in.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
     let out = out_path(tmp.path(), "out.csv");
-    let table = format!("duckle_test_{}", std::process::id());
+    let table = format!("quilt_test_{}", std::process::id());
 
     // Write csv -> snk.postgres.
     let write_doc = doc(
@@ -1632,26 +1632,26 @@ fn pg_sink_then_source_roundtrip() {
 }
 
 fn mysql_env() -> Option<(String, u64, String, String, String)> {
-    let host = std::env::var("DUCKLE_MYSQL_HOST").ok()?;
-    let port = std::env::var("DUCKLE_MYSQL_PORT")
+    let host = std::env::var("QUILT_MYSQL_HOST").ok()?;
+    let port = std::env::var("QUILT_MYSQL_PORT")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(3306);
-    let db = std::env::var("DUCKLE_MYSQL_DB").unwrap_or_else(|_| "ducktest".into());
-    let user = std::env::var("DUCKLE_MYSQL_USER").unwrap_or_else(|_| "root".into());
-    let pass = std::env::var("DUCKLE_MYSQL_PASS").unwrap_or_default();
+    let db = std::env::var("QUILT_MYSQL_DB").unwrap_or_else(|_| "ducktest".into());
+    let user = std::env::var("QUILT_MYSQL_USER").unwrap_or_else(|_| "root".into());
+    let pass = std::env::var("QUILT_MYSQL_PASS").unwrap_or_default();
     Some((host, port, db, user, pass))
 }
 
 fn mssql_env() -> Option<(String, u64, String, String, String)> {
-    let host = std::env::var("DUCKLE_MSSQL_HOST").ok()?;
-    let port = std::env::var("DUCKLE_MSSQL_PORT")
+    let host = std::env::var("QUILT_MSSQL_HOST").ok()?;
+    let port = std::env::var("QUILT_MSSQL_PORT")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(1433);
-    let db = std::env::var("DUCKLE_MSSQL_DB").unwrap_or_else(|_| "master".into());
-    let user = std::env::var("DUCKLE_MSSQL_USER").unwrap_or_else(|_| "sa".into());
-    let pass = std::env::var("DUCKLE_MSSQL_PASS").unwrap_or_default();
+    let db = std::env::var("QUILT_MSSQL_DB").unwrap_or_else(|_| "master".into());
+    let user = std::env::var("QUILT_MSSQL_USER").unwrap_or_else(|_| "sa".into());
+    let pass = std::env::var("QUILT_MSSQL_PASS").unwrap_or_default();
     Some((host, port, db, user, pass))
 }
 
@@ -1666,9 +1666,9 @@ fn uniq_suffix() -> u128 {
 }
 
 fn oracle_env() -> Option<(String, String, String)> {
-    let connect = std::env::var("DUCKLE_ORACLE_CONNECT").ok()?;
-    let user = std::env::var("DUCKLE_ORACLE_USER").unwrap_or_else(|_| "system".into());
-    let pass = std::env::var("DUCKLE_ORACLE_PASS").unwrap_or_else(|_| "duckle".into());
+    let connect = std::env::var("QUILT_ORACLE_CONNECT").ok()?;
+    let user = std::env::var("QUILT_ORACLE_USER").unwrap_or_else(|_| "system".into());
+    let pass = std::env::var("QUILT_ORACLE_PASS").unwrap_or_else(|_| "quilt".into());
     Some((connect, user, pass))
 }
 
@@ -1678,14 +1678,14 @@ fn mysql_sink_then_source_roundtrip() {
     let (host, port, db, user, pass) = match mysql_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_MYSQL_HOST to run against a real MySQL");
+            eprintln!("skipping: set QUILT_MYSQL_HOST to run against a real MySQL");
             return;
         }
     };
     let tmp = tempfile::tempdir().unwrap();
     let csv = write_file(tmp.path(), "in.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
     let out = out_path(tmp.path(), "out.csv");
-    let table = format!("duckle_test_{}", std::process::id());
+    let table = format!("quilt_test_{}", std::process::id());
 
     // csv -> snk.mysql
     let write_doc = doc(
@@ -1747,7 +1747,7 @@ fn sqlserver_upsert_merges_and_inserts() {
     let (host, port, db, user, pass) = match mssql_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_MSSQL_HOST to run against a real SQL Server");
+            eprintln!("skipping: set QUILT_MSSQL_HOST to run against a real SQL Server");
             return;
         }
     };
@@ -1755,7 +1755,7 @@ fn sqlserver_upsert_merges_and_inserts() {
     let seed = write_file(tmp.path(), "seed.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
     let upd = write_file(tmp.path(), "upd.csv", "id,name\n2,BOB\n4,dave\n");
     let out = out_path(tmp.path(), "out.csv");
-    let table = format!("duckle_upsert_{}", uniq_suffix());
+    let table = format!("quilt_upsert_{}", uniq_suffix());
     let snk = |path: &str, mode: &str| {
         json!([
             node("s", "src.csv", json!({ "path": path, "hasHeader": true })),
@@ -1791,7 +1791,7 @@ fn oracle_upsert_merges_and_inserts() {
     let (connect, user, pass) = match oracle_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_ORACLE_CONNECT to run against a real Oracle");
+            eprintln!("skipping: set QUILT_ORACLE_CONNECT to run against a real Oracle");
             return;
         }
     };
@@ -1799,7 +1799,7 @@ fn oracle_upsert_merges_and_inserts() {
     let seed = write_file(tmp.path(), "seed.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
     let upd = write_file(tmp.path(), "upd.csv", "id,name\n2,BOB\n4,dave\n");
     let out = out_path(tmp.path(), "out.csv");
-    let table = format!("DUCKLE_UPSERT_{}", uniq_suffix());
+    let table = format!("QUILT_UPSERT_{}", uniq_suffix());
     let snk = |path: &str, mode: &str| {
         json!([
             node("s", "src.csv", json!({ "path": path, "hasHeader": true })),
@@ -1833,10 +1833,10 @@ fn snowflake_upsert_merges_and_inserts() {
     // Verified against the nnnkkk7/snowflake-emulator (DuckDB-backed) which
     // serves the real /api/v2/statements REST API and supports MERGE.
     let engine = engine_or_skip!();
-    let endpoint = match std::env::var("DUCKLE_SNOWFLAKE_ENDPOINT") {
+    let endpoint = match std::env::var("QUILT_SNOWFLAKE_ENDPOINT") {
         Ok(e) if !e.is_empty() => e,
         _ => {
-            eprintln!("skipping: set DUCKLE_SNOWFLAKE_ENDPOINT to run against a Snowflake-compatible endpoint");
+            eprintln!("skipping: set QUILT_SNOWFLAKE_ENDPOINT to run against a Snowflake-compatible endpoint");
             return;
         }
     };
@@ -1844,7 +1844,7 @@ fn snowflake_upsert_merges_and_inserts() {
     let seed = write_file(tmp.path(), "seed.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
     let upd = write_file(tmp.path(), "upd.csv", "id,name\n2,BOB\n4,dave\n");
     let out = out_path(tmp.path(), "out.csv");
-    let table = format!("DUCKLE_UPSERT_{}", uniq_suffix());
+    let table = format!("QUILT_UPSERT_{}", uniq_suffix());
     let snk = |path: &str, mode: &str| {
         json!([
             node("s", "src.csv", json!({ "path": path, "hasHeader": true })),
@@ -1984,7 +1984,7 @@ fn sqlserver_upsert_delete_propagation() {
     let (host, port, db, user, pass) = match mssql_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_MSSQL_HOST to run against a real SQL Server");
+            eprintln!("skipping: set QUILT_MSSQL_HOST to run against a real SQL Server");
             return;
         }
     };
@@ -1996,7 +1996,7 @@ fn sqlserver_upsert_delete_propagation() {
         "id,name,op\n2,BOB,update\n3,carol,delete\n4,dave,insert\n",
     );
     let out = out_path(tmp.path(), "out.csv");
-    let table = format!("duckle_del_{}", uniq_suffix());
+    let table = format!("quilt_del_{}", uniq_suffix());
     let r1 = engine.execute_pipeline(&doc(
         json!([
             node("s", "src.csv", json!({ "path": seed, "hasHeader": true })),
@@ -2044,12 +2044,12 @@ fn mysql_upsert_delete_propagation() {
     let (host, port, db, user, pass) = match mysql_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_MYSQL_HOST to run against a real MySQL");
+            eprintln!("skipping: set QUILT_MYSQL_HOST to run against a real MySQL");
             return;
         }
     };
     let tmp = tempfile::tempdir().unwrap();
-    let table = format!("duckle_del_{}", uniq_suffix());
+    let table = format!("quilt_del_{}", uniq_suffix());
     let seed = write_file(tmp.path(), "seed.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
     let r1 = engine.execute_pipeline(&doc(
         json!([
@@ -2063,7 +2063,7 @@ fn mysql_upsert_delete_propagation() {
     ));
     assert_eq!(r1.status, "ok", "seed failed: {:?}", r1.error);
     // Add the primary key so ON DUPLICATE KEY UPDATE has a constraint to fire.
-    let bin = std::env::var("DUCKLE_DUCKDB_BIN").expect("DUCKLE_DUCKDB_BIN set");
+    let bin = std::env::var("QUILT_DUCKDB_BIN").expect("QUILT_DUCKDB_BIN set");
     let alter = std::process::Command::new(&bin)
         .arg(":memory:")
         .arg("-c")
@@ -2119,7 +2119,7 @@ fn oracle_upsert_delete_propagation() {
     let (connect, user, pass) = match oracle_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_ORACLE_CONNECT to run against a real Oracle");
+            eprintln!("skipping: set QUILT_ORACLE_CONNECT to run against a real Oracle");
             return;
         }
     };
@@ -2131,7 +2131,7 @@ fn oracle_upsert_delete_propagation() {
         "id,name,op\n2,BOB,update\n3,carol,delete\n4,dave,insert\n",
     );
     let out = out_path(tmp.path(), "out.csv");
-    let table = format!("DUCKLE_DEL_{}", uniq_suffix());
+    let table = format!("QUILT_DEL_{}", uniq_suffix());
     let r1 = engine.execute_pipeline(&doc(
         json!([
             node("s", "src.csv", json!({ "path": seed, "hasHeader": true })),
@@ -2172,10 +2172,10 @@ fn oracle_upsert_delete_propagation() {
 #[test]
 fn snowflake_upsert_delete_propagation() {
     let engine = engine_or_skip!();
-    let endpoint = match std::env::var("DUCKLE_SNOWFLAKE_ENDPOINT") {
+    let endpoint = match std::env::var("QUILT_SNOWFLAKE_ENDPOINT") {
         Ok(e) if !e.is_empty() => e,
         _ => {
-            eprintln!("skipping: set DUCKLE_SNOWFLAKE_ENDPOINT to run against a Snowflake-compatible endpoint");
+            eprintln!("skipping: set QUILT_SNOWFLAKE_ENDPOINT to run against a Snowflake-compatible endpoint");
             return;
         }
     };
@@ -2187,7 +2187,7 @@ fn snowflake_upsert_delete_propagation() {
         "id,name,op\n2,BOB,update\n3,carol,delete\n4,dave,insert\n",
     );
     let out = out_path(tmp.path(), "out.csv");
-    let table = format!("DUCKLE_DEL_{}", uniq_suffix());
+    let table = format!("QUILT_DEL_{}", uniq_suffix());
     let snk = |path: &str, mode: &str, del: bool| {
         let mut props = json!({
             "account": "local", "endpoint": &endpoint, "authType": "pat", "pat": "test",
@@ -2224,8 +2224,8 @@ fn snowflake_upsert_delete_propagation() {
 #[test]
 fn md_source_reads_table() {
     // Live MotherDuck test: requires MOTHERDUCK_TOKEN plus a pre-created
-    // table named by DUCKLE_MD_TABLE (default 'duckle_test') inside the
-    // database DUCKLE_MD_DB (default 'my_db'). Skips cleanly otherwise.
+    // table named by QUILT_MD_TABLE (default 'quilt_test') inside the
+    // database QUILT_MD_DB (default 'my_db'). Skips cleanly otherwise.
     let engine = engine_or_skip!();
     let token = match std::env::var("MOTHERDUCK_TOKEN") {
         Ok(t) if !t.is_empty() => t,
@@ -2234,8 +2234,8 @@ fn md_source_reads_table() {
             return;
         }
     };
-    let db = std::env::var("DUCKLE_MD_DB").unwrap_or_else(|_| "my_db".into());
-    let table = std::env::var("DUCKLE_MD_TABLE").unwrap_or_else(|_| "duckle_test".into());
+    let db = std::env::var("QUILT_MD_DB").unwrap_or_else(|_| "my_db".into());
+    let table = std::env::var("QUILT_MD_TABLE").unwrap_or_else(|_| "quilt_test".into());
     let tmp = tempfile::tempdir().unwrap();
     let out = out_path(tmp.path(), "out.csv");
     let d = doc(
@@ -2258,20 +2258,20 @@ fn md_source_reads_table() {
 #[test]
 fn minio_source_reads_via_endpoint() {
     // Live S3-compatible test. The CI minio-integration job seeds
-    // s3://duckle-test/orders.parquet with 3 rows; this verifies the
+    // s3://quilt-test/orders.parquet with 3 rows; this verifies the
     // engine can read it back through the SECRET's endpoint plumbing.
     let engine = engine_or_skip!();
-    let host = match std::env::var("DUCKLE_MINIO_HOST") {
+    let host = match std::env::var("QUILT_MINIO_HOST") {
         Ok(h) if !h.is_empty() => h,
         _ => {
-            eprintln!("skipping: set DUCKLE_MINIO_HOST to run against MinIO");
+            eprintln!("skipping: set QUILT_MINIO_HOST to run against MinIO");
             return;
         }
     };
-    let port = std::env::var("DUCKLE_MINIO_PORT").unwrap_or_else(|_| "9000".into());
-    let bucket = std::env::var("DUCKLE_MINIO_BUCKET").unwrap_or_else(|_| "duckle-test".into());
-    let access = std::env::var("DUCKLE_MINIO_ACCESS_KEY").unwrap_or_else(|_| "minioadmin".into());
-    let secret = std::env::var("DUCKLE_MINIO_SECRET_KEY").unwrap_or_else(|_| "minioadmin".into());
+    let port = std::env::var("QUILT_MINIO_PORT").unwrap_or_else(|_| "9000".into());
+    let bucket = std::env::var("QUILT_MINIO_BUCKET").unwrap_or_else(|_| "quilt-test".into());
+    let access = std::env::var("QUILT_MINIO_ACCESS_KEY").unwrap_or_else(|_| "minioadmin".into());
+    let secret = std::env::var("QUILT_MINIO_SECRET_KEY").unwrap_or_else(|_| "minioadmin".into());
 
     let tmp = tempfile::tempdir().unwrap();
     let out = out_path(tmp.path(), "out.csv");
@@ -2334,12 +2334,12 @@ fn pg_sink_append_grows_table() {
     let (host, port, db, user, pass) = match pg_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_PG_HOST to run against a real PostgreSQL");
+            eprintln!("skipping: set QUILT_PG_HOST to run against a real PostgreSQL");
             return;
         }
     };
     let tmp = tempfile::tempdir().unwrap();
-    let table = format!("duckle_append_{}", std::process::id());
+    let table = format!("quilt_append_{}", std::process::id());
     let conn = |csv: &str, mode: &str| {
         doc(
             json!([
@@ -2382,13 +2382,13 @@ fn pg_sink_append_grows_table() {
 #[test]
 fn avro_source_reads_fixture() {
     // The DuckDB avro extension is read-only and we can't self-generate
-    // a fixture; this test runs when DUCKLE_AVRO_FIXTURE points at an
+    // a fixture; this test runs when QUILT_AVRO_FIXTURE points at an
     // .avro file. CI doesn't ship a fixture today.
     let engine = engine_or_skip!();
-    let path = match std::env::var("DUCKLE_AVRO_FIXTURE") {
+    let path = match std::env::var("QUILT_AVRO_FIXTURE") {
         Ok(p) if !p.is_empty() && std::path::Path::new(&p).exists() => p,
         _ => {
-            eprintln!("skipping: set DUCKLE_AVRO_FIXTURE to an .avro file path");
+            eprintln!("skipping: set QUILT_AVRO_FIXTURE to an .avro file path");
             return;
         }
     };
@@ -2414,12 +2414,12 @@ fn pg_sink_truncate_replaces_rows() {
     let (host, port, db, user, pass) = match pg_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_PG_HOST to run against PostgreSQL");
+            eprintln!("skipping: set QUILT_PG_HOST to run against PostgreSQL");
             return;
         }
     };
     let tmp = tempfile::tempdir().unwrap();
-    let table = format!("duckle_trunc_{}", std::process::id());
+    let table = format!("quilt_trunc_{}", std::process::id());
     let write = |csv: &str, mode: &str| {
         doc(
             json!([
@@ -2616,12 +2616,12 @@ fn pg_sink_upsert_updates_and_inserts() {
     let (host, port, db, user, pass) = match pg_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_PG_HOST to run against PostgreSQL");
+            eprintln!("skipping: set QUILT_PG_HOST to run against PostgreSQL");
             return;
         }
     };
     let tmp = tempfile::tempdir().unwrap();
-    let table = format!("duckle_upsert_{}", uniq_suffix());
+    let table = format!("quilt_upsert_{}", uniq_suffix());
 
     // Seed: overwrite with 3 rows including a PRIMARY KEY on id.
     // (build_relational_sink in overwrite mode does CREATE TABLE AS,
@@ -2643,7 +2643,7 @@ fn pg_sink_upsert_updates_and_inserts() {
     // Run the ALTER via the postgres extension's passthrough so the
     // constraint lands in PG's catalog (DuckDB's ATTACH path silently
     // no-ops some DDL).
-    let bin = std::env::var("DUCKLE_DUCKDB_BIN").expect("DUCKLE_DUCKDB_BIN set");
+    let bin = std::env::var("QUILT_DUCKDB_BIN").expect("QUILT_DUCKDB_BIN set");
     let alter = std::process::Command::new(&bin)
         .arg(":memory:")
         .arg("-c")
@@ -2730,14 +2730,14 @@ fn switch_routes_rows_to_case_outputs() {
 
 #[test]
 fn iceberg_source_reads_fixture() {
-    // Env-gated: set DUCKLE_ICEBERG_FIXTURE to a local Iceberg table
+    // Env-gated: set QUILT_ICEBERG_FIXTURE to a local Iceberg table
     // root (the directory that contains metadata/ and data/). DuckDB's
     // iceberg extension is read-only, so the test can't self-generate.
     let engine = engine_or_skip!();
-    let path = match std::env::var("DUCKLE_ICEBERG_FIXTURE") {
+    let path = match std::env::var("QUILT_ICEBERG_FIXTURE") {
         Ok(p) if !p.is_empty() && std::path::Path::new(&p).exists() => p,
         _ => {
-            eprintln!("skipping: set DUCKLE_ICEBERG_FIXTURE to an Iceberg table directory");
+            eprintln!("skipping: set QUILT_ICEBERG_FIXTURE to an Iceberg table directory");
             return;
         }
     };
@@ -2757,12 +2757,12 @@ fn iceberg_source_reads_fixture() {
 
 #[test]
 fn delta_source_reads_fixture() {
-    // Env-gated: set DUCKLE_DELTA_FIXTURE to a local Delta table root.
+    // Env-gated: set QUILT_DELTA_FIXTURE to a local Delta table root.
     let engine = engine_or_skip!();
-    let path = match std::env::var("DUCKLE_DELTA_FIXTURE") {
+    let path = match std::env::var("QUILT_DELTA_FIXTURE") {
         Ok(p) if !p.is_empty() && std::path::Path::new(&p).exists() => p,
         _ => {
-            eprintln!("skipping: set DUCKLE_DELTA_FIXTURE to a Delta table directory");
+            eprintln!("skipping: set QUILT_DELTA_FIXTURE to a Delta table directory");
             return;
         }
     };
@@ -2852,9 +2852,9 @@ fn vector_search_ranks_by_cosine_similarity() {
 #[test]
 fn spatial_source_reads_geojson() {
     // The spatial extension is GDAL-backed (~50 MB); only opt-in CI /
-    // local runs install it. Set DUCKLE_TEST_SPATIAL=1 to exercise.
-    if std::env::var("DUCKLE_TEST_SPATIAL").ok().as_deref() != Some("1") {
-        eprintln!("skipping: set DUCKLE_TEST_SPATIAL=1 to run spatial tests");
+    // local runs install it. Set QUILT_TEST_SPATIAL=1 to exercise.
+    if std::env::var("QUILT_TEST_SPATIAL").ok().as_deref() != Some("1") {
+        eprintln!("skipping: set QUILT_TEST_SPATIAL=1 to run spatial tests");
         return;
     }
     let engine = engine_or_skip!();
@@ -2939,8 +2939,8 @@ fn excel_sink_writes_xlsx() {
 
 #[test]
 fn spatial_sink_writes_geojson() {
-    if std::env::var("DUCKLE_TEST_SPATIAL").ok().as_deref() != Some("1") {
-        eprintln!("skipping: set DUCKLE_TEST_SPATIAL=1 to run spatial tests");
+    if std::env::var("QUILT_TEST_SPATIAL").ok().as_deref() != Some("1") {
+        eprintln!("skipping: set QUILT_TEST_SPATIAL=1 to run spatial tests");
         return;
     }
     let engine = engine_or_skip!();
@@ -2985,8 +2985,8 @@ fn md_sink_writes_table() {
             return;
         }
     };
-    let db = std::env::var("DUCKLE_MD_DB").unwrap_or_else(|_| "my_db".into());
-    let table = format!("duckle_sink_test_{}", std::process::id());
+    let db = std::env::var("QUILT_MD_DB").unwrap_or_else(|_| "my_db".into());
+    let table = format!("quilt_sink_test_{}", std::process::id());
     let tmp = tempfile::tempdir().unwrap();
     let csv = write_file(tmp.path(), "in.csv", "id,name\n1,alice\n2,bob\n");
     let d = doc(
@@ -3098,8 +3098,8 @@ fn hash_adds_md5_column() {
 fn geo_distance_computes_point_distance() {
     // Same gate as the other spatial tests - the GDAL-backed extension
     // is ~50 MB so only opt-in runs install it.
-    if std::env::var("DUCKLE_TEST_SPATIAL").ok().as_deref() != Some("1") {
-        eprintln!("skipping: set DUCKLE_TEST_SPATIAL=1 to run spatial tests");
+    if std::env::var("QUILT_TEST_SPATIAL").ok().as_deref() != Some("1") {
+        eprintln!("skipping: set QUILT_TEST_SPATIAL=1 to run spatial tests");
         return;
     }
     let engine = engine_or_skip!();
@@ -3391,20 +3391,20 @@ fn snk_clickhouse_emits_jsoneachrow_to_insert_endpoint() {
 #[test]
 fn snk_and_src_mongodb_roundtrip_via_real_uri() {
     // Env-gated like the postgres / mysql / minio tests. Set
-    // DUCKLE_MONGO_URI to a working mongodb URI (e.g. mongodb://127.0.0.1:27017)
+    // QUILT_MONGO_URI to a working mongodb URI (e.g. mongodb://127.0.0.1:27017)
     // to run; otherwise skip cleanly. Insert 3 docs via snk.mongodb,
     // read them back via src.mongodb, assert the count.
     let engine = engine_or_skip!();
-    let uri = match std::env::var("DUCKLE_MONGO_URI").ok() {
+    let uri = match std::env::var("QUILT_MONGO_URI").ok() {
         Some(u) if !u.is_empty() => u,
         _ => {
-            eprintln!("skipping: set DUCKLE_MONGO_URI to run MongoDB tests");
+            eprintln!("skipping: set QUILT_MONGO_URI to run MongoDB tests");
             return;
         }
     };
     let tmp = tempfile::tempdir().unwrap();
     let csv = write_file(tmp.path(), "in.csv", "id,name\n1,alice\n2,bob\n3,carol\n");
-    let coll = format!("duckle_test_{}", std::process::id());
+    let coll = format!("quilt_test_{}", std::process::id());
 
     // Sink: replace mode so re-runs are idempotent.
     let r1 = engine.execute_pipeline(&doc(
@@ -3412,7 +3412,7 @@ fn snk_and_src_mongodb_roundtrip_via_real_uri() {
             node("s", "src.csv", json!({ "path": csv, "hasHeader": true })),
             node("m", "snk.mongodb", json!({
                 "uri": &uri,
-                "database": "duckle_test",
+                "database": "quilt_test",
                 "collection": &coll,
                 "mode": "replace"
             })),
@@ -3427,7 +3427,7 @@ fn snk_and_src_mongodb_roundtrip_via_real_uri() {
         json!([
             node("m", "src.mongodb", json!({
                 "uri": &uri,
-                "database": "duckle_test",
+                "database": "quilt_test",
                 "collection": &coll
             })),
             node("k", "snk.csv", json!({ "path": out, "hasHeader": true })),
@@ -6682,8 +6682,8 @@ fn regex_extract_pulls_capture_group() {
 
 #[test]
 fn spatial_join_matches_points_inside_polygons() {
-    if std::env::var("DUCKLE_TEST_SPATIAL").ok().as_deref() != Some("1") {
-        eprintln!("skipping: set DUCKLE_TEST_SPATIAL=1 to run spatial tests");
+    if std::env::var("QUILT_TEST_SPATIAL").ok().as_deref() != Some("1") {
+        eprintln!("skipping: set QUILT_TEST_SPATIAL=1 to run spatial tests");
         return;
     }
     let engine = engine_or_skip!();
@@ -6745,8 +6745,8 @@ fn spatial_join_matches_points_inside_polygons() {
 
 #[test]
 fn geo_intersects_flags_overlapping_geometries() {
-    if std::env::var("DUCKLE_TEST_SPATIAL").ok().as_deref() != Some("1") {
-        eprintln!("skipping: set DUCKLE_TEST_SPATIAL=1 to run spatial tests");
+    if std::env::var("QUILT_TEST_SPATIAL").ok().as_deref() != Some("1") {
+        eprintln!("skipping: set QUILT_TEST_SPATIAL=1 to run spatial tests");
         return;
     }
     let engine = engine_or_skip!();
@@ -6845,14 +6845,14 @@ fn ip_parse_extracts_host_and_family() {
 fn pg_pgvector_roundtrip_through_postgres_attach() {
     // Lives in the CI postgres-integration job (pgvector/pgvector:pg16
     // image, so CREATE EXTENSION vector is preinstalled). Local skip is
-    // governed by DUCKLE_PG_HOST, same as the other PG tests. snk.pgvector
+    // governed by QUILT_PG_HOST, same as the other PG tests. snk.pgvector
     // + src.pgvector ride the same postgres ATTACH path as snk.postgres /
     // src.postgres; this test confirms the component IDs route correctly.
     let engine = engine_or_skip!();
     let (host, port, db, user, pass) = match pg_env() {
         Some(x) => x,
         None => {
-            eprintln!("skipping: set DUCKLE_PG_HOST to run pgvector tests");
+            eprintln!("skipping: set QUILT_PG_HOST to run pgvector tests");
             return;
         }
     };
@@ -7737,20 +7737,20 @@ fn src_milvus_paginates_via_offset() {
 
 #[test]
 fn snk_and_src_kafka_roundtrip_via_real_broker() {
-    // Env-gated like the mongo / redis tests. Set DUCKLE_KAFKA_BROKERS
+    // Env-gated like the mongo / redis tests. Set QUILT_KAFKA_BROKERS
     // to a working comma-separated list (e.g. 127.0.0.1:9092) and
-    // DUCKLE_KAFKA_TOPIC to a topic name. Produces 3 records via
+    // QUILT_KAFKA_TOPIC to a topic name. Produces 3 records via
     // snk.kafka then consumes them back via src.kafka.
     let engine = engine_or_skip!();
-    let brokers = match std::env::var("DUCKLE_KAFKA_BROKERS").ok() {
+    let brokers = match std::env::var("QUILT_KAFKA_BROKERS").ok() {
         Some(b) if !b.is_empty() => b,
         _ => {
-            eprintln!("skipping: set DUCKLE_KAFKA_BROKERS to run Kafka tests");
+            eprintln!("skipping: set QUILT_KAFKA_BROKERS to run Kafka tests");
             return;
         }
     };
-    let topic = std::env::var("DUCKLE_KAFKA_TOPIC")
-        .unwrap_or_else(|_| format!("duckle-test-{}", std::process::id()));
+    let topic = std::env::var("QUILT_KAFKA_TOPIC")
+        .unwrap_or_else(|_| format!("quilt-test-{}", std::process::id()));
 
     let tmp = tempfile::tempdir().unwrap();
     let csv = write_file(tmp.path(), "in.csv", "id,name\n1,alpha\n2,beta\n3,gamma\n");
@@ -7792,20 +7792,20 @@ fn snk_and_src_kafka_roundtrip_via_real_broker() {
 
 #[test]
 fn snk_and_src_rabbit_roundtrip_via_real_broker() {
-    // Env-gated. Set DUCKLE_RABBITMQ_URL to an amqp:// URL
+    // Env-gated. Set QUILT_RABBITMQ_URL to an amqp:// URL
     // (e.g. amqp://guest:guest@127.0.0.1:5672/%2f) and
-    // DUCKLE_RABBITMQ_QUEUE to a queue name (must exist on the
+    // QUILT_RABBITMQ_QUEUE to a queue name (must exist on the
     // broker). Publishes 3 messages, consumes them back, asserts count.
     let engine = engine_or_skip!();
-    let url = match std::env::var("DUCKLE_RABBITMQ_URL").ok() {
+    let url = match std::env::var("QUILT_RABBITMQ_URL").ok() {
         Some(u) if !u.is_empty() => u,
         _ => {
-            eprintln!("skipping: set DUCKLE_RABBITMQ_URL to run RabbitMQ tests");
+            eprintln!("skipping: set QUILT_RABBITMQ_URL to run RabbitMQ tests");
             return;
         }
     };
-    let queue = std::env::var("DUCKLE_RABBITMQ_QUEUE")
-        .unwrap_or_else(|_| format!("duckle-test-{}", std::process::id()));
+    let queue = std::env::var("QUILT_RABBITMQ_QUEUE")
+        .unwrap_or_else(|_| format!("quilt-test-{}", std::process::id()));
 
     let tmp = tempfile::tempdir().unwrap();
     let csv = write_file(tmp.path(), "in.csv", "id,name\n1,alpha\n2,beta\n3,gamma\n");
@@ -7845,19 +7845,19 @@ fn snk_and_src_rabbit_roundtrip_via_real_broker() {
 
 #[test]
 fn snk_and_src_nats_roundtrip_via_real_urls() {
-    // Env-gated like Kafka / Mongo / Redis. Set DUCKLE_NATS_URL to a
+    // Env-gated like Kafka / Mongo / Redis. Set QUILT_NATS_URL to a
     // working comma-separated list (e.g. nats://127.0.0.1:4222). Uses
     // a unique subject per test run so concurrent test invocations
     // don't collide.
     let engine = engine_or_skip!();
-    let urls = match std::env::var("DUCKLE_NATS_URL").ok() {
+    let urls = match std::env::var("QUILT_NATS_URL").ok() {
         Some(u) if !u.is_empty() => u,
         _ => {
-            eprintln!("skipping: set DUCKLE_NATS_URL to run NATS tests");
+            eprintln!("skipping: set QUILT_NATS_URL to run NATS tests");
             return;
         }
     };
-    let subject = format!("duckle.test.{}", std::process::id());
+    let subject = format!("quilt.test.{}", std::process::id());
 
     let tmp = tempfile::tempdir().unwrap();
     let csv = write_file(tmp.path(), "in.csv", "id,name\n1,alpha\n2,beta\n3,gamma\n");
@@ -7940,21 +7940,21 @@ fn snk_pubsub_routes_through_pubsub_handler_not_preview_fallback() {
 #[test]
 fn snk_and_src_redis_roundtrip_via_real_url() {
     // Env-gated like the mongo / postgres / mysql tests. Set
-    // DUCKLE_REDIS_URL to a working redis URL (e.g. redis://127.0.0.1:6379/0)
+    // QUILT_REDIS_URL to a working redis URL (e.g. redis://127.0.0.1:6379/0)
     // to run; otherwise skip cleanly. Write 3 keys via snk.redis, scan
     // them back via src.redis, assert the count + that they're all
     // present.
     let engine = engine_or_skip!();
-    let url = match std::env::var("DUCKLE_REDIS_URL").ok() {
+    let url = match std::env::var("QUILT_REDIS_URL").ok() {
         Some(u) if !u.is_empty() => u,
         _ => {
-            eprintln!("skipping: set DUCKLE_REDIS_URL to run Redis tests");
+            eprintln!("skipping: set QUILT_REDIS_URL to run Redis tests");
             return;
         }
     };
     let tmp = tempfile::tempdir().unwrap();
     // Unique prefix per test run so concurrent runs don't collide.
-    let prefix = format!("duckle_test_{}_", std::process::id());
+    let prefix = format!("quilt_test_{}_", std::process::id());
     let csv_body = format!(
         "key,value\n{p}k1,alpha\n{p}k2,beta\n{p}k3,gamma\n",
         p = prefix
@@ -8014,7 +8014,7 @@ fn src_git_log_emits_one_row_per_commit() {
     let g = |args: &[&str]| {
         let mut cmd = std::process::Command::new("git");
         cmd.arg("-C").arg(&repo);
-        cmd.arg("-c").arg("user.email=test@duckle.local");
+        cmd.arg("-c").arg("user.email=test@quilt.local");
         cmd.arg("-c").arg("user.name=Test User");
         cmd.arg("-c").arg("commit.gpgsign=false");
         cmd.arg("-c").arg("init.defaultBranch=main");
@@ -8063,7 +8063,7 @@ fn src_git_log_emits_one_row_per_commit() {
         "SELECT author_email FROM read_csv_auto('{}') LIMIT 1",
         out
     ));
-    assert_eq!(email, "test@duckle.local");
+    assert_eq!(email, "test@quilt.local");
     // Verify a subject containing a `|` survives the TAB-framed
     // pretty=format - we deliberately picked a subject with a pipe to
     // catch the easy-to-make `|`-as-delimiter mistake.
@@ -8614,7 +8614,7 @@ fn code_wasm_reverses_each_row_via_inline_module() {
     let in_csv = write_file(
         tmp.path(),
         "in.csv",
-        "id,text\n1,hello\n2,duckle\n3,abc\n",
+        "id,text\n1,hello\n2,quilt\n3,abc\n",
     );
     let out = out_path(tmp.path(), "out.csv");
     let r = engine.execute_pipeline(&doc(
@@ -8638,7 +8638,7 @@ fn code_wasm_reverses_each_row_via_inline_module() {
         out
     ));
     assert_eq!(h, "olleh");
-    // duckle -> elkcud
+    // quilt -> elkcud
     let d = scalar_string(&format!(
         "SELECT reversed FROM read_csv_auto('{}') WHERE id = 2",
         out
@@ -8706,7 +8706,7 @@ fn xf_ai_embed_calls_openai_compatible_endpoint() {
     let in_csv = write_file(
         tmp.path(),
         "in.csv",
-        "id,text\n1,hello\n2,world\n3,duckle\n",
+        "id,text\n1,hello\n2,world\n3,quilt\n",
     );
     let out = out_path(tmp.path(), "out.csv");
     let base_url = format!("http://127.0.0.1:{}", port);
@@ -8745,7 +8745,7 @@ fn xf_ai_embed_calls_openai_compatible_endpoint() {
     );
     assert!(req.contains("\"hello\""), "expected hello in request body");
     assert!(req.contains("\"world\""), "expected world in request body");
-    assert!(req.contains("\"duckle\""), "expected duckle in request body");
+    assert!(req.contains("\"quilt\""), "expected quilt in request body");
     // Verify the embedding column came back. The CSV writer renders
     // the vec column as a list literal like '[0.1,0.2,0.3]'.
     let v1 = scalar_string(&format!(
@@ -8806,7 +8806,7 @@ fn src_clipboard_reads_json_array_and_plain_text() {
 
     // ---- Phase 2: non-JSON text becomes one {text, length} row ----
     writer
-        .set_text("hello duckle".to_string())
+        .set_text("hello quilt".to_string())
         .expect("set_text");
     let out2 = out_path(tmp.path(), "text.csv");
     let r2 = engine.execute_pipeline(&doc(
@@ -8826,39 +8826,39 @@ fn src_clipboard_reads_json_array_and_plain_text() {
 }
 
 /// snk.email: env-gated integration test against a real SMTP server.
-/// Set DUCKLE_SMTP_HOST + USER + PASSWORD + FROM (and optionally
+/// Set QUILT_SMTP_HOST + USER + PASSWORD + FROM (and optionally
 /// PORT + TO_OVERRIDE) to run. Skips otherwise.
 #[test]
 fn snk_email_sends_messages_via_real_smtp() {
     let engine = engine_or_skip!();
-    let host = match std::env::var("DUCKLE_SMTP_HOST").ok() {
+    let host = match std::env::var("QUILT_SMTP_HOST").ok() {
         Some(h) if !h.is_empty() => h,
         _ => {
-            eprintln!("skipping: set DUCKLE_SMTP_HOST to run SMTP tests");
+            eprintln!("skipping: set QUILT_SMTP_HOST to run SMTP tests");
             return;
         }
     };
-    let user = std::env::var("DUCKLE_SMTP_USER").unwrap_or_default();
-    let password = std::env::var("DUCKLE_SMTP_PASSWORD").unwrap_or_default();
-    let from = std::env::var("DUCKLE_SMTP_FROM").unwrap_or_default();
+    let user = std::env::var("QUILT_SMTP_USER").unwrap_or_default();
+    let password = std::env::var("QUILT_SMTP_PASSWORD").unwrap_or_default();
+    let from = std::env::var("QUILT_SMTP_FROM").unwrap_or_default();
     if from.is_empty() {
-        eprintln!("skipping: need DUCKLE_SMTP_FROM");
+        eprintln!("skipping: need QUILT_SMTP_FROM");
         return;
     }
-    let port = std::env::var("DUCKLE_SMTP_PORT")
+    let port = std::env::var("QUILT_SMTP_PORT")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(587);
     // To address: default to a per-row column in the CSV; if
-    // DUCKLE_SMTP_TO_OVERRIDE is set, all rows go there instead.
-    let to_override = std::env::var("DUCKLE_SMTP_TO_OVERRIDE").ok();
+    // QUILT_SMTP_TO_OVERRIDE is set, all rows go there instead.
+    let to_override = std::env::var("QUILT_SMTP_TO_OVERRIDE").ok();
     let tmp = tempfile::tempdir().unwrap();
-    let to_addr = to_override.as_deref().unwrap_or("test@duckle.local");
+    let to_addr = to_override.as_deref().unwrap_or("test@quilt.local");
     let in_csv = write_file(
         tmp.path(),
         "in.csv",
         &format!(
-            "to,subject,body\n{to},duckle test 1,hello from duckle\n{to},duckle test 2,second test message\n",
+            "to,subject,body\n{to},quilt test 1,hello from quilt\n{to},quilt test 2,second test message\n",
             to = to_addr
         ),
     );
@@ -8878,30 +8878,30 @@ fn snk_email_sends_messages_via_real_smtp() {
     assert_eq!(r.status, "ok", "snk.email failed: {:?}", r.error);
 }
 
-/// src.email: env-gated integration test. Set DUCKLE_IMAP_HOST,
+/// src.email: env-gated integration test. Set QUILT_IMAP_HOST,
 /// USER, PASSWORD (and optionally PORT, MAILBOX) to a working IMAP
 /// account. Skips cleanly otherwise.
 #[test]
 fn src_email_fetches_messages_via_real_imap() {
     let engine = engine_or_skip!();
-    let host = match std::env::var("DUCKLE_IMAP_HOST").ok() {
+    let host = match std::env::var("QUILT_IMAP_HOST").ok() {
         Some(h) if !h.is_empty() => h,
         _ => {
-            eprintln!("skipping: set DUCKLE_IMAP_HOST to run IMAP tests");
+            eprintln!("skipping: set QUILT_IMAP_HOST to run IMAP tests");
             return;
         }
     };
-    let user = std::env::var("DUCKLE_IMAP_USER").unwrap_or_default();
-    let password = std::env::var("DUCKLE_IMAP_PASSWORD").unwrap_or_default();
+    let user = std::env::var("QUILT_IMAP_USER").unwrap_or_default();
+    let password = std::env::var("QUILT_IMAP_PASSWORD").unwrap_or_default();
     if user.is_empty() || password.is_empty() {
-        eprintln!("skipping: need DUCKLE_IMAP_USER + DUCKLE_IMAP_PASSWORD");
+        eprintln!("skipping: need QUILT_IMAP_USER + QUILT_IMAP_PASSWORD");
         return;
     }
-    let port = std::env::var("DUCKLE_IMAP_PORT")
+    let port = std::env::var("QUILT_IMAP_PORT")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(993);
-    let mailbox = std::env::var("DUCKLE_IMAP_MAILBOX").unwrap_or_else(|_| "INBOX".into());
+    let mailbox = std::env::var("QUILT_IMAP_MAILBOX").unwrap_or_else(|_| "INBOX".into());
 
     let tmp = tempfile::tempdir().unwrap();
     let out = out_path(tmp.path(), "mail.csv");
@@ -8924,26 +8924,26 @@ fn src_email_fetches_messages_via_real_imap() {
     assert!(n >= 1 && n <= 5, "expected 1..=5 messages, got {}", n);
 }
 
-/// src.ftp: env-gated integration test. Set DUCKLE_FTP_HOST (and
+/// src.ftp: env-gated integration test. Set QUILT_FTP_HOST (and
 /// optionally PORT/USER/PASSWORD/DIRECTORY) to a working FTP server
 /// holding the expected layout. Skips cleanly otherwise.
 #[test]
 fn src_ftp_lists_and_downloads_files_via_real_url() {
     let engine = engine_or_skip!();
-    let host = match std::env::var("DUCKLE_FTP_HOST").ok() {
+    let host = match std::env::var("QUILT_FTP_HOST").ok() {
         Some(h) if !h.is_empty() => h,
         _ => {
-            eprintln!("skipping: set DUCKLE_FTP_HOST to run FTP tests");
+            eprintln!("skipping: set QUILT_FTP_HOST to run FTP tests");
             return;
         }
     };
-    let port = std::env::var("DUCKLE_FTP_PORT")
+    let port = std::env::var("QUILT_FTP_PORT")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(21);
-    let user = std::env::var("DUCKLE_FTP_USER").unwrap_or_else(|_| "anonymous".into());
-    let password = std::env::var("DUCKLE_FTP_PASSWORD").unwrap_or_else(|_| "anonymous@".into());
-    let directory = std::env::var("DUCKLE_FTP_DIRECTORY").unwrap_or_else(|_| "/".into());
+    let user = std::env::var("QUILT_FTP_USER").unwrap_or_else(|_| "anonymous".into());
+    let password = std::env::var("QUILT_FTP_PASSWORD").unwrap_or_else(|_| "anonymous@".into());
+    let directory = std::env::var("QUILT_FTP_DIRECTORY").unwrap_or_else(|_| "/".into());
 
     let tmp = tempfile::tempdir().unwrap();
     let out = out_path(tmp.path(), "files.csv");
@@ -8991,7 +8991,7 @@ fn src_git_files_lists_tracked_tree() {
     let g = |args: &[&str]| {
         let mut cmd = std::process::Command::new("git");
         cmd.arg("-C").arg(&repo);
-        cmd.arg("-c").arg("user.email=test@duckle.local");
+        cmd.arg("-c").arg("user.email=test@quilt.local");
         cmd.arg("-c").arg("user.name=Test User");
         cmd.arg("-c").arg("commit.gpgsign=false");
         cmd.arg("-c").arg("init.defaultBranch=main");
@@ -9435,7 +9435,7 @@ fn runjob_resolves_bare_pipeline_id_via_workspace_env() {
     // A Run Job stored by the workspace picker carries a bare pipeline id
     // (not a path). Headless runs (scheduler) execute the saved file
     // directly, so the engine must resolve a bare id against
-    // $DUCKLE_WORKSPACE/pipelines/<id>.json. This proves that resolution.
+    // $QUILT_WORKSPACE/pipelines/<id>.json. This proves that resolution.
     let _env = env_guard();
     let engine = engine_or_skip!();
     let tmp = tempfile::tempdir().unwrap();
@@ -9459,13 +9459,13 @@ fn runjob_resolves_bare_pipeline_id_via_workspace_env() {
     )
     .unwrap();
 
-    std::env::set_var("DUCKLE_WORKSPACE", ws);
+    std::env::set_var("QUILT_WORKSPACE", ws);
     let parent = doc(
         json!([node("rj", "ctl.runjob", json!({ "pipelineRef": child_id }))]),
         json!([]),
     );
     let result = engine.execute_pipeline(&parent);
-    std::env::remove_var("DUCKLE_WORKSPACE");
+    std::env::remove_var("QUILT_WORKSPACE");
 
     assert_eq!(
         result.status, "ok",
@@ -9499,7 +9499,7 @@ fn incremental_load_advances_watermark_across_runs() {
     ]);
     let edges = json!([main_edge("e1", "s", "inc"), main_edge("e2", "inc", "k")]);
 
-    std::env::set_var("DUCKLE_WORKSPACE", ws);
+    std::env::set_var("QUILT_WORKSPACE", ws);
 
     // Run 1: three rows -> all loaded, watermark saved as 3.
     std::fs::write(&csv, "id\n1\n2\n3\n").unwrap();
@@ -9514,7 +9514,7 @@ fn incremental_load_advances_watermark_across_runs() {
     // Run 2: two more rows -> only those past id=3 load.
     std::fs::write(&csv, "id\n1\n2\n3\n4\n5\n").unwrap();
     let r2 = engine.execute_pipeline_named(&doc(pipeline.clone(), edges.clone()), "IncTest");
-    std::env::remove_var("DUCKLE_WORKSPACE");
+    std::env::remove_var("QUILT_WORKSPACE");
     assert_eq!(r2.status, "ok", "run2 failed: {:?}", r2.error);
     assert_eq!(
         count(&format!("read_csv_auto('{}')", out)),
@@ -9531,13 +9531,13 @@ fn ducklake_cdc_reads_incremental_changes() {
     // consumed snapshot (saved in workspace state). First run sees all
     // changes; after a new commit, the second run sees only the new delta.
     // Requires a DuckDB build with the `ducklake` extension (set
-    // DUCKLE_DUCKDB_BIN to v1.5+). The state lives under DUCKLE_WORKSPACE.
+    // QUILT_DUCKDB_BIN to v1.5+). The state lives under QUILT_WORKSPACE.
     let engine = engine_or_skip!();
-    let bin = std::env::var("DUCKLE_DUCKDB_BIN").unwrap();
+    let bin = std::env::var("QUILT_DUCKDB_BIN").unwrap();
     let _env = env_guard();
     let tmp = tempfile::tempdir().unwrap();
     let ws = tmp.path();
-    std::env::set_var("DUCKLE_WORKSPACE", ws);
+    std::env::set_var("QUILT_WORKSPACE", ws);
     let cat = ws.join("lake.ducklake").to_string_lossy().replace('\\', "/");
     let out = out_path(ws, "cdc1.csv");
     let out2 = out_path(ws, "cdc2.csv");
@@ -9564,7 +9564,7 @@ fn ducklake_cdc_reads_incremental_changes() {
         attach
     ));
     if !std::path::Path::new(&cat).exists() {
-        std::env::remove_var("DUCKLE_WORKSPACE");
+        std::env::remove_var("QUILT_WORKSPACE");
         eprintln!("skipping: ducklake extension unavailable for this DuckDB build");
         return;
     }
@@ -9587,7 +9587,7 @@ fn ducklake_cdc_reads_incremental_changes() {
     // New commit, then run 2: only the new delta (id=3 insert).
     cli(&format!("{}INSERT INTO lake.t VALUES (3,'c');", attach));
     let r2 = engine.execute_pipeline_named(&pipe(&out2), "LakeCDC");
-    std::env::remove_var("DUCKLE_WORKSPACE");
+    std::env::remove_var("QUILT_WORKSPACE");
     assert_eq!(r2.status, "ok", "cdc run2 failed: {:?}", r2.error);
     assert_eq!(count(&format!("read_csv_auto('{}')", out2)), 1, "run2 should see only the new row");
     let n = scalar_string(&format!("SELECT name FROM read_csv_auto('{}') WHERE id = 3", out2));
@@ -9596,7 +9596,7 @@ fn ducklake_cdc_reads_incremental_changes() {
 
 #[test]
 fn run_log_writes_per_pipeline_ndjson() {
-    // With DUCKLE_LOG_DIR set, a run appends component-level NDJSON to
+    // With QUILT_LOG_DIR set, a run appends component-level NDJSON to
     // <dir>/<pipeline name>/runtime.log, including the ctl.log line.
     let _env = env_guard();
     let engine = engine_or_skip!();
@@ -9612,9 +9612,9 @@ fn run_log_writes_per_pipeline_ndjson() {
         ]),
         json!([main_edge("e1", "s", "lg"), main_edge("e2", "lg", "k")]),
     );
-    std::env::set_var("DUCKLE_LOG_DIR", &logdir);
+    std::env::set_var("QUILT_LOG_DIR", &logdir);
     let r = engine.execute_pipeline_named(&d, "Daily Load");
-    std::env::remove_var("DUCKLE_LOG_DIR");
+    std::env::remove_var("QUILT_LOG_DIR");
     assert_eq!(r.status, "ok", "run failed: {:?}", r.error);
 
     let log_file = logdir.join("Daily Load").join("runtime.log");

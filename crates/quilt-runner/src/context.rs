@@ -12,7 +12,7 @@
 //! payloads before calling resolveForRun; this port loads them from disk
 //! itself (a naive port reading only repository.json would see zero vars).
 
-use duckle_duckdb_engine::PipelineDoc;
+use quilt_duckdb_engine::PipelineDoc;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;

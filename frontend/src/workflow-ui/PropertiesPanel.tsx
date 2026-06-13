@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import type { Edge, Node } from '@xyflow/react';
 import { CheckCircle2, ChevronLeft, ChevronRight, MousePointer2, Workflow } from 'lucide-react';
 import { resolveUpstreamSchema, resolveUpstreamSampleRows } from '../schema-resolve';
-import type { Column, DuckleNodeData } from '../pipeline-types';
+import type { Column, QuiltNodeData } from '../pipeline-types';
 import type {
     ConnectionPayload,
     ContextPayload,
     RepoItem,
     RoutinePayload,
 } from '../repo-types';
+import { SECRET_CONNECTION_KEYS } from '../repo-types';
 import SchemaEditor from './SchemaEditor';
 import FieldRenderer from './fields/FieldRenderer';
 import { FieldContext, type ActiveContext } from './fields/FieldContext';
@@ -66,12 +67,12 @@ const KIND_COLOR: Record<string, string> = {
 };
 
 type Props = {
-    selected: Node<DuckleNodeData> | null;
-    allNodes: Node<DuckleNodeData>[];
+    selected: Node<QuiltNodeData> | null;
+    allNodes: Node<QuiltNodeData>[];
     edges: Edge[];
     repoItems: RepoItem[];
     activeContextId?: string | null;
-    onUpdate: (id: string, patch: Partial<DuckleNodeData>) => void;
+    onUpdate: (id: string, patch: Partial<QuiltNodeData>) => void;
     onOpenMapper?: (nodeId: string) => void;
     focusNameRequest?: number;
 };
@@ -123,13 +124,13 @@ export default function PropertiesPanel({
     // Right panel collapse: a thin rail on the right edge with an expand button,
     // so the canvas can use the full width. Persists per machine.
     const [collapsed, setCollapsed] = useState(
-        () => localStorage.getItem('duckle.properties.collapsed') === '1',
+        () => localStorage.getItem('quilt.properties.collapsed') === '1',
     );
     const toggleCollapsed = () =>
         setCollapsed(c => {
             const next = !c;
             try {
-                localStorage.setItem('duckle.properties.collapsed', next ? '1' : '0');
+                localStorage.setItem('quilt.properties.collapsed', next ? '1' : '0');
             } catch {
                 /* localStorage unavailable - non-fatal */
             }
@@ -272,18 +273,23 @@ export default function PropertiesPanel({
                     onPickConnection: (payload: ConnectionPayload) => {
                         if (!selected) return;
                         const next = { ...(selected.data.properties ?? {}) };
+                        // Only the non-secret descriptive fields are copied into
+                        // the node (and thus persisted to pipelines/*.json). The
+                        // secret fields (password / accessKey / secretKey /
+                        // accountKey) are deliberately NOT copied here - they
+                        // would land in the unencrypted pipeline file and could
+                        // be committed to git. Instead the node keeps only the
+                        // `connectionRef` id, and the secrets are injected at run
+                        // time from the (decrypted, in-memory) saved connection.
+                        // See resolveForRun in run-resolve.ts.
                         const keys: (keyof ConnectionPayload)[] = [
                             'host',
                             'port',
                             'database',
                             'username',
-                            'password',
                             'bucket',
                             'region',
-                            'accessKey',
-                            'secretKey',
                             'accountName',
-                            'accountKey',
                             'brokers',
                             'url',
                         ];
@@ -292,6 +298,12 @@ export default function PropertiesPanel({
                             if (v !== undefined && v !== '' && v !== null) {
                                 next[k] = v as string | number;
                             }
+                        }
+                        // Drop any secret values a previous (pre-fix) pick may
+                        // have copied in, so re-picking a connection scrubs them
+                        // from the node instead of leaving stale plaintext.
+                        for (const k of SECRET_CONNECTION_KEYS) {
+                            delete next[k];
                         }
                         // Snowflake components key the account identifier as
                         // `account`, but the connection stores it in `host`.
@@ -491,7 +503,9 @@ function PreviewTab({ schema, rows, inheritedRows }: PreviewProps) {
         return (
             <div className="preview-empty">
                 <div className="preview-empty-title">{t('properties.noSample')}</div>
-                <div className="preview-empty-desc" dangerouslySetInnerHTML={{ __html: t('properties.noSampleDescHtml') }} />
+                <div className="preview-empty-desc">
+                    <Trans i18nKey="properties.noSampleDescHtml" components={{ b: <b /> }} />
+                </div>
             </div>
         );
     }

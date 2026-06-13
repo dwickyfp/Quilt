@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="docs/assets/hero.svg" alt="Duckle" width="100%"/>
+<img src="docs/assets/hero.svg" alt="Quilt" width="100%"/>
 
 <h3>The local-first data studio with a built-in AI assistant.</h3>
 
-<p><b>Duckle</b> is an open-source desktop ETL / ELT studio. Drag a pipeline onto the canvas, describe what you need in plain English to <b>Duckie</b> (the on-device AI assistant), and execute at native speed through DuckDB. 290+ connectors, 50+ transforms, a built-in scheduler, and a chat assistant that runs entirely on your CPU. Ships as a ~65 MB single-file desktop app. No cloud, no servers, no lock-in.</p>
+<p><b>Quilt</b> is an open-source desktop ETL / ELT studio. Drag a pipeline onto the canvas, describe what you need in plain English to <b>Duckie</b> (the on-device AI assistant), and execute at native speed through DuckDB. 290+ connectors, 50+ transforms, a built-in scheduler, and a chat assistant that runs entirely on your CPU. Ships as a ~65 MB single-file desktop app. No cloud, no servers, no lock-in.</p>
 
 <p>
 <img alt="status" src="https://img.shields.io/badge/status-beta-3b82f6"/>
@@ -15,14 +15,14 @@
 <img alt="react" src="https://img.shields.io/badge/React%2019-20232A?logo=react&logoColor=61DAFB"/>
 <img alt="typescript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white"/>
 <img alt="duckdb" src="https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black"/>
-<img alt="stars" src="https://img.shields.io/github/stars/SouravRoy-ETL/duckle?style=social"/>
+<img alt="stars" src="https://img.shields.io/github/stars/dwickyfp/Quilt?style=social"/>
 </p>
 
 </div>
 
 <div align="center">
 
-<a href="https://discord.gg/VbSVt7Etx"><img src="docs/assets/discord-cta.svg" alt="Join the Duckle community on Discord" width="340"/></a>
+<a href="https://discord.gg/VbSVt7Etx"><img src="docs/assets/discord-cta.svg" alt="Join the Quilt community on Discord" width="340"/></a>
 
 </div>
 
@@ -36,7 +36,7 @@
 
 **Get started**
 
-- [What is Duckle?](#what-is-duckle)
+- [What is Quilt?](#what-is-quilt)
 - [Quickstart (60 s)](#quickstart-60-seconds)
 - [Download / Install](#download--install)
 - [Build from source](#build-from-source)
@@ -48,13 +48,13 @@
 **Use the product**
 
 - [Meet Duckie (AI)](#meet-duckie---the-local-ai-pipeline-assistant)
-- [How to use Duckle](#how-to-use-duckle)
+- [How to use Quilt](#how-to-use-quilt)
 - [Recipes / examples](#recipes-and-examples)
 - [In-app Git (GitHub/GitLab)](#git-integration-github--gitlab)
 - [Workspace + Git flow](#workspace-and-git-flow)
 - [Schedules](#schedules-and-triggers)
 - [Server deployment](#server-deployment-build-pipeline)
-- [MCP server (Claude / LLM integration)](#mcp-server-connect-claude-or-any-llm-to-duckle)
+- [MCP server (Claude / LLM integration)](#mcp-server-connect-claude-or-any-llm-to-quilt)
 - [Connection management](#connection-management)
 - [Context variables](#context-variables)
 
@@ -88,9 +88,9 @@
 - [Status](#status)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
-- [Sponsor Duckle](SPONSORS.md)
+- [Sponsor Quilt](SPONSORS.md)
 - [License](#license)
-- [Releases](https://github.com/SouravRoy-ETL/duckle/releases)
+- [Releases](https://github.com/dwickyfp/Quilt/releases)
 - [Roadmap doc](docs/roadmap.md)
 - [Contributing doc](CONTRIBUTING.md)
 
@@ -100,11 +100,11 @@
 
 ---
 
-## What is Duckle?
+## What is Quilt?
 
-A visual data pipeline studio that runs on your laptop. Drag sources, transforms, validators, and sinks onto a canvas. Wire them together. Press **Run**. Duckle compiles the graph to SQL and executes it through a real columnar engine, with live previews, generated SQL on every node, and zero hidden state.
+A visual data pipeline studio that runs on your laptop. Drag sources, transforms, validators, and sinks onto a canvas. Wire them together. Press **Run**. Quilt compiles the graph to SQL and executes it through a real columnar engine, with live previews, generated SQL on every node, and zero hidden state.
 
-Three things make Duckle different from the heavyweights and the toy ETL tools:
+Three things make Quilt different from the heavyweights and the toy ETL tools:
 
 1. **An AI assistant that ships in the box.** Describe the pipeline you want in English; Duckie writes the JSON and drops it onto the canvas. The model runs locally - no API key, no telemetry, no cloud round-trip.
 2. **290+ connectors at install time.** Files, lakehouses, SQL databases, warehouses, NoSQL, vector DBs, streaming brokers, SaaS REST/GraphQL APIs, even FTP and IMAP - working today, not coming-soon.
@@ -124,7 +124,7 @@ Three things make Duckle different from the heavyweights and the toy ETL tools:
 <img src="docs/assets/real-life-screenshot/duckie.png" alt="Duckie AI Assistant panel open beside a real pipeline on the canvas, showing example prompts and a LOCAL badge" width="100%"/>
 </p>
 
-The sidebar on the right is **Duckie AI Assistant** - powered by **Qwen 2.5 Coder 1.5B** running through **llama.cpp**, downloaded once (~1.1 GB) and then run entirely on your CPU. Ask in plain English; Duckie streams back a valid Duckle pipeline definition. One click drops it onto the canvas, ready to inspect, tweak, and run.
+The sidebar on the right is **Duckie AI Assistant** - powered by **Qwen 2.5 Coder 1.5B** running through **llama.cpp**, downloaded once (~1.1 GB) and then run entirely on your CPU. Ask in plain English; Duckie streams back a valid Quilt pipeline definition. One click drops it onto the canvas, ready to inspect, tweak, and run.
 
 | | |
 |---|---|
@@ -136,7 +136,7 @@ The sidebar on the right is **Duckie AI Assistant** - powered by **Qwen 2.5 Code
 
 ---
 
-## Why Duckle is different
+## Why Quilt is different
 
 | | |
 |---|---|
@@ -154,9 +154,9 @@ The sidebar on the right is **Duckie AI Assistant** - powered by **Qwen 2.5 Code
 
 ## Status
 
-Duckle is in **public beta**. The visual designer, the DuckDB execution engine, the scheduler, the cloud connectors, and the Duckie AI assistant all work today and are covered by 170+ integration tests across Linux, macOS, and Windows. The catalog is still growing and APIs may evolve before 1.0, but the day-to-day surface is stable enough for real work.
+Quilt is in **public beta**. The visual designer, the DuckDB execution engine, the scheduler, the cloud connectors, and the Duckie AI assistant all work today and are covered by 170+ integration tests across Linux, macOS, and Windows. The catalog is still growing and APIs may evolve before 1.0, but the day-to-day surface is stable enough for real work.
 
-**Scope, stated plainly:** Duckle is a single-machine, embedded studio. If you outgrow one box, point Duckle's output at the system that scales (a warehouse, an object store, a lakehouse). It will not pretend to be a cluster.
+**Scope, stated plainly:** Quilt is a single-machine, embedded studio. If you outgrow one box, point Quilt's output at the system that scales (a warehouse, an object store, a lakehouse). It will not pretend to be a cluster.
 
 The component palette ships **313 nodes** so the roadmap is visible in the product itself:
 
@@ -168,7 +168,7 @@ The component palette ships **313 nodes** so the roadmap is visible in the produ
 
 ## Screenshots
 
-Real pipelines, built and run in Duckle - not mockups.
+Real pipelines, built and run in Quilt - not mockups.
 
 <p align="center">
   <img src="docs/assets/real-life-screenshot/mega-pipeline-join.png" alt="A 5-million-row pipeline joining a CSV, a Parquet file, a DuckDB table, and a SQLite table through the visual Map node" width="100%"/>
@@ -202,7 +202,7 @@ Real pipelines, built and run in Duckle - not mockups.
 
 ## Capabilities
 
-Duckle is not a CSV tool with extras. It reads a broad set of formats and sources, ships a deep transform library, and writes to files, databases, object storage, vector DBs, message buses, and email.
+Quilt is not a CSV tool with extras. It reads a broad set of formats and sources, ships a deep transform library, and writes to files, databases, object storage, vector DBs, message buses, and email.
 
 ### Sources (74 available)
 
@@ -358,7 +358,7 @@ Every node has an **Advanced** tab with fields the engine honours at run time:
 
 ## Clean data before it reaches your AI
 
-Models inherit the quality of their inputs. RAG indexes, embedding stores, and training sets quietly accumulate duplicates, nulls, malformed rows, mixed encodings, and inconsistent schemas. Duckle is built to scrub that data before it lands in a vector store:
+Models inherit the quality of their inputs. RAG indexes, embedding stores, and training sets quietly accumulate duplicates, nulls, malformed rows, mixed encodings, and inconsistent schemas. Quilt is built to scrub that data before it lands in a vector store:
 
 - **Deduplicate** with exact Distinct, Uniqueness, and **Fuzzy Deduplicate** (Jaro-Winkler / Levenshtein); use **Record Match** to find near-duplicate pairs with a similarity score
 - **Semantic dedupe** with `xf.ai.dedupe` over a precomputed embedding column
@@ -375,18 +375,16 @@ Models inherit the quality of their inputs. RAG indexes, embedding stores, and t
 
 ## Engines
 
-Duckle ships a thin shell and installs its engines on first launch.
+Quilt ships a thin shell and installs its engines on first launch.
 
 | Engine | Role | Status |
 |---|---|---|
 | **DuckDB** | Default execution engine: analytics, file formats, cloud reads, SQL pushdown. Tracking **v1.5.3** (latest stable). | Working |
 | **Duckie AI Assistant** | Local chat assistant via **llama.cpp** + **Qwen 2.5 Coder 1.5B GGUF**. Downloads ~1.1 GB; runs entirely offline once installed. Managed as a `llama-server` subprocess exposing an OpenAI-compatible API on `127.0.0.1`. | Installable |
-| **SlothDB** | Alternate embedded analytical engine ([SouravRoy-ETL/slothdb](https://github.com/SouravRoy-ETL/slothdb)), installed the same way and selectable per pipeline. | Installable |
-| **Native** | In-process Rust streaming / incremental engine. | Planned |
 
 ### First-launch extension pre-fetch
 
-When the installer downloads the DuckDB CLI it also pre-fetches the extensions Duckle uses, with per-extension progress, so the first time you touch a Postgres source or an Iceberg table there is no surprise network hop mid-pipeline:
+When the installer downloads the DuckDB CLI it also pre-fetches the extensions Quilt uses, with per-extension progress, so the first time you touch a Postgres source or an Iceberg table there is no surprise network hop mid-pipeline:
 
 `httpfs` (S3 / GCS / HTTP), `azure` (Azure Blob native), `sqlite`, `postgres`, `mysql`, `excel`, `iceberg`, `delta`, `ducklake`, `vss`, `fts`.
 
@@ -396,13 +394,13 @@ When the installer downloads the DuckDB CLI it also pre-fetches the extensions D
 
 ## Download / Install
 
-Pick the binary for your OS from the [latest release](https://github.com/SouravRoy-ETL/duckle/releases/tag/v0.3.0):
+Pick the binary for your OS from the [latest release](https://github.com/dwickyfp/Quilt/releases/tag/v0.3.0):
 
 | OS | Asset | How to run |
 |---|---|---|
-| **Windows** | `Duckle-windows-x64.exe` | Double-click. Unsigned binary - Windows SmartScreen will warn the first time; click "More info" -> "Run anyway". |
-| **macOS** (Apple Silicon) | `Duckle-macos-arm64` | `chmod +x Duckle-macos-arm64 && ./Duckle-macos-arm64`. Right-click -> Open the first time to bypass Gatekeeper. |
-| **Linux** (x86_64) | `Duckle-linux-x64` | `chmod +x Duckle-linux-x64 && ./Duckle-linux-x64`. Requires WebKitGTK 4.1 (`libwebkit2gtk-4.1-0` on Debian / Ubuntu). |
+| **Windows** | `Quilt-windows-x64.exe` | Double-click. Unsigned binary - Windows SmartScreen will warn the first time; click "More info" -> "Run anyway". |
+| **macOS** (Apple Silicon) | `Quilt-macos-arm64` | `chmod +x Quilt-macos-arm64 && ./Quilt-macos-arm64`. Right-click -> Open the first time to bypass Gatekeeper. |
+| **Linux** (x86_64) | `Quilt-linux-x64` | `chmod +x Quilt-linux-x64 && ./Quilt-linux-x64`. Requires WebKitGTK 4.1 (`libwebkit2gtk-4.1-0` on Debian / Ubuntu). |
 
 The single-file binary above is all you need for **Build Pipeline** too: the headless runner is embedded into the app at build time, and exporting a pipeline produces ONE self-contained executable (the engine, the DuckDB CLI, any needed extensions, and the resolved pipeline are all inside that one file). Copy that single file to your server and run or schedule it - no separate runner download required.
 
@@ -414,9 +412,9 @@ The binary is ~55-78 MB depending on platform (it embeds the headless runner and
 | **Duckie AI Assistant** | ~1.1 GB (llama-server + Qwen 2.5 Coder 1.5B GGUF) | Optional | The chat sidebar that generates pipelines from natural language |
 
 App-data location:
-- Windows: `%APPDATA%\io.duckle.app\engines\`
-- macOS: `~/Library/Application Support/io.duckle.app/engines/`
-- Linux: `~/.config/io.duckle.app/engines/`
+- Windows: `%APPDATA%\io.quilt.app\engines\`
+- macOS: `~/Library/Application Support/io.quilt.app/engines/`
+- Linux: `~/.config/io.quilt.app/engines/`
 
 Delete the `engines/` folder if you ever want to force a fresh install.
 
@@ -478,7 +476,7 @@ A worked example using the bundled `samples/orders.csv` data.
 
 ---
 
-## How to use Duckle
+## How to use Quilt
 
 A wider tour of the workflow.
 
@@ -579,7 +577,7 @@ More examples live in [`samples/`](samples) - drop the pipeline files into a wor
 
 ## Git integration (GitHub + GitLab)
 
-> Push, pull, branch, and watch CI from inside Duckle. No terminal required.
+> Push, pull, branch, and watch CI from inside Quilt. No terminal required.
 
 Click the **Git icon** in the topbar to open the workspace Git panel. Built-in integration with GitHub and GitLab, on the system `git` CLI (no FFI, no embedded git library):
 
@@ -590,17 +588,17 @@ Click the **Git icon** in the topbar to open the workspace Git panel. Built-in i
 | **Push / Pull** | `git push` and `git pull --ff-only` against `origin`. The button stays disabled when there's nothing to push |
 | **Branch list, switch, create** | Lists local branches; click to switch; create new branches inline |
 | **Remote URL config** | Add or change `origin` URL from inside the panel - auto-detects GitHub vs GitLab from the host |
-| **PAT-prompt fallback** | First tries `git push` using your system credential helper (GitHub CLI, osxkeychain, manager-core). On a 401, prompts for a Personal Access Token, saves it AES-encrypted in `<workspace>/.duckle/secrets/git.json` (auto-gitignored), retries with the token injected into the HTTPS URL |
+| **PAT-prompt fallback** | First tries `git push` using your system credential helper (GitHub CLI, osxkeychain, manager-core). On a 401, prompts for a Personal Access Token, saves it AES-encrypted in `<workspace>/.quilt/secrets/git.json` (auto-gitignored), retries with the token injected into the HTTPS URL |
 | **CI build badge in topbar** | Polls GitHub Actions or GitLab CI every 30 s for the latest pipeline on your current branch. Shows green / red / yellow / gray. Click to open the build in your browser |
 
 **Workflow.** Workspaces are plain folders (see [Workspace and Git flow](#workspace-and-git-flow)) - any standard Git workflow works:
 
 ```
-Create / clone -> open in Duckle -> edit pipelines -> commit + push -> 
+Create / clone -> open in Quilt -> edit pipelines -> commit + push -> 
 PR / MR -> CI runs your pipeline tests -> merge -> pull
 ```
 
-You can do the entire push / pull / merge loop without leaving Duckle. Heavy operations (interactive rebase, conflict resolution, log archaeology) still live in your terminal or external Git tool - the panel is designed for the everyday flow, not as a full Git replacement.
+You can do the entire push / pull / merge loop without leaving Quilt. Heavy operations (interactive rebase, conflict resolution, log archaeology) still live in your terminal or external Git tool - the panel is designed for the everyday flow, not as a full Git replacement.
 
 **Provider detection.** The remote URL host determines which CI API the badge polls:
 
@@ -653,13 +651,13 @@ git push
 
 # Branch for a risky migration
 git checkout -b feature/upsert-mode
-# ...edit pipelines in Duckle...
+# ...edit pipelines in Quilt...
 git diff       # readable JSON diffs
 git push -u origin feature/upsert-mode
 # open PR / MR
 ```
 
-**Sensitive values** in connections get encrypted with a workspace-local key (`workspace/.duckle/keys/`). Don't commit that file - add `**/.duckle/keys/` to `.gitignore`. The connection JSON files themselves only hold the ciphertext, which is safe.
+**Sensitive values** in connections get encrypted with a workspace-local key (`workspace/.quilt/keys/`). Don't commit that file - add `**/.quilt/keys/` to `.gitignore`. The connection JSON files themselves only hold the ciphertext, which is safe.
 
 ---
 
@@ -674,15 +672,15 @@ Pipelines can run on cron, fixed interval, or file-watch triggers. Configure the
 | **File watch** | Watch a directory for new/changed files matching a glob | `/inbox/*.csv` |
 | **Manual** | Run-on-demand only (the default) | - |
 
-Schedules persist to `workspace/schedules.json` and execute via the in-process scheduler crate. They survive app restarts but require Duckle to be running.
+Schedules persist to `workspace/schedules.json` and execute via the in-process scheduler crate. They survive app restarts but require Quilt to be running.
 
-For headless / always-on schedules that run when Duckle is closed, build the pipeline into a standalone file and let the operating system's own scheduler run it - see [Server deployment](#server-deployment-build-pipeline) below.
+For headless / always-on schedules that run when Quilt is closed, build the pipeline into a standalone file and let the operating system's own scheduler run it - see [Server deployment](#server-deployment-build-pipeline) below.
 
 ---
 
 ## Server deployment (Build Pipeline)
 
-The in-app scheduler runs only while Duckle is open. To run a pipeline on a server with no desktop app, **Build Pipeline** turns it into ONE self-contained executable - the equivalent of a standalone "Job".
+The in-app scheduler runs only while Quilt is open. To run a pipeline on a server with no desktop app, **Build Pipeline** turns it into ONE self-contained executable - the equivalent of a standalone "Job".
 
 Right-click a pipeline (in the project tree or on the canvas) and choose **Build Pipeline**. The output is a single file named after the pipeline (`orders_etl.exe` on Windows, `orders_etl` on macOS / Linux) that embeds everything it needs:
 
@@ -692,7 +690,7 @@ Right-click a pipeline (in the project tree or on the canvas) and choose **Build
 - the resolved pipeline (context variables substituted, routines inlined),
 - its secrets (see below).
 
-On first run it self-extracts to a temp cache and uses its **own** embedded DuckDB, so the server needs nothing installed - no Duckle, no DuckDB. There is no folder to copy, no `run.sh`, and no separate runner download. A CSV-to-CSV pipeline builds to about 28 MB; only the extensions a pipeline uses are bundled, so the file stays lean.
+On first run it self-extracts to a temp cache and uses its **own** embedded DuckDB, so the server needs nothing installed - no Quilt, no DuckDB. There is no folder to copy, no `run.sh`, and no separate runner download. A CSV-to-CSV pipeline builds to about 28 MB; only the extensions a pipeline uses are bundled, so the file stays lean.
 
 ```bash
 ./orders_etl            # or orders_etl.exe on Windows
@@ -707,13 +705,13 @@ The process exits `0` on success and non-zero on failure, and writes the same ND
 | **Target OS** | The file is built for the OS you build on - build on Linux to deploy to a Linux server. Appending the payload makes the file unsigned, so do not codesign / Authenticode-sign it. |
 | **Context** | Pick a context at build time; its non-secret variables are baked into the pipeline. |
 | **Secrets: Environment** | Each secret becomes a `${ENV:KEY}` placeholder, so nothing sensitive is written into the file. The runner resolves real environment variables first, then a `secrets.env` (KEY=VALUE lines) placed next to the file. |
-| **Secrets: Passphrase** | Secrets are encrypted inside the file with AES-256-GCM, decrypted at run time from the `DUCKLE_BUNDLE_PASSPHRASE` environment variable. |
+| **Secrets: Passphrase** | Secrets are encrypted inside the file with AES-256-GCM, decrypted at run time from the `QUILT_BUNDLE_PASSPHRASE` environment variable. |
 
 **Schedule it** with whatever the server already has - point the OS scheduler straight at the file:
 
 ```cron
 # Linux cron - run every day at 02:00
-0 2 * * * /opt/duckle/orders_etl >> /var/log/orders_etl.log 2>&1
+0 2 * * * /opt/quilt/orders_etl >> /var/log/orders_etl.log 2>&1
 ```
 
 On Windows use **Task Scheduler**; on macOS a **launchd** plist; on Linux a **systemd** timer. Full examples in [docs/current/scheduler.md](docs/current/scheduler.md).
@@ -721,18 +719,18 @@ On Windows use **Task Scheduler**; on macOS a **launchd** plist; on Linux a **sy
 **Run against an existing workspace** - the same embedded headless runner can also execute a pipeline JSON directly, resolving context the way the app does:
 
 ```bash
-duckle-runner --pipeline /path/to/pipeline.json [--workspace /path/to/workspace] [--duckdb /path/to/duckdb]
+quilt-runner --pipeline /path/to/pipeline.json [--workspace /path/to/workspace] [--duckdb /path/to/duckdb]
 ```
 
 ---
 
-## MCP server (connect Claude or any LLM to Duckle)
+## MCP server (connect Claude or any LLM to Quilt)
 
-<p align="center"><img src="docs/assets/mcp-claude-banner.svg" alt="Connect Duckle to Claude via MCP" width="92%"/></p>
+<p align="center"><img src="docs/assets/mcp-claude-banner.svg" alt="Connect Quilt to Claude via MCP" width="92%"/></p>
 
-Duckle ships its own [Model Context Protocol](https://modelcontextprotocol.io)
+Quilt ships its own [Model Context Protocol](https://modelcontextprotocol.io)
 server, so Claude (or any MCP client - Claude Desktop, Claude Code, Cursor, or
-any other LLM agent) can drive Duckle directly: browse the full component catalog
+any other LLM agent) can drive Quilt directly: browse the full component catalog
 and per-component property schemas, **generate a pipeline straight into a working
 directory you choose**, validate it (compile without running), run it headlessly,
 read existing pipelines and their run logs, build a standalone artifact, and
@@ -744,25 +742,25 @@ The MCP server is **bundled inside the app** - there is nothing extra to install
 In the designer, click **Connect to Claude** in the top bar to open the connector
 popup, then pick your client:
 
-- **Connect to Claude Code** - registers the `duckle` server for you (runs
+- **Connect to Claude Code** - registers the `quilt` server for you (runs
   `claude mcp add` under the hood).
-- **Add to Claude Desktop** / **Add to Cursor** - writes the `duckle` entry into
+- **Add to Claude Desktop** / **Add to Cursor** - writes the `quilt` entry into
   that client's config, with the resolved engine paths filled in (both the
   Microsoft Store / MSIX and standalone Claude Desktop layouts are handled).
 - Or copy the command / config for any other MCP client.
 
-Restart the AI client, then try *"Use duckle to list the available components"*
+Restart the AI client, then try *"Use quilt to list the available components"*
 to confirm the connection.
 
 ### Manual / headless
 
-For a build-from-source or server setup, point any client at the `duckle-mcp`
+For a build-from-source or server setup, point any client at the `quilt-mcp`
 binary directly. It speaks JSON-RPC over stdio and reuses the DuckDB engine
 in-process (no GUI, no Node runtime).
 
 ```bash
-cargo build -p duckle-mcp --release      # target/release/duckle-mcp
-claude mcp add duckle -- /path/to/duckle-mcp
+cargo build -p quilt-mcp --release      # target/release/quilt-mcp
+claude mcp add quilt -- /path/to/quilt-mcp
 ```
 
 For Claude Desktop and other clients, add it to `mcpServers`:
@@ -770,11 +768,11 @@ For Claude Desktop and other clients, add it to `mcpServers`:
 ```json
 {
   "mcpServers": {
-    "duckle": {
-      "command": "/path/to/duckle-mcp",
+    "quilt": {
+      "command": "/path/to/quilt-mcp",
       "env": {
-        "DUCKLE_DUCKDB_BIN": "/path/to/duckdb",
-        "DUCKLE_RUNNER_BIN": "/path/to/duckle-runner"
+        "QUILT_DUCKDB_BIN": "/path/to/duckdb",
+        "QUILT_RUNNER_BIN": "/path/to/quilt-runner"
       }
     }
   }
@@ -784,8 +782,8 @@ For Claude Desktop and other clients, add it to `mcpServers`:
 Tools: `list_components`, `get_component_schema`, `create_pipeline`,
 `validate_pipeline`, `run_pipeline`, `list_pipelines`, `read_pipeline`,
 `read_run_logs`, `build_pipeline`, `list_connections`, `create_connection`.
-`run_pipeline` / `build_pipeline` need a DuckDB binary (`DUCKLE_DUCKDB_BIN`);
-`build_pipeline` also needs `duckle-runner` (`DUCKLE_RUNNER_BIN`). Full guide:
+`run_pipeline` / `build_pipeline` need a DuckDB binary (`QUILT_DUCKDB_BIN`);
+`build_pipeline` also needs `quilt-runner` (`QUILT_RUNNER_BIN`). Full guide:
 [docs/current/mcp.md](docs/current/mcp.md).
 
 ---
@@ -806,7 +804,7 @@ Connections live in `workspace/connections/` as JSON. The token/password field i
 
 To use a connection in a pipeline, the Properties panel of any compatible source/sink shows a **Connection** dropdown - pick one and the fields auto-fill.
 
-The **Copy SQL** / **Export SQL** output is display-only and never executed. Secret values (passwords, tokens, keys, connection strings) are replaced with named placeholders such as `${DUCKLE_PASSWORD}`, so the exported script stays valid and is safe to share - substitute the real value at run time. To emit the real credentials instead (so the script runs unchanged), set the environment variable `DUCKLE_EXPORT_INCLUDE_SECRETS=1`; the output then contains live secrets and should be handled accordingly.
+The **Copy SQL** / **Export SQL** output is display-only and never executed. Secret values (passwords, tokens, keys, connection strings) are replaced with named placeholders such as `${QUILT_PASSWORD}`, so the exported script stays valid and is safe to share - substitute the real value at run time. To emit the real credentials instead (so the script runs unchanged), set the environment variable `QUILT_EXPORT_INCLUDE_SECRETS=1`; the output then contains live secrets and should be handled accordingly.
 
 ---
 
@@ -845,8 +843,8 @@ Pick the active context from the topbar's **Context** dropdown. Switch contexts 
 **Clone and install**
 
 ```bash
-git clone https://github.com/SouravRoy-ETL/duckle
-cd duckle
+git clone https://github.com/dwickyfp/Quilt
+cd quilt
 npm --prefix frontend install
 ```
 
@@ -864,13 +862,13 @@ cargo tauri dev
 cargo build --release --manifest-path apps/desktop/Cargo.toml --features custom-protocol
 ```
 
-Outputs land in `target/release/duckle` (or `duckle.exe`). The engine is not statically linked: DuckDB downloads at first launch, which is why the build is fast and the binary is tiny.
+Outputs land in `target/release/quilt` (or `quilt.exe`). The engine is not statically linked: DuckDB downloads at first launch, which is why the build is fast and the binary is tiny.
 
 **Run the tests:**
 
 ```bash
 cargo test                                                          # workspace unit + plan tests
-DUCKLE_DUCKDB_BIN=/path/to/duckdb cargo test -p duckle-duckdb-engine # full integration suite
+QUILT_DUCKDB_BIN=/path/to/duckdb cargo test -p quilt-duckdb-engine # full integration suite
 ```
 
 ---
@@ -878,12 +876,11 @@ DUCKLE_DUCKDB_BIN=/path/to/duckdb cargo test -p duckle-duckdb-engine # full inte
 ## Architecture
 
 ```
-duckle/
+quilt/
   apps/desktop/         Tauri 2 shell: Tauri commands, engine installer, llama runtime, window
   frontend/             React 19 + Vite + TypeScript: the designer UI + chat panel
   crates/
     duckdb-engine/      Compiles the node graph to SQL and drives the DuckDB CLI
-    slothdb-engine/     SlothDB adapter
     scheduler/          Cron / interval / file-watch triggers
     metadata/           Schema and type model
     plugin-sdk/         Connector / inspector traits
@@ -905,16 +902,15 @@ A few knobs you can set without touching code.
 | Setting | Where | Effect |
 |---|---|---|
 | **Theme** | Topbar sun/moon toggle | Light / dark, persisted to `localStorage` |
-| **Workspace** | Topbar workspace pill -> Switch | Change the folder Duckle reads/writes to |
-| **Active engine** | Topbar engine selector | DuckDB (default) or SlothDB - per-pipeline |
+| **Workspace** | Topbar workspace pill -> Switch | Change the folder Quilt reads/writes to |
 | **Active context** | Topbar context dropdown | Switches which context variables resolve at run time |
 | **AI Assistant baseURL** | `xf.ai.llm` / `xf.ai.embed` / `xf.ai.classify` props | Point at any OpenAI-compatible endpoint (default: Duckie's local llama-server) |
 | **Per-stage retry** | Properties panel -> Advanced tab | Total attempts + linear-scaled backoff per stage |
 | **Per-stage memory cap** | Properties panel -> Advanced tab | `PRAGMA memory_limit` applied just to that stage |
 | **DuckDB extensions** | Pre-fetched at install; lazy-loaded for `spatial` | See [First-launch extension pre-fetch](#first-launch-extension-pre-fetch) |
-| **Env var `RUST_LOG`** | Before launching the binary | `RUST_LOG=debug duckle.exe` to see verbose engine logs |
-| **Env var `DUCKLE_DUCKDB_BIN`** | Before running engine tests | Points the integration test suite at a DuckDB CLI |
-| **Env var `DUCKLE_CA_CERT`** | Before launching the binary | Path to a PEM bundle of extra CA certificates to trust (corporate proxy / private CA), added on top of the OS trust store and bundled roots |
+| **Env var `RUST_LOG`** | Before launching the binary | `RUST_LOG=debug quilt.exe` to see verbose engine logs |
+| **Env var `QUILT_DUCKDB_BIN`** | Before running engine tests | Points the integration test suite at a DuckDB CLI |
+| **Env var `QUILT_CA_CERT`** | Before launching the binary | Path to a PEM bundle of extra CA certificates to trust (corporate proxy / private CA), added on top of the OS trust store and bundled roots |
 
 ---
 
@@ -938,16 +934,16 @@ A few patterns that consistently produce sub-second runs at small / medium data 
 ## FAQ
 
 <details>
-<summary><b>Is Duckle free? What's the license?</b></summary>
+<summary><b>Is Quilt free? What's the license?</b></summary>
 
 Yes, free + open source. Dual-licensed **MIT OR Apache-2.0**. You can use it commercially, fork it, sell what you build with it. No usage limits, no telemetry.
 
 </details>
 
 <details>
-<summary><b>Does Duckle send my data anywhere?</b></summary>
+<summary><b>Does Quilt send my data anywhere?</b></summary>
 
-No. The app runs entirely on your machine. The engines (DuckDB, llama.cpp) are downloaded from official upstream releases on first launch and then run locally. The only network calls Duckle makes on your behalf are the ones your pipelines explicitly do (e.g. a `src.s3` reading from your S3 bucket, or `xf.ai.embed` if you configure it to hit OpenAI).
+No. The app runs entirely on your machine. The engines (DuckDB, llama.cpp) are downloaded from official upstream releases on first launch and then run locally. The only network calls Quilt makes on your behalf are the ones your pipelines explicitly do (e.g. a `src.s3` reading from your S3 bucket, or `xf.ai.embed` if you configure it to hit OpenAI).
 
 Duckie AI Assistant runs **fully offline** once the model is downloaded.
 
@@ -956,14 +952,14 @@ Duckie AI Assistant runs **fully offline** once the model is downloaded.
 <details>
 <summary><b>How big are pipelines this works well on?</b></summary>
 
-DuckDB is excellent on data that fits on one machine - tens of GB on a laptop, hundreds on a workstation. Beyond that, point Duckle's output at a warehouse / lakehouse that scales horizontally. Duckle is honest about being single-machine.
+DuckDB is excellent on data that fits on one machine - tens of GB on a laptop, hundreds on a workstation. Beyond that, point Quilt's output at a warehouse / lakehouse that scales horizontally. Quilt is honest about being single-machine.
 
 </details>
 
 <details>
 <summary><b>Do I need DuckDB installed first?</b></summary>
 
-No - Duckle downloads it for you on first launch. The download is ~30 MB and includes the most-used extensions (httpfs, postgres, mysql, iceberg, delta, vss, fts, etc.) so the first time you touch a Postgres source there's no mid-pipeline network pause.
+No - Quilt downloads it for you on first launch. The download is ~30 MB and includes the most-used extensions (httpfs, postgres, mysql, iceberg, delta, vss, fts, etc.) so the first time you touch a Postgres source there's no mid-pipeline network pause.
 
 </details>
 
@@ -977,7 +973,7 @@ About 55-78 MB depending on platform (macOS ~54-67, Windows ~59-68, Linux ~66-78
 <details>
 <summary><b>Can I use OpenAI / Cohere / Voyage instead of the local Duckie?</b></summary>
 
-Yes. The AI transforms (`xf.ai.embed`, `xf.ai.llm`, `xf.ai.classify`) accept a `baseUrl` prop. Point it at any OpenAI-compatible `/v1/...` endpoint and an `apiKey` and Duckle uses that instead. The local Duckie chat panel is hardwired to localhost; the pipeline AI transforms are configurable.
+Yes. The AI transforms (`xf.ai.embed`, `xf.ai.llm`, `xf.ai.classify`) accept a `baseUrl` prop. Point it at any OpenAI-compatible `/v1/...` endpoint and an `apiKey` and Quilt uses that instead. The local Duckie chat panel is hardwired to localhost; the pipeline AI transforms are configurable.
 
 </details>
 
@@ -991,14 +987,14 @@ In the workspace folder you pick on first launch (see [Workspace and Git flow](#
 <details>
 <summary><b>Can multiple people collaborate on the same workspace?</b></summary>
 
-Via Git, yes - check the workspace into a repo and use standard branch/PR flows. Duckle does not have a real-time multiplayer mode (single-machine by design).
+Via Git, yes - check the workspace into a repo and use standard branch/PR flows. Quilt does not have a real-time multiplayer mode (single-machine by design).
 
 </details>
 
 <details>
 <summary><b>Can I run pipelines headlessly / from CI?</b></summary>
 
-Yes. **Build Pipeline** (right-click a pipeline) produces a single self-contained executable that runs anywhere with nothing installed - drop it on a server or CI runner and execute it, or schedule it with cron / systemd / Task Scheduler. The embedded `duckle-runner` can also run a workspace pipeline JSON directly (`duckle-runner --pipeline pipeline.json`). See [Server deployment](#server-deployment-build-pipeline). You can also import the engine crate (`duckle-duckdb-engine`) into your own Rust binary.
+Yes. **Build Pipeline** (right-click a pipeline) produces a single self-contained executable that runs anywhere with nothing installed - drop it on a server or CI runner and execute it, or schedule it with cron / systemd / Task Scheduler. The embedded `quilt-runner` can also run a workspace pipeline JSON directly (`quilt-runner --pipeline pipeline.json`). See [Server deployment](#server-deployment-build-pipeline). You can also import the engine crate (`quilt-duckdb-engine`) into your own Rust binary.
 
 </details>
 
@@ -1041,21 +1037,21 @@ See the [Contributing](#contributing) section and `crates/duckdb-engine/src/plan
 | **"Couldn't download Duckie AI Assistant (HTTP 404)"** | Pinned llama.cpp build temporarily unavailable from upstream | Bump `LLAMACPP_BUILD` in `apps/desktop/src/engine_manager.rs` to a recent stable, rebuild |
 | **Linux: app won't launch, missing libwebkit** | WebKitGTK 4.1 isn't installed | `sudo apt install libwebkit2gtk-4.1-0` (Debian/Ubuntu) or your distro's equivalent |
 | **macOS: "App can't be opened because Apple cannot check it"** | Gatekeeper, unsigned binary | Right-click the binary -> Open -> Open Anyway |
-| **Pipeline runs but a connector errors with "extension not loaded"** | Lazy-loaded extension (e.g. `spatial`) downloaded mid-run and failed | Run `duckdb :memory: -c "INSTALL spatial; LOAD spatial;"` from a terminal to pre-install; relaunch Duckle |
-| **Chat panel says "AI engine not registered"** | Old version of Duckle before AI shipped (pre-v0.0.10) | Update to latest release |
+| **Pipeline runs but a connector errors with "extension not loaded"** | Lazy-loaded extension (e.g. `spatial`) downloaded mid-run and failed | Run `duckdb :memory: -c "INSTALL spatial; LOAD spatial;"` from a terminal to pre-install; relaunch Quilt |
+| **Chat panel says "AI engine not registered"** | Old version of Quilt before AI shipped (pre-v0.0.10) | Update to latest release |
 | **Duckie generates a pipeline but Insert doesn't put anything on the canvas** | Active pipeline tab has been closed; nothing to insert into | Open a pipeline (or create a new one) before clicking Insert |
-| **MotherDuck / Snowflake auth fails** | Token expired, or PAT lacks the role you're trying to use | Regenerate in the vendor UI; paste into the Connection in Duckle |
+| **MotherDuck / Snowflake auth fails** | Token expired, or PAT lacks the role you're trying to use | Regenerate in the vendor UI; paste into the Connection in Quilt |
 | **Postgres `ATTACH` says "could not connect"** | Local SSL mode mismatch | Connection -> Advanced -> set SSL mode to `disable` for localhost / `require` for production |
-| **AI tests skip with no failure** | `DUCKLE_DUCKDB_BIN` isn't set | `export DUCKLE_DUCKDB_BIN=/path/to/duckdb` before `cargo test` |
-| **TLS "UnknownIssuer" / "invalid peer certificate" behind a corporate proxy** | A TLS-inspecting proxy (Zscaler, Netskope, ...) re-signs traffic with its own CA | Duckle trusts your OS certificate store on top of its bundled roots, so the proxy CA in the Windows / macOS / Linux store is honoured automatically. If the CA isn't in the store, point `DUCKLE_CA_CERT` at a PEM file containing it. Note: DuckDB's own extension fetch (`extensions.duckdb.org`) and cloud reads (S3 / GCS / Azure) run inside the DuckDB engine with its own TLS, so also allow / exempt `extensions.duckdb.org` from inspection. |
+| **AI tests skip with no failure** | `QUILT_DUCKDB_BIN` isn't set | `export QUILT_DUCKDB_BIN=/path/to/duckdb` before `cargo test` |
+| **TLS "UnknownIssuer" / "invalid peer certificate" behind a corporate proxy** | A TLS-inspecting proxy (Zscaler, Netskope, ...) re-signs traffic with its own CA | Quilt trusts your OS certificate store on top of its bundled roots, so the proxy CA in the Windows / macOS / Linux store is honoured automatically. If the CA isn't in the store, point `QUILT_CA_CERT` at a PEM file containing it. Note: DuckDB's own extension fetch (`extensions.duckdb.org`) and cloud reads (S3 / GCS / Azure) run inside the DuckDB engine with its own TLS, so also allow / exempt `extensions.duckdb.org` from inspection. |
 
-If you see something not listed, please [open an issue](https://github.com/SouravRoy-ETL/duckle/issues) with steps to reproduce + the relevant log line.
+If you see something not listed, please [open an issue](https://github.com/dwickyfp/Quilt/issues) with steps to reproduce + the relevant log line.
 
 ---
 
 ## CI / CD
 
-Duckle's CI pipeline runs on **both GitHub and GitLab** - the project mirrors to both. Push / pull-request / merge-request / tag events all trigger builds.
+Quilt's CI pipeline runs on **both GitHub and GitLab** - the project mirrors to both. Push / pull-request / merge-request / tag events all trigger builds.
 
 | Trigger | GitHub Actions | GitLab CI |
 |---|---|---|
@@ -1070,7 +1066,7 @@ What each pipeline does:
 3. **Live-service integration tests** - PostgreSQL + MySQL + MinIO services spun up via Docker, real connector code runs against them
 4. **Desktop release-build smoke check** - `cargo build --release --features custom-protocol` then grep the binary for the embedded frontend JS chunk (catches the v0.0.7-class "binary loads devUrl" bug at PR time)
 5. **Format + clippy** - informational (does not block merge)
-6. **On tag**: build the Duckle binary on all three OSes, upload as release assets
+6. **On tag**: build the Quilt binary on all three OSes, upload as release assets
 
 See [`.github/workflows/`](.github/workflows/) and [`.gitlab-ci.yml`](.gitlab-ci.yml) for the exact steps. The two pipelines are kept feature-equivalent so contributors can fork to either platform.
 
@@ -1112,13 +1108,12 @@ A complete planned-component breakdown lives in [`docs/roadmap.md`](docs/roadmap
 - [ ] **Embedded Python / Rust** code stages (current code.* family: SQL, Shell, JavaScript, WebAssembly all ship)
 - [ ] **Hosted documentation site**
 - [ ] **Plugin marketplace** via the connector SDK
-- [ ] **In-process Native engine** - a Rust streaming / incremental executor as an alternative to shelling out to the DuckDB CLI
 
 ---
 
 ## Contributing
 
-Contributions, issues, and ideas are welcome. Duckle is young and there is a lot of green field. Open an issue to discuss a change before a large PR, match the existing code style, and keep changes focused. Run `cargo test` and `npm --prefix frontend run build` before submitting. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions, issues, and ideas are welcome. Quilt is young and there is a lot of green field. Open an issue to discuss a change before a large PR, match the existing code style, and keep changes focused. Run `cargo test` and `npm --prefix frontend run build` before submitting. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -1129,7 +1124,7 @@ Licensed under either of **MIT** or **Apache-2.0** at your option.
 ---
 
 <div align="center">
-<sub>Built with Rust, Tauri, React, and DuckDB by <a href="https://github.com/SouravRoy-ETL">Sourav Roy</a></sub>
+<sub>Built with Rust, Tauri, React, and DuckDB by <a href="https://github.com/dwickyfp">Sourav Roy</a></sub>
 </div>
 
 <!-- Suggested GitHub topics: etl, elt, data-engineering, data-pipeline, duckdb, rust, tauri, react, typescript, local-first, embedded, drag-and-drop, data-cleaning, vector-database, ai, ai-assistant, llm, llama-cpp, qwen, desktop-app, no-code, low-code, sql, pipeline-builder -->

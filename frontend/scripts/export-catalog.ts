@@ -1,5 +1,5 @@
-// Export the Duckle component catalog (ids, labels, kinds, summaries, property
-// schemas and ports) to a single JSON file the duckle-mcp crate embeds via
+// Export the Quilt component catalog (ids, labels, kinds, summaries, property
+// schemas and ports) to a single JSON file the quilt-mcp crate embeds via
 // include_str!. The frontend manifest stays the single source of truth; this
 // just serializes it. Run via scripts/build-catalog.mjs (esbuild bundles this
 // and stubs the Tauri bridge so it runs under plain Node).

@@ -19,7 +19,7 @@ export default function WorkspacePickerModal({ onPicked }: Props) {
             if (path) {
                 onPicked(path);
             } else {
-                setError('No folder selected. Pick a directory where Duckle can store pipelines, connections, and routines.');
+                setError('No folder selected. Pick a directory where Quilt can store pipelines, connections, and routines.');
             }
         } catch (err) {
             setError(String(err));
@@ -36,14 +36,14 @@ export default function WorkspacePickerModal({ onPicked }: Props) {
                         <Workflow size={28} />
                     </div>
                     <div className="modal-workspace-titles">
-                        <div className="modal-title">Welcome to Duckle</div>
+                        <div className="modal-title">Welcome to Quilt</div>
                         <div className="modal-subtitle">Pick a folder to store your workspace</div>
                     </div>
                 </div>
 
                 <div className="modal-body modal-workspace-body">
                     <p className="modal-workspace-lead">
-                        Duckle keeps your pipelines, saved connections, contexts, routines, and
+                        Quilt keeps your pipelines, saved connections, contexts, routines, and
                         documentation in a regular folder on disk. Everything is plain JSON so it
                         plays nicely with version control.
                     </p>
@@ -52,12 +52,12 @@ export default function WorkspacePickerModal({ onPicked }: Props) {
                         <Feature
                             icon={<Folder size={14} />}
                             title="Pick an existing folder"
-                            description="If you already have a Duckle workspace, point at the same folder and your saved state loads automatically."
+                            description="If you already have a Quilt workspace, point at the same folder and your saved state loads automatically."
                         />
                         <Feature
                             icon={<FolderOpen size={14} />}
                             title="Or choose a new empty folder"
-                            description="Duckle will create workspace.json on first save. Use any folder - a fresh one, your Documents folder, anywhere."
+                            description="Quilt will create workspace.json on first save. Use any folder - a fresh one, your Documents folder, anywhere."
                         />
                     </div>
 

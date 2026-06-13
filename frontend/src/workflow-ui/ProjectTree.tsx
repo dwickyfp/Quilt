@@ -358,7 +358,7 @@ export default function ProjectTree(props: Props) {
                     onDragStart={
                         item.type === 'context'
                             ? e => {
-                                  e.dataTransfer.setData('application/duckle-context', item.id);
+                                  e.dataTransfer.setData('application/quilt-context', item.id);
                                   e.dataTransfer.effectAllowed = 'copy';
                               }
                             : undefined

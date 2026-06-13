@@ -1,12 +1,12 @@
 //! CSV (and TSV) source connector.
 //!
 //! Reads the header row, scans up to `sample_rows` records, infers
-//! per-column types, and returns a [`duckle_plugin_sdk::Inspection`]
+//! per-column types, and returns a [`quilt_plugin_sdk::Inspection`]
 //! with the schema plus the sampled rows as JSON values for preview.
 
 use async_trait::async_trait;
-use duckle_metadata::{Column, DataType};
-use duckle_plugin_sdk::{Connector, ConnectorKind, Inspection, InspectError, SchemaInspector};
+use quilt_metadata::{Column, DataType};
+use quilt_plugin_sdk::{Connector, ConnectorKind, Inspection, InspectError, SchemaInspector};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 use std::collections::HashMap;

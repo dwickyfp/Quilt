@@ -39,7 +39,7 @@
        visual mapper button. DuckDB lemon -> hot orange ("duck"). */
     --gradient-brand: linear-gradient(135deg, #fff100, #ff6900);
 
-    /* The "D." brand mark (DuckleLogo). Dark theme: yellow glyph on a slate
+    /* The "D." brand mark (QuiltLogo). Dark theme: yellow glyph on a slate
        disc. Light theme overrides these to an orange glyph on a pale disc. */
     --logo-disc: #1b1f2a;
     --logo-glyph: #ffd000;
@@ -303,13 +303,13 @@ textarea:focus-visible {
 }
 
 /* The "D." mark colors follow the theme via the --logo-* tokens. */
-.duckle-logo-disc {
+.quilt-logo-disc {
     fill: var(--logo-disc);
     stroke: var(--logo-ring);
     stroke-width: 1.5;
 }
 
-.duckle-logo-glyph {
+.quilt-logo-glyph {
     fill: var(--logo-glyph);
 }
 
@@ -2534,7 +2534,7 @@ select.schema-input {
 }
 
 /* Small red "report a bug" pill at the far right of the status bar; opens
-   the Duckle Discord invite. */
+   the Quilt Discord invite. */
 .statusbar-support {
     display: inline-flex;
     align-items: center;
@@ -5382,7 +5382,7 @@ html[dir='rtl'] .topbar-lang {
 }
 
 /* Edge animation while a run is flowing through it ------------------- */
-.duckle-edge.is-flowing {
+.quilt-edge.is-flowing {
     animation: edge-dash 0.6s linear infinite;
     stroke-dasharray: 8 4;
 }
@@ -5393,7 +5393,7 @@ html[dir='rtl'] .topbar-lang {
     }
 }
 
-.duckle-edge.is-completed {
+.quilt-edge.is-completed {
     transition: opacity 200ms ease;
 }
 
@@ -7375,7 +7375,7 @@ html[dir='rtl'] .topbar-lang {
     0%, 100% { filter: drop-shadow(0 0 1px rgba(217, 119, 87, 0.45)); }
     50% { filter: drop-shadow(0 0 5px rgba(217, 119, 87, 0.95)); }
 }
-/* Primary action buttons in the MCP popup use Claude's orange (not the Duckle
+/* Primary action buttons in the MCP popup use Claude's orange (not the Quilt
    lemon) so the "connect to Claude" flow reads in Claude's color scheme. */
 .btn-claude {
     background: #d97757;

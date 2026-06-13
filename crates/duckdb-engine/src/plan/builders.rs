@@ -24,7 +24,7 @@ pub fn source_select_for_format(format: &str, props: &JsonValue) -> Option<Strin
         "delta" => build_delta_source(props),
         "spatial" => build_spatial_source(props),
         "fixedwidth" => return build_fixedwidth_source(props).ok(),
-        // DuckLake is DuckDB-backed; the catalog is ATTACHed as duckle_src by
+        // DuckLake is DuckDB-backed; the catalog is ATTACHed as quilt_src by
         // the inspect prelude (see source_prelude), so the SELECT is identical
         // to the run path.
         "ducklake" => return build_relational_source("src.ducklake", props).ok(),
@@ -46,7 +46,7 @@ pub(crate) fn build_view_sql(
     component_id: &str,
     props: &JsonValue,
     inputs: &NodeInputs,
-    declared: Option<&[duckle_metadata::Column]>,
+    declared: Option<&[quilt_metadata::Column]>,
     reject_wired: bool,
 ) -> Result<String, String> {
     match component_id {
@@ -404,7 +404,7 @@ pub(crate) fn sanitize_dbt_model_name(name: &str) -> String {
         .map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' })
         .collect();
     let s = s.trim_matches('_').to_string();
-    if s.is_empty() { "duckle_model".to_string() } else { s }
+    if s.is_empty() { "quilt_model".to_string() } else { s }
 }
 
 pub(crate) fn build_distinct(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
@@ -1459,8 +1459,8 @@ pub(crate) fn build_switch(
     // A case port with ZERO consumers is skipped entirely - but its
     // condition is STILL pushed into the negation chain (`prior`), or
     // first-match-wins routing would break and later branches/default would
-    // wrongly claim its rows. DUCKLE_FORCE_VIEWS forces views as elsewhere.
-    let force_views = std::env::var("DUCKLE_FORCE_VIEWS")
+    // wrongly claim its rows. QUILT_FORCE_VIEWS forces views as elsewhere.
+    let force_views = std::env::var("QUILT_FORCE_VIEWS")
         .map(|v| {
             let v = v.trim();
             v == "1" || v.eq_ignore_ascii_case("true")
@@ -1969,7 +1969,7 @@ pub(crate) fn build_reject_sql(
     component_id: &str,
     props: &JsonValue,
     inputs: &NodeInputs,
-    declared: Option<&[duckle_metadata::Column]>,
+    declared: Option<&[quilt_metadata::Column]>,
 ) -> Result<Option<String>, String> {
     match component_id {
         // CSV / TSV sources: rows whose raw text fails to parse into a
@@ -2035,7 +2035,7 @@ pub(crate) fn build_addcol(inputs: &NodeInputs, props: &JsonValue) -> Result<Str
     };
     let typed_expr = |expr: &str, ty: Option<&str>| -> String {
         match ty.map(str::trim).filter(|s| !s.is_empty()) {
-            Some(t) => format!("{}(({}) AS {})", cast_fn, expr, duckle_type_to_duckdb(t)),
+            Some(t) => format!("{}(({}) AS {})", cast_fn, expr, quilt_type_to_duckdb(t)),
             None => expr.to_string(),
         }
     };
@@ -2122,7 +2122,7 @@ pub(crate) fn build_cast(inputs: &NodeInputs, props: &JsonValue) -> Result<Strin
                 column
             ));
         }
-        let target_sql = duckle_type_to_duckdb(target);
+        let target_sql = quilt_type_to_duckdb(target);
         replacements.push(format!(
             "{}({} AS {}) AS {}",
             cast_fn,
@@ -2142,7 +2142,7 @@ pub(crate) fn build_cast(inputs: &NodeInputs, props: &JsonValue) -> Result<Strin
                 "{}({} AS {}) AS {}",
                 cast_fn,
                 quote_ident(column),
-                duckle_type_to_duckdb(&target),
+                quilt_type_to_duckdb(&target),
                 quote_ident(column)
             ));
         }
@@ -2801,7 +2801,7 @@ fn csv_read_args_base(props: &JsonValue) -> Vec<String> {
     args
 }
 
-pub(crate) fn build_csv_source(props: &JsonValue, declared: Option<&[duckle_metadata::Column]>) -> String {
+pub(crate) fn build_csv_source(props: &JsonValue, declared: Option<&[quilt_metadata::Column]>) -> String {
     let mut args = csv_read_args_base(props);
     // Explicit date / timestamp parsing format. DuckDB's strptime tokens
     // (%d, %m, %Y, etc.) - the most common pain point is dd/mm/yyyy which
@@ -2837,7 +2837,7 @@ pub(crate) fn build_csv_source(props: &JsonValue, declared: Option<&[duckle_meta
     // try_strptime in a `SELECT * REPLACE (...)` wrap. try_strptime yields
     // NULL (not an error) on a value the format can't parse.
     if let Some(cols) = declared.filter(|c| !c.is_empty()) {
-        use duckle_metadata::DataType;
+        use quilt_metadata::DataType;
         let mut pairs = Vec::with_capacity(cols.len());
         let mut replaces = Vec::new();
         for c in cols {
@@ -2878,12 +2878,12 @@ pub(crate) fn build_csv_source(props: &JsonValue, declared: Option<&[duckle_meta
     format!("SELECT * FROM read_csv_auto({})", args.join(", "))
 }
 
-/// Map Duckle's DataType enum to a DuckDB SQL type string suitable for
+/// Map Quilt's DataType enum to a DuckDB SQL type string suitable for
 /// read_csv_auto's `columns = {...}` argument. "string" -> VARCHAR is
 /// the key one here: it stops DuckDB from trying (and usually failing)
 /// to auto-parse dd/mm/yy and other non-ISO date formats.
-pub(crate) fn data_type_to_duckdb_sql(t: &duckle_metadata::DataType) -> &'static str {
-    use duckle_metadata::DataType as D;
+pub(crate) fn data_type_to_duckdb_sql(t: &quilt_metadata::DataType) -> &'static str {
+    use quilt_metadata::DataType as D;
     match t {
         D::String => "VARCHAR",
         D::Int32 => "INTEGER",
@@ -2900,7 +2900,7 @@ pub(crate) fn data_type_to_duckdb_sql(t: &duckle_metadata::DataType) -> &'static
     }
 }
 
-pub(crate) fn build_tsv_source(props: &JsonValue, declared: Option<&[duckle_metadata::Column]>) -> String {
+pub(crate) fn build_tsv_source(props: &JsonValue, declared: Option<&[quilt_metadata::Column]>) -> String {
     // TSV is just CSV with delim='\t'. Force it.
     let mut p = props.clone();
     if let Some(obj) = p.as_object_mut() {
@@ -2919,8 +2919,8 @@ pub(crate) fn build_tsv_source(props: &JsonValue, declared: Option<&[duckle_meta
 ///   - a cast expression for `SELECT * REPLACE (...)` that turns the raw text
 ///     back into the declared type (NULL on a bad value).
 /// Returns None for text columns (they can never fail to parse).
-fn csv_typed_col_exprs(c: &duckle_metadata::Column) -> Option<(String, String)> {
-    use duckle_metadata::DataType;
+fn csv_typed_col_exprs(c: &quilt_metadata::Column) -> Option<(String, String)> {
+    use quilt_metadata::DataType;
     let ty = data_type_to_duckdb_sql(&c.data_type);
     if ty == "VARCHAR" {
         return None;
@@ -2952,7 +2952,7 @@ fn csv_typed_col_exprs(c: &duckle_metadata::Column) -> Option<(String, String)> 
 /// read_csv_auto args for the reject / split path: base args + force every
 /// declared column to raw VARCHAR so a bad value never aborts the read. TSV
 /// forces a tab delimiter, matching build_tsv_source.
-fn csv_raw_args(props: &JsonValue, declared: &[duckle_metadata::Column], is_tsv: bool) -> Vec<String> {
+fn csv_raw_args(props: &JsonValue, declared: &[quilt_metadata::Column], is_tsv: bool) -> Vec<String> {
     let owned;
     let p: &JsonValue = if is_tsv {
         let mut c = props.clone();
@@ -2981,7 +2981,7 @@ fn csv_raw_args(props: &JsonValue, declared: &[duckle_metadata::Column], is_tsv:
 /// planner skips materializing an always-empty reject relation.
 pub(crate) fn build_csv_reject_sql(
     props: &JsonValue,
-    declared: Option<&[duckle_metadata::Column]>,
+    declared: Option<&[quilt_metadata::Column]>,
     is_tsv: bool,
 ) -> Option<String> {
     let cols = declared.filter(|c| !c.is_empty())?;
@@ -3005,7 +3005,7 @@ pub(crate) fn build_csv_reject_sql(
 /// identical to today in that case.
 pub(crate) fn build_csv_source_split(
     props: &JsonValue,
-    declared: Option<&[duckle_metadata::Column]>,
+    declared: Option<&[quilt_metadata::Column]>,
     is_tsv: bool,
 ) -> String {
     let cols = match declared.filter(|c| !c.is_empty()) {
@@ -3028,7 +3028,7 @@ pub(crate) fn build_csv_source_split(
 }
 
 /// Dispatch to build_csv_source / build_tsv_source by the TSV flag.
-fn csv_source_for(props: &JsonValue, declared: Option<&[duckle_metadata::Column]>, is_tsv: bool) -> String {
+fn csv_source_for(props: &JsonValue, declared: Option<&[quilt_metadata::Column]>, is_tsv: bool) -> String {
     if is_tsv {
         build_tsv_source(props, declared)
     } else {
@@ -3098,19 +3098,19 @@ pub(crate) fn build_sqlite_source(props: &JsonValue) -> String {
 }
 
 pub(crate) fn build_duckdb_source(props: &JsonValue) -> String {
-    // The DuckDB file is ATTACHed as `duckle_src` (READ_ONLY) by the
+    // The DuckDB file is ATTACHed as `quilt_src` (READ_ONLY) by the
     // stage / inspect prelude; we read from it qualified by that alias.
     if let Some(table) = string_prop(props, "tableName").filter(|s| !s.is_empty()) {
         match string_prop(props, "schema").filter(|s| !s.is_empty()) {
             Some(schema) => format!(
-                "SELECT * FROM duckle_src.{}.{}",
+                "SELECT * FROM quilt_src.{}.{}",
                 quote_ident(&schema),
                 quote_ident(&table)
             ),
-            None => format!("SELECT * FROM duckle_src.{}", quote_ident(&table)),
+            None => format!("SELECT * FROM quilt_src.{}", quote_ident(&table)),
         }
     } else if let Some(sql) = string_prop(props, "sql").filter(|s| !s.trim().is_empty()) {
-        // Advanced: a custom query. Reference tables as duckle_src.<table>.
+        // Advanced: a custom query. Reference tables as quilt_src.<table>.
         format!("({})", sql)
     } else {
         "SELECT 1 AS placeholder LIMIT 0".into()
@@ -3118,7 +3118,7 @@ pub(crate) fn build_duckdb_source(props: &JsonValue) -> String {
 }
 
 /// ATTACH statements for external-database nodes. The aliases are fixed
-/// (`duckle_src` / `duckle_dst`) - safe because each stage is its own
+/// (`quilt_src` / `quilt_dst`) - safe because each stage is its own
 /// CLI process.
 pub(crate) fn attach_prelude(component_id: &str, props: &JsonValue) -> String {
     // Network DBs use host/port + libpq-style fields, not the
@@ -3147,7 +3147,7 @@ pub(crate) fn attach_prelude(component_id: &str, props: &JsonValue) -> String {
         "snk.ducklake" => return ducklake_attach(props, false),
         // BigQuery via the duckdb-bigquery community extension. The
         // user's prop 'project' becomes the BigQuery project ID; the
-        // ATTACH alias is the standard duckle_src / duckle_dst.
+        // ATTACH alias is the standard quilt_src / quilt_dst.
         "src.bigquery" => return bigquery_attach(props, true),
         "snk.bigquery" => return bigquery_attach(props, false),
         // snk.excel COPYs through the DuckDB excel extension; LOAD is
@@ -3189,9 +3189,9 @@ pub(crate) fn attach_prelude(component_id: &str, props: &JsonValue) -> String {
         None => return String::new(),
     };
     match component_id {
-        "src.duckdb" => format!("ATTACH '{}' AS duckle_src (READ_ONLY); ", sql_escape(&db)),
-        "snk.sqlite" => format!("ATTACH '{}' AS duckle_dst (TYPE SQLITE); ", sql_escape(&db)),
-        "snk.duckdb" => format!("ATTACH '{}' AS duckle_dst; ", sql_escape(&db)),
+        "src.duckdb" => format!("ATTACH '{}' AS quilt_src (READ_ONLY); ", sql_escape(&db)),
+        "snk.sqlite" => format!("ATTACH '{}' AS quilt_dst (TYPE SQLITE); ", sql_escape(&db)),
+        "snk.duckdb" => format!("ATTACH '{}' AS quilt_dst; ", sql_escape(&db)),
         _ => String::new(),
     }
 }
@@ -3214,24 +3214,31 @@ pub(crate) fn db_attach(props: &JsonValue, extension: &str, default_port: u64, r
         .filter(|p| *p > 0)
         .unwrap_or(default_port);
     let db_key = if extension == "postgres" { "dbname" } else { "database" };
-    let mut parts = vec![format!("host={}", host), format!("port={}", port)];
+    // Each value is single-quoted with libpq escaping so a value containing a
+    // space or special char can't inject extra `key=value` params (e.g. a
+    // password of `x sslmode=disable` downgrading TLS, or a host of
+    // `evil.com port=5432` redirecting the connection).
+    let mut parts = vec![
+        format!("host={}", libpq_quote(&host)),
+        format!("port={}", port),
+    ];
     if let Some(db) = string_prop(props, "database").filter(|s| !s.is_empty()) {
-        parts.push(format!("{}={}", db_key, db));
+        parts.push(format!("{}={}", db_key, libpq_quote(&db)));
     }
     if let Some(u) = string_prop(props, "user")
         .or_else(|| string_prop(props, "username"))
         .filter(|s| !s.is_empty())
     {
-        parts.push(format!("user={}", u));
+        parts.push(format!("user={}", libpq_quote(&u)));
     }
     if let Some(p) = string_prop(props, "password").filter(|s| !s.is_empty()) {
-        parts.push(format!("password={}", p));
+        parts.push(format!("password={}", libpq_quote(&p)));
     }
     let connstr = parts.join(" ");
     let (alias, mode) = if read_only {
-        ("duckle_src", ", READ_ONLY")
+        ("quilt_src", ", READ_ONLY")
     } else {
-        ("duckle_dst", "")
+        ("quilt_dst", "")
     };
     let type_name = extension.to_uppercase();
     format!(
@@ -3246,7 +3253,7 @@ pub(crate) fn db_attach(props: &JsonValue, extension: &str, default_port: u64, r
 
 /// Source for a network relational DB (Postgres / Cockroach via the
 /// postgres extension; MySQL / MariaDB via the mysql extension). Reads
-/// from `duckle_src` qualified by the right depth: Postgres uses
+/// from `quilt_src` qualified by the right depth: Postgres uses
 /// catalog.schema.table (default schema `public`); MySQL uses
 /// catalog.table (the database is selected at ATTACH time).
 pub(crate) fn build_relational_source(component_id: &str, props: &JsonValue) -> Result<String, String> {
@@ -3269,14 +3276,14 @@ pub(crate) fn build_relational_source(component_id: &str, props: &JsonValue) -> 
     let schema = string_prop(props, "schemaName").filter(|s| !s.is_empty());
     Ok(format!(
         "SELECT * FROM {}",
-        relational_qualified("duckle_src", component_id, schema.as_deref(), &table)
+        relational_qualified("quilt_src", component_id, schema.as_deref(), &table)
     ))
 }
 
 /// Sink for a network relational DB (Postgres / Cockroach / MySQL /
 /// MariaDB). Only `overwrite` (DROP + CREATE) is wired today; append /
 /// upsert / truncate / error-if-exists error loudly rather than
-/// pretending to apply. Writes inside the ATTACHed `duckle_dst` DB.
+/// pretending to apply. Writes inside the ATTACHed `quilt_dst` DB.
 pub(crate) fn build_relational_sink(
     component_id: &str,
     props: &JsonValue,
@@ -3287,7 +3294,7 @@ pub(crate) fn build_relational_sink(
         .ok_or_else(|| EngineError::Config(format!("{}: table name is required", component_id)))?;
     let schema = string_prop(props, "schemaName").filter(|s| !s.is_empty());
     let mode = string_prop(props, "mode").unwrap_or_else(|| "overwrite".into());
-    let qual = relational_qualified("duckle_dst", component_id, schema.as_deref(), &table);
+    let qual = relational_qualified("quilt_dst", component_id, schema.as_deref(), &table);
     match mode.as_str() {
         "overwrite" => Ok(format!(
             "DROP TABLE IF EXISTS {q}; CREATE TABLE {q} AS (SELECT * FROM {from})",
@@ -3401,9 +3408,9 @@ pub(crate) fn ducklake_attach(props: &JsonValue, read_only: bool) -> String {
         None => return String::new(),
     };
     let (alias, mode) = if read_only {
-        ("duckle_src", " (READ_ONLY)")
+        ("quilt_src", " (READ_ONLY)")
     } else {
-        ("duckle_dst", "")
+        ("quilt_dst", "")
     };
     format!(
         "INSTALL ducklake; LOAD ducklake; ATTACH 'ducklake:{}' AS {}{}; ",
@@ -3435,9 +3442,9 @@ pub(crate) fn bigquery_attach(props: &JsonValue, read_only: bool) -> String {
         None => format!("project={}", project),
     };
     let (alias, mode) = if read_only {
-        ("duckle_src", " (READ_ONLY)")
+        ("quilt_src", " (READ_ONLY)")
     } else {
-        ("duckle_dst", "")
+        ("quilt_dst", "")
     };
     // INSTALL/LOAD the community extension. The community: tag tells
     // DuckDB to fetch from the community-extensions repo.
@@ -3454,13 +3461,17 @@ pub(crate) fn md_attach(props: &JsonValue, read_only: bool) -> String {
     };
     let token = string_prop(props, "token").filter(|s| !s.is_empty());
     let url = match token {
-        Some(t) => format!("md:{}?motherduck_token={}", db, t),
-        None => format!("md:{}", db),
+        Some(t) => format!(
+            "md:{}?motherduck_token={}",
+            url_encode_component(&db),
+            url_encode_component(&t)
+        ),
+        None => format!("md:{}", url_encode_component(&db)),
     };
     let (alias, mode) = if read_only {
-        ("duckle_src", " (READ_ONLY)")
+        ("quilt_src", " (READ_ONLY)")
     } else {
-        ("duckle_dst", "")
+        ("quilt_dst", "")
     };
     format!("ATTACH '{}' AS {}{}; ", sql_escape(&url), alias, mode)
 }
@@ -3473,7 +3484,7 @@ pub(crate) fn md_attach(props: &JsonValue, read_only: bool) -> String {
 ///
 /// Requires DuckDB built with quack support; older builds will surface
 /// a clear error at runtime ("Unknown ATTACH option 'TYPE'" or
-/// similar) without any Duckle-side breakage.
+/// similar) without any Quilt-side breakage.
 pub(crate) fn quack_attach(props: &JsonValue, read_only: bool) -> String {
     let host = match string_prop(props, "host").filter(|s| !s.is_empty()) {
         Some(h) => h,
@@ -3495,14 +3506,14 @@ pub(crate) fn quack_attach(props: &JsonValue, read_only: bool) -> String {
     };
 
     let (alias, mode) = if read_only {
-        ("duckle_src", " (READ_ONLY)")
+        ("quilt_src", " (READ_ONLY)")
     } else {
-        ("duckle_dst", "")
+        ("quilt_dst", "")
     };
 
     let secret = match token {
         Some(t) => format!(
-            "CREATE OR REPLACE SECRET duckle_quack_secret (TYPE QUACK, TOKEN '{}'); ",
+            "CREATE OR REPLACE SECRET quilt_quack_secret (TYPE QUACK, TOKEN '{}'); ",
             sql_escape(&t)
         ),
         None => String::new(),
@@ -3557,7 +3568,7 @@ pub(crate) fn build_spatial_sink(props: &JsonValue, from_view: &str) -> String {
 }
 
 /// SQLite / DuckDB sink - write the upstream into a table inside the
-/// ATTACHed `duckle_dst` database. DROP+CREATE works for both writers
+/// ATTACHed `quilt_dst` database. DROP+CREATE works for both writers
 /// (the SQLite writer doesn't support CREATE OR REPLACE).
 pub(crate) fn build_db_sink(
     component_id: &str,
@@ -3610,9 +3621,9 @@ pub(crate) fn build_db_sink(
             None => String::new(),
         };
         return Ok(format!(
-            "CREATE TABLE IF NOT EXISTS duckle_dst.{t} AS SELECT {sel} FROM {up} LIMIT 0; \
-             DELETE FROM duckle_dst.{t} WHERE ({keys}) IN (SELECT {keys} FROM {up}); \
-             INSERT INTO duckle_dst.{t} SELECT {sel} FROM {up}{insert_filter}",
+            "CREATE TABLE IF NOT EXISTS quilt_dst.{t} AS SELECT {sel} FROM {up} LIMIT 0; \
+             DELETE FROM quilt_dst.{t} WHERE ({keys}) IN (SELECT {keys} FROM {up}); \
+             INSERT INTO quilt_dst.{t} SELECT {sel} FROM {up}{insert_filter}",
             t = t,
             sel = sel,
             up = up,
@@ -3622,8 +3633,8 @@ pub(crate) fn build_db_sink(
     }
     if mode == "append" {
         return Ok(format!(
-            "CREATE TABLE IF NOT EXISTS duckle_dst.{t} AS SELECT * FROM {up} LIMIT 0; \
-             INSERT INTO duckle_dst.{t} SELECT * FROM {up}",
+            "CREATE TABLE IF NOT EXISTS quilt_dst.{t} AS SELECT * FROM {up} LIMIT 0; \
+             INSERT INTO quilt_dst.{t} SELECT * FROM {up}",
             t = t,
             up = up,
         ));
@@ -3633,15 +3644,15 @@ pub(crate) fn build_db_sink(
         // replace just the rows. CREATE IF NOT EXISTS so a first run still
         // works against a fresh target file.
         return Ok(format!(
-            "CREATE TABLE IF NOT EXISTS duckle_dst.{t} AS SELECT * FROM {up} LIMIT 0; \
-             DELETE FROM duckle_dst.{t}; \
-             INSERT INTO duckle_dst.{t} SELECT * FROM {up}",
+            "CREATE TABLE IF NOT EXISTS quilt_dst.{t} AS SELECT * FROM {up} LIMIT 0; \
+             DELETE FROM quilt_dst.{t}; \
+             INSERT INTO quilt_dst.{t} SELECT * FROM {up}",
             t = t,
             up = up,
         ));
     }
     Ok(format!(
-        "DROP TABLE IF EXISTS duckle_dst.{}; CREATE TABLE duckle_dst.{} AS (SELECT * FROM {})",
+        "DROP TABLE IF EXISTS quilt_dst.{}; CREATE TABLE quilt_dst.{} AS (SELECT * FROM {})",
         t, t, up
     ))
 }
@@ -4293,7 +4304,7 @@ pub(crate) fn build_rank_filter(inputs: &NodeInputs, props: &JsonValue) -> Resul
         format!("PARTITION BY {} ", cols)
     };
     Ok(format!(
-        "SELECT * EXCLUDE (_duckle_rank) FROM (SELECT u.*, row_number() OVER ({part}ORDER BY {ord} {dir}) AS _duckle_rank FROM {up} u) WHERE _duckle_rank <= {n}",
+        "SELECT * EXCLUDE (_quilt_rank) FROM (SELECT u.*, row_number() OVER ({part}ORDER BY {ord} {dir}) AS _quilt_rank FROM {up} u) WHERE _quilt_rank <= {n}",
         part = partition_clause,
         ord = quote_ident(&order_col),
         dir = direction,
@@ -4389,7 +4400,7 @@ pub(crate) fn build_row_hash(inputs: &NodeInputs, props: &JsonValue) -> Result<S
 ///
 /// All four columns are independently toggleable. Strings (`source`,
 /// `batchId`) are emitted as literals so context variables resolve
-/// at compile time. Use Duckle's `{{ context.foo }}` interpolation
+/// at compile time. Use Quilt's `{{ context.foo }}` interpolation
 /// in the form to wire a per-run batch ID.
 pub(crate) fn build_audit(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
     let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.audit"))?;
@@ -4740,7 +4751,7 @@ pub(crate) fn build_assert(inputs: &NodeInputs, props: &JsonValue) -> Result<Str
     // genuinely materialized. COALESCE(..., TRUE) treats an empty
     // input as a pass (vacuously true).
     Ok(format!(
-        "WITH _duckle_assert AS MATERIALIZED (SELECT CASE WHEN COALESCE(bool_and(CAST(({pred}) AS BOOLEAN)), TRUE) THEN 'ok' ELSE error('{msg}') END AS result FROM {up}) SELECT u.* FROM {up} u WHERE (SELECT result FROM _duckle_assert) IS NOT NULL",
+        "WITH _quilt_assert AS MATERIALIZED (SELECT CASE WHEN COALESCE(bool_and(CAST(({pred}) AS BOOLEAN)), TRUE) THEN 'ok' ELSE error('{msg}') END AS result FROM {up}) SELECT u.* FROM {up} u WHERE (SELECT result FROM _quilt_assert) IS NOT NULL",
         pred = predicate,
         msg = msg,
         up = quote_ident(upstream)
@@ -4968,7 +4979,7 @@ pub(crate) fn build_delta_source(props: &JsonValue) -> String {
 /// and a `hasHeader` toggle.
 pub(crate) fn build_excel_source(
     props: &JsonValue,
-    declared: Option<&[duckle_metadata::Column]>,
+    declared: Option<&[quilt_metadata::Column]>,
 ) -> String {
     let path = string_prop(props, "path").unwrap_or_default();
     // read_xlsx has no `types=` / `columns=` (unlike read_csv_auto), so the
@@ -5017,7 +5028,7 @@ pub(crate) fn build_excel_source(
     // a DATE/TIMESTAMP column with its own format is re-parsed via
     // try_strptime (NULL on a value the format can't parse); everything else
     // is a plain cast from the all_varchar text.
-    use duckle_metadata::DataType;
+    use quilt_metadata::DataType;
     let proj = cols
         .iter()
         .map(|c| {
@@ -5122,7 +5133,7 @@ fn wildcard_match(pattern: &str, name: &str) -> bool {
 pub(crate) fn build_cloud_source(
     scheme: &str,
     props: &JsonValue,
-    declared: Option<&[duckle_metadata::Column]>,
+    declared: Option<&[quilt_metadata::Column]>,
 ) -> String {
     let path = string_prop(props, "path")
         .or_else(|| string_prop(props, "url"))
@@ -5492,7 +5503,30 @@ pub(crate) fn quote_ident(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
 }
 
-pub(crate) fn duckle_type_to_duckdb(t: &str) -> String {
+/// Quote a value for a libpq-style `key=value` connection string. libpq
+/// single-quotes a value and backslash-escapes embedded `\` and `'`, so the
+/// value can't introduce additional whitespace-separated parameters.
+pub(crate) fn libpq_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
+}
+
+/// Percent-encode a value for use inside a URL component (the MotherDuck
+/// `md:` connection string). Encodes everything outside the RFC 3986
+/// unreserved set so `?`, `&`, `#`, etc. can't inject query parameters.
+pub(crate) fn url_encode_component(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => out.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    out
+}
+
+pub(crate) fn quilt_type_to_duckdb(t: &str) -> String {
     match t.to_lowercase().as_str() {
         "string" | "varchar" | "text" => "VARCHAR".into(),
         "int32" | "int" | "integer" => "INTEGER".into(),

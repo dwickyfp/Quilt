@@ -3,8 +3,8 @@
 //! record run history. This is everything the ticker does on a fire,
 //! minus the wall-clock wait.
 
-use duckle_duckdb_engine::DuckdbEngine;
-use duckle_scheduler::{Schedule, ScheduleKind, Scheduler};
+use quilt_duckdb_engine::DuckdbEngine;
+use quilt_scheduler::{Schedule, ScheduleKind, Scheduler};
 use serde_json::json;
 
 fn norm(p: &std::path::Path) -> String {
@@ -44,12 +44,12 @@ async fn run_now_executes_pipeline_from_disk_and_records_history() {
     .unwrap();
 
     // Drives the real DuckDB CLI; soft-skip if not provided.
-    let engine = match std::env::var("DUCKLE_DUCKDB_BIN").ok() {
+    let engine = match std::env::var("QUILT_DUCKDB_BIN").ok() {
         Some(bin) if std::path::Path::new(&bin).exists() => {
             DuckdbEngine::new(std::path::PathBuf::from(bin))
         }
         _ => {
-            eprintln!("skipping: set DUCKLE_DUCKDB_BIN to a duckdb CLI to run");
+            eprintln!("skipping: set QUILT_DUCKDB_BIN to a duckdb CLI to run");
             return;
         }
     };

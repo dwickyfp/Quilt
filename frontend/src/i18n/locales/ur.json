@@ -132,9 +132,9 @@
     "copySqlDesc": "DuckDB SQL میں مرتب کریں، کلپ بورڈ پر کاپی کریں۔",
     "exportSql": ".sql کے بطور برآمد کریں۔",
     "exportSqlDesc": "مرتب کردہ ایس کیو ایل کو بطور فائل ڈاؤن لوڈ کریں۔",
-    "exportJson": ".duckle.json کے بطور برآمد کریں۔",
+    "exportJson": ".quilt.json کے بطور برآمد کریں۔",
     "exportJsonDesc": "نوڈس + کناروں کو پورٹیبل JSON کے بطور ڈاؤن لوڈ کریں۔",
-    "importJson": "duckle.json درآمد کریں...",
+    "importJson": "quilt.json درآمد کریں...",
     "importJsonDesc": "پورٹیبل JSON کو ایک نئی پائپ لائن کے طور پر کھولیں۔"
   },
   "properties": {

@@ -161,13 +161,13 @@ silently passing data through.
 
 ## What's NOT on the roadmap (intentional non-goals)
 
-- **A distributed execution engine** - Duckle is a single-machine
+- **A distributed execution engine** - Quilt is a single-machine
   embedded studio. If a pipeline outgrows one box, the right answer is
   to land its output in the system that scales (a warehouse, an object
-  store) rather than to scale Duckle itself.
+  store) rather than to scale Quilt itself.
 - **A hosted SaaS** - the project is local-first by design. Future work
   on the orchestration crate may add a "run this pipeline on a remote
-  Duckle daemon" mode, but not a hosted Duckle service.
+  Quilt daemon" mode, but not a hosted Quilt service.
 - **A workflow visual debugger beyond what's already there** - the live
   per-stage preview, per-stage row counts, run-history, and mid-run
   cancel cover the inner-loop ETL debugging need; deeper time-travel
@@ -187,7 +187,7 @@ The fastest path for a new connector is to:
 4. Add a palette tile in `frontend/src/workflow-ui/palette-data.ts`.
 5. Add an integration test in `crates/duckdb-engine/tests/execution.rs` -
    real network tests should be `env-gated` (skip unless the relevant
-   `DUCKLE_*_URI` env var is set).
+   `QUILT_*_URI` env var is set).
 6. Update the README capability table and this roadmap.
 
 See `CONTRIBUTING.md` for the broader project conventions.

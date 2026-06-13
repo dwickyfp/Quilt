@@ -8,9 +8,8 @@ members = [
     "crates/transform-engine",
     "crates/stream-engine",
     "crates/duckdb-engine",
-    "crates/duckle-runner",
-    "crates/duckle-mcp",
-    "crates/slothdb-engine",
+    "crates/quilt-runner",
+    "crates/quilt-mcp",
     "crates/execution-core",
     "crates/plugin-sdk",
     "crates/metadata",
@@ -22,23 +21,22 @@ version = "0.0.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["Sourav Roy"]
-repository = "https://github.com/SouravRoy-ETL/duckle"
-homepage = "https://github.com/SouravRoy-ETL/duckle"
+repository = "https://github.com/dwickyfp/Quilt"
+homepage = "https://github.com/dwickyfp/Quilt"
 rust-version = "1.80"
 
 [workspace.dependencies]
 # Internal crates
-duckle-runtime = { path = "crates/runtime", version = "0.0.1" }
-duckle-connectors = { path = "crates/connectors", version = "0.0.1" }
-duckle-workflow-engine = { path = "crates/workflow-engine", version = "0.0.1" }
-duckle-transform-engine = { path = "crates/transform-engine", version = "0.0.1" }
-duckle-stream-engine = { path = "crates/stream-engine", version = "0.0.1" }
-duckle-duckdb-engine = { path = "crates/duckdb-engine", version = "0.0.1" }
-duckle-slothdb-engine = { path = "crates/slothdb-engine", version = "0.0.1" }
-duckle-execution-core = { path = "crates/execution-core", version = "0.0.1" }
-duckle-plugin-sdk = { path = "crates/plugin-sdk", version = "0.0.1" }
-duckle-metadata = { path = "crates/metadata", version = "0.0.1" }
-duckle-scheduler = { path = "crates/scheduler", version = "0.0.1" }
+quilt-runtime = { path = "crates/runtime", version = "0.0.1" }
+quilt-connectors = { path = "crates/connectors", version = "0.0.1" }
+quilt-workflow-engine = { path = "crates/workflow-engine", version = "0.0.1" }
+quilt-transform-engine = { path = "crates/transform-engine", version = "0.0.1" }
+quilt-stream-engine = { path = "crates/stream-engine", version = "0.0.1" }
+quilt-duckdb-engine = { path = "crates/duckdb-engine", version = "0.0.1" }
+quilt-execution-core = { path = "crates/execution-core", version = "0.0.1" }
+quilt-plugin-sdk = { path = "crates/plugin-sdk", version = "0.0.1" }
+quilt-metadata = { path = "crates/metadata", version = "0.0.1" }
+quilt-scheduler = { path = "crates/scheduler", version = "0.0.1" }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -93,7 +91,7 @@ codegen-units = 16
 lto = "thin"
 strip = "none"
 
-# Size-optimized profile for the duckle-runner stub. The runner is embedded
+# Size-optimized profile for the quilt-runner stub. The runner is embedded
 # into the desktop binary via include_bytes! and copied into every built
 # artifact, so its size matters directly. Measured: opt-level "z" =
 # 16,958,976 bytes vs "s" = 19,958,784 bytes vs the default release build's

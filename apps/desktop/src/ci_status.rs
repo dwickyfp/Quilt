@@ -109,9 +109,9 @@ fn poll_github(remote_url: &str, branch: &str, token: Option<&str>) -> Result<Ci
         slug,
         urlencoding_minimal(branch)
     );
-    let mut req = duckle_duckdb_engine::tls::http_agent()
+    let mut req = quilt_duckdb_engine::tls::http_agent()
         .get(&api)
-        .set("User-Agent", "duckle-app")
+        .set("User-Agent", "quilt-app")
         .set("Accept", "application/vnd.github+json")
         .timeout(Duration::from_secs(8));
     if let Some(t) = token {
@@ -156,7 +156,7 @@ fn poll_github(remote_url: &str, branch: &str, token: Option<&str>) -> Result<Ci
     let sha = run
         .pointer("/head_sha")
         .and_then(|v| v.as_str())
-        .map(|s| s[..s.len().min(7)].to_string());
+        .map(|s| s.chars().take(7).collect());
     let label = format!(
         "GitHub Actions: {} ({})",
         state,
@@ -173,6 +173,17 @@ fn poll_github(remote_url: &str, branch: &str, token: Option<&str>) -> Result<Ci
 
 fn poll_gitlab(remote_url: &str, branch: &str, token: Option<&str>) -> Result<CiStatus, String> {
     let (host, path) = parse_gitlab(remote_url).ok_or_else(|| "couldn't parse GitLab URL".to_string())?;
+    // The host comes from the workspace's git remote, which a cloned/malicious
+    // repo could point anywhere. `detect_provider` only checks for a "gitlab."
+    // substring, so `gitlab.attacker.com` would reach here. Validate the host
+    // shape (no userinfo / path / port trickery) and only attach the user's PAT
+    // when the host is trusted - gitlab.com, or one listed in
+    // QUILT_GITLAB_HOSTS - so the token can't be exfiltrated to an arbitrary
+    // server. Untrusted hosts are still polled, just without the token.
+    if !is_valid_host(&host) {
+        return Err("refusing to query malformed GitLab host".to_string());
+    }
+    let token = token.filter(|_| is_trusted_gitlab_host(&host));
     let project_id = urlencoding_full(&path);
     let api = format!(
         "https://{}/api/v4/projects/{}/pipelines?ref={}&per_page=1",
@@ -180,9 +191,9 @@ fn poll_gitlab(remote_url: &str, branch: &str, token: Option<&str>) -> Result<Ci
         project_id,
         urlencoding_minimal(branch)
     );
-    let mut req = duckle_duckdb_engine::tls::http_agent()
+    let mut req = quilt_duckdb_engine::tls::http_agent()
         .get(&api)
-        .set("User-Agent", "duckle-app")
+        .set("User-Agent", "quilt-app")
         .timeout(Duration::from_secs(8));
     if let Some(t) = token {
         // GitLab uses PRIVATE-TOKEN header (not Bearer).
@@ -225,7 +236,7 @@ fn poll_gitlab(remote_url: &str, branch: &str, token: Option<&str>) -> Result<Ci
     let sha = pipeline
         .get("sha")
         .and_then(|v| v.as_str())
-        .map(|s| s[..s.len().min(7)].to_string());
+        .map(|s| s.chars().take(7).collect());
     Ok(CiStatus {
         provider: "gitlab".into(),
         state: state.into(),
@@ -252,6 +263,35 @@ fn urlencoding_full(s: &str) -> String {
     urlencoding_minimal(s)
 }
 
+/// A syntactically safe hostname: letters, digits, dots, and hyphens only.
+/// Rejects anything carrying userinfo (`@`), a path (`/`), a port (`:`),
+/// whitespace, or other characters that could reshape the request URL.
+fn is_valid_host(host: &str) -> bool {
+    !host.is_empty()
+        && host.len() <= 253
+        && host
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+}
+
+/// Whether we'll send the user's PAT to this GitLab host. gitlab.com is always
+/// trusted; self-hosted instances must be opted in via QUILT_GITLAB_HOSTS
+/// (comma-separated). Comparison is case-insensitive on the exact host.
+fn is_trusted_gitlab_host(host: &str) -> bool {
+    let h = host.to_ascii_lowercase();
+    if h == "gitlab.com" {
+        return true;
+    }
+    std::env::var("QUILT_GITLAB_HOSTS")
+        .ok()
+        .map(|list| {
+            list.split(',')
+                .map(|s| s.trim().to_ascii_lowercase())
+                .any(|allowed| !allowed.is_empty() && allowed == h)
+        })
+        .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -259,16 +299,16 @@ mod tests {
     #[test]
     fn parse_github_slug_handles_both_forms() {
         assert_eq!(
-            parse_github_slug("https://github.com/SouravRoy-ETL/duckle.git").as_deref(),
-            Some("SouravRoy-ETL/duckle")
+            parse_github_slug("https://github.com/dwickyfp/Quilt.git").as_deref(),
+            Some("dwickyfp/Quilt")
         );
         assert_eq!(
-            parse_github_slug("https://github.com/SouravRoy-ETL/duckle").as_deref(),
-            Some("SouravRoy-ETL/duckle")
+            parse_github_slug("https://github.com/dwickyfp/Quilt").as_deref(),
+            Some("dwickyfp/Quilt")
         );
         assert_eq!(
-            parse_github_slug("git@github.com:SouravRoy-ETL/duckle.git").as_deref(),
-            Some("SouravRoy-ETL/duckle")
+            parse_github_slug("git@github.com:dwickyfp/Quilt.git").as_deref(),
+            Some("dwickyfp/Quilt")
         );
         assert!(parse_github_slug("https://gitlab.com/foo/bar").is_none());
     }
@@ -290,5 +330,26 @@ mod tests {
         assert_eq!(urlencoding_full("foo/bar"), "foo%2Fbar");
         assert_eq!(urlencoding_minimal("feature/x"), "feature%2Fx");
         assert_eq!(urlencoding_minimal("my branch"), "my%20branch");
+    }
+
+    #[test]
+    fn is_valid_host_rejects_url_trickery() {
+        assert!(is_valid_host("gitlab.com"));
+        assert!(is_valid_host("gitlab.internal-1.example"));
+        // userinfo / path / port / whitespace must all be rejected.
+        assert!(!is_valid_host("gitlab.com@evil.com"));
+        assert!(!is_valid_host("gitlab.com/../../evil"));
+        assert!(!is_valid_host("gitlab.com:8080"));
+        assert!(!is_valid_host("evil .com"));
+        assert!(!is_valid_host(""));
+    }
+
+    #[test]
+    fn only_gitlab_com_trusted_without_env() {
+        // Don't depend on the ambient env in CI.
+        std::env::remove_var("QUILT_GITLAB_HOSTS");
+        assert!(is_trusted_gitlab_host("gitlab.com"));
+        assert!(is_trusted_gitlab_host("GitLab.com"));
+        assert!(!is_trusted_gitlab_host("gitlab.attacker.com"));
     }
 }

@@ -1,5 +1,5 @@
 // Bundle + run scripts/export-catalog.ts under plain Node to produce
-// crates/duckle-mcp/catalog.json.
+// crates/quilt-mcp/catalog.json.
 //
 // manifest-synth.ts imports the Tauri bridge (@tauri-apps/api), which has no
 // meaning outside a Tauri window. The component property schemas it builds do
@@ -16,8 +16,8 @@ import { rmSync } from 'node:fs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const entry = resolve(here, 'export-catalog.ts');
-const out = resolve(here, '../../crates/duckle-mcp/catalog.json');
-const bundle = resolve(tmpdir(), `duckle-export-catalog-${process.pid}.mjs`);
+const out = resolve(here, '../../crates/quilt-mcp/catalog.json');
+const bundle = resolve(tmpdir(), `quilt-export-catalog-${process.pid}.mjs`);
 
 const stubTauri = {
     name: 'stub-tauri',

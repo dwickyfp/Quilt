@@ -1,6 +1,6 @@
-"""Render the Duckle "D." logo to a high-res PNG for `tauri icon`.
+"""Render the Quilt "D." logo to a high-res PNG for `tauri icon`.
 
-Reproduces docs/assets/duckle-logo-dark.svg (a slate disc with the brand-yellow
+Reproduces docs/assets/quilt-logo-dark.svg (a slate disc with the brand-yellow
 "D" half-disc and dot) as a 1024x1024 source image with a transparent
 background. Shapes are drawn at 4x and downscaled with LANCZOS for smooth,
 anti-aliased edges. Run from the repo root, then regenerate the icon set:

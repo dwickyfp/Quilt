@@ -1,4 +1,4 @@
-# Duckle CI/CD for GitLab.
+# Quilt CI/CD for GitLab.
 #
 # Mirrors .github/workflows/ci.yml and .github/workflows/release.yml so the
 # project can run the same push / merge-request / tag pipeline on either
@@ -71,16 +71,16 @@ test:linux:
     - mkdir -p /tmp/duckdb
     - curl -fsSL "https://github.com/duckdb/duckdb/releases/download/v${DUCKDB_VERSION}/duckdb_cli-linux-amd64.zip" -o duckdb.zip
     - unzip -o duckdb.zip -d /tmp/duckdb
-    - export DUCKLE_DUCKDB_BIN=/tmp/duckdb/duckdb
-    - $DUCKLE_DUCKDB_BIN :memory: -c "INSTALL postgres; INSTALL mysql; INSTALL sqlite; INSTALL excel; INSTALL httpfs; INSTALL iceberg; INSTALL delta; INSTALL ducklake; INSTALL vss; INSTALL fts; INSTALL inet;"
+    - export QUILT_DUCKDB_BIN=/tmp/duckdb/duckdb
+    - $QUILT_DUCKDB_BIN :memory: -c "INSTALL postgres; INSTALL mysql; INSTALL sqlite; INSTALL excel; INSTALL httpfs; INSTALL iceberg; INSTALL delta; INSTALL ducklake; INSTALL vss; INSTALL fts; INSTALL inet;"
   script:
-    - export DUCKLE_DUCKDB_BIN=/tmp/duckdb/duckdb
-    # apps/desktop embeds duckle-runner at compile time (build.rs
+    - export QUILT_DUCKDB_BIN=/tmp/duckdb/duckdb
+    # apps/desktop embeds quilt-runner at compile time (build.rs
     # include_bytes!), so build + stage it before anything compiles the
     # desktop crate. Dev profile shares the engine build with cargo test.
-    - cargo build -p duckle-runner
+    - cargo build -p quilt-runner
     - mkdir -p apps/desktop/bin
-    - cp target/debug/duckle-runner apps/desktop/bin/duckle-runner
+    - cp target/debug/quilt-runner apps/desktop/bin/quilt-runner
     - cargo test --workspace
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
@@ -138,18 +138,18 @@ desktop-build:linux:
     - npm --prefix frontend ci
   script:
     - npm --prefix frontend run build
-    # Build + stage duckle-runner + duckle-mcp first: the desktop crate embeds
+    # Build + stage quilt-runner + quilt-mcp first: the desktop crate embeds
     # both at compile time (build.rs include_bytes!). Release profile so the
     # engine build is shared with the desktop release build below.
-    - cargo build --release -p duckle-runner -p duckle-mcp
+    - cargo build --release -p quilt-runner -p quilt-mcp
     - mkdir -p apps/desktop/bin
-    - cp target/release/duckle-runner apps/desktop/bin/duckle-runner
-    - cp target/release/duckle-mcp apps/desktop/bin/duckle-mcp
+    - cp target/release/quilt-runner apps/desktop/bin/quilt-runner
+    - cp target/release/quilt-mcp apps/desktop/bin/quilt-mcp
     - cargo build --release --manifest-path apps/desktop/Cargo.toml --features custom-protocol
     # Verify the embedded frontend chunk is actually in the binary. If
     # tauri-codegen embedded devUrl instead this would be absent.
     - asset=$(ls frontend/dist/assets/index-*.js | head -1 | xargs basename)
-    - if grep -q "$asset" target/release/duckle; then
+    - if grep -q "$asset" target/release/quilt; then
         echo "OK; embedded frontend asset '$asset' is in the binary";
       else
         echo "FAIL; '$asset' not found in binary - tauri-codegen likely embedded devUrl";
@@ -159,7 +159,7 @@ desktop-build:linux:
     when: on_success
     expire_in: 1 week
     paths:
-      - target/release/duckle
+      - target/release/quilt
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -185,12 +185,12 @@ integration:postgres:
     - apt-get update -qq && apt-get install -y -qq unzip curl ca-certificates
     - curl -fsSL "https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip" -o duckdb.zip
     - unzip -o duckdb.zip -d /tmp/duckdb
-    - export DUCKLE_DUCKDB_BIN=/tmp/duckdb/duckdb
-    - $DUCKLE_DUCKDB_BIN :memory: -c "INSTALL postgres;"
+    - export QUILT_DUCKDB_BIN=/tmp/duckdb/duckdb
+    - $QUILT_DUCKDB_BIN :memory: -c "INSTALL postgres;"
   script:
-    - export DUCKLE_DUCKDB_BIN=/tmp/duckdb/duckdb
-    - export DUCKLE_PG_HOST=postgres DUCKLE_PG_PORT=5432 DUCKLE_PG_DB=postgres DUCKLE_PG_USER=postgres DUCKLE_PG_PASS=pgtest
-    - cargo test -p duckle-duckdb-engine --test execution -- pg_
+    - export QUILT_DUCKDB_BIN=/tmp/duckdb/duckdb
+    - export QUILT_PG_HOST=postgres QUILT_PG_PORT=5432 QUILT_PG_DB=postgres QUILT_PG_USER=postgres QUILT_PG_PASS=pgtest
+    - cargo test -p quilt-duckdb-engine --test execution -- pg_
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -209,17 +209,17 @@ integration:mysql:
     - apt-get update -qq && apt-get install -y -qq unzip curl ca-certificates default-mysql-client
     - curl -fsSL "https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip" -o duckdb.zip
     - unzip -o duckdb.zip -d /tmp/duckdb
-    - export DUCKLE_DUCKDB_BIN=/tmp/duckdb/duckdb
-    - $DUCKLE_DUCKDB_BIN :memory: -c "INSTALL mysql;"
+    - export QUILT_DUCKDB_BIN=/tmp/duckdb/duckdb
+    - $QUILT_DUCKDB_BIN :memory: -c "INSTALL mysql;"
     # Wait for the MySQL service to be ready (it takes a few seconds).
     - for i in $(seq 1 30); do
         mysqladmin ping -h mysql -uroot -pmytest --silent && break;
         echo "Waiting for MySQL... ($i)"; sleep 2;
       done
   script:
-    - export DUCKLE_DUCKDB_BIN=/tmp/duckdb/duckdb
-    - export DUCKLE_MYSQL_HOST=mysql DUCKLE_MYSQL_PORT=3306 DUCKLE_MYSQL_DB=ducktest DUCKLE_MYSQL_USER=root DUCKLE_MYSQL_PASS=mytest
-    - cargo test -p duckle-duckdb-engine --test execution -- mysql_
+    - export QUILT_DUCKDB_BIN=/tmp/duckdb/duckdb
+    - export QUILT_MYSQL_HOST=mysql QUILT_MYSQL_PORT=3306 QUILT_MYSQL_DB=ducktest QUILT_MYSQL_USER=root QUILT_MYSQL_PASS=mytest
+    - cargo test -p quilt-duckdb-engine --test execution -- mysql_
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -239,14 +239,14 @@ integration:minio:
     - apt-get update -qq && apt-get install -y -qq unzip curl ca-certificates
     - curl -fsSL "https://github.com/duckdb/duckdb/releases/download/v1.5.3/duckdb_cli-linux-amd64.zip" -o duckdb.zip
     - unzip -o duckdb.zip -d /tmp/duckdb
-    - export DUCKLE_DUCKDB_BIN=/tmp/duckdb/duckdb
+    - export QUILT_DUCKDB_BIN=/tmp/duckdb/duckdb
     # Wait for MinIO to be ready.
     - for i in $(seq 1 30); do
         curl -fs http://minio:9000/minio/health/live > /dev/null && break;
         echo "Waiting for MinIO... ($i)"; sleep 2;
       done
     # Seed bucket + a test object via DuckDB itself.
-    - $DUCKLE_DUCKDB_BIN :memory: -c "
+    - $QUILT_DUCKDB_BIN :memory: -c "
         INSTALL httpfs; LOAD httpfs;
         CREATE OR REPLACE SECRET seed (
           TYPE S3, KEY_ID 'minioadmin', SECRET 'minioadmin',
@@ -254,12 +254,12 @@ integration:minio:
           URL_STYLE 'path', USE_SSL false
         );
         COPY (SELECT * FROM (VALUES (1,'alice'),(2,'bob'),(3,'carol')) t(id,name))
-          TO 's3://duckle-test/orders.parquet' (FORMAT PARQUET);
+          TO 's3://quilt-test/orders.parquet' (FORMAT PARQUET);
       "
   script:
-    - export DUCKLE_DUCKDB_BIN=/tmp/duckdb/duckdb
-    - export DUCKLE_MINIO_HOST=minio DUCKLE_MINIO_PORT=9000 DUCKLE_MINIO_BUCKET=duckle-test DUCKLE_MINIO_ACCESS_KEY=minioadmin DUCKLE_MINIO_SECRET_KEY=minioadmin
-    - cargo test -p duckle-duckdb-engine --test execution -- minio_
+    - export QUILT_DUCKDB_BIN=/tmp/duckdb/duckdb
+    - export QUILT_MINIO_HOST=minio QUILT_MINIO_PORT=9000 QUILT_MINIO_BUCKET=quilt-test QUILT_MINIO_ACCESS_KEY=minioadmin QUILT_MINIO_SECRET_KEY=minioadmin
+    - cargo test -p quilt-duckdb-engine --test execution -- minio_
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -279,22 +279,22 @@ release:linux:
   before_script:
     # The release-cli image is tiny - no curl, no apt - so we just rename
     # the artifact in place.
-    - test -f target/release/duckle && cp target/release/duckle Duckle-linux-x64
-    - test -f Duckle-linux-x64
+    - test -f target/release/quilt && cp target/release/quilt Quilt-linux-x64
+    - test -f Quilt-linux-x64
   script:
     - echo "Publishing release for tag $CI_COMMIT_TAG"
   release:
     tag_name: $CI_COMMIT_TAG
-    name: "Duckle $CI_COMMIT_TAG"
+    name: "Quilt $CI_COMMIT_TAG"
     description: |
       Auto-generated release from GitLab CI on tag `$CI_COMMIT_TAG`.
 
       See the GitHub Releases page for the Windows + macOS binaries:
-      https://github.com/SouravRoy-ETL/duckle/releases/tag/$CI_COMMIT_TAG
+      https://github.com/dwickyfp/Quilt/releases/tag/$CI_COMMIT_TAG
     assets:
       links:
-        - name: "Duckle-linux-x64"
-          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/raw/Duckle-linux-x64"
+        - name: "Quilt-linux-x64"
+          url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/raw/Quilt-linux-x64"
           link_type: package
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/

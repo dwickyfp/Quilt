@@ -1,6 +1,6 @@
 //! Pipeline → DuckDB SQL compiler.
 //!
-//! Lowers a Duckle pipeline document (the same JSON the frontend
+//! Lowers a Quilt pipeline document (the same JSON the frontend
 //! produces) into an ordered list of SQL statements. Each non-sink node
 //! becomes a `CREATE OR REPLACE TEMP VIEW "<node_id>" AS (...)` so
 //! downstream nodes can reference it by name. Sinks become standalone
@@ -8,7 +8,7 @@
 
 use crate::sql_escape;
 use crate::EngineError;
-use duckle_metadata::{PipelineEdge, PipelineNode};
+use quilt_metadata::{PipelineEdge, PipelineNode};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -569,19 +569,19 @@ fn build_stage(
         .filter(|n| *n > 0)
         .map(|n| n as u32);
     // ATTACH statements for external-DB nodes (DuckDB/SQLite/relational).
-    // The prelude uses fixed aliases (duckle_src / duckle_dst). In batched
+    // The prelude uses fixed aliases (quilt_src / quilt_dst). In batched
     // mode every pure-SQL stage shares ONE DuckDB connection, so two
     // attach-backed stages would each ATTACH the same alias and the second
-    // fails with `database with name "duckle_src" already exists`. Each
+    // fails with `database with name "quilt_src" already exists`. Each
     // attach-backed stage copies its rows into <node> (downstream never
     // reads the alias - see the materialize-as-TABLE note below), so we
     // DETACH the alias at the end of the stage (further down) to free it for
     // the next stage's ATTACH.
     let attach = attach_prelude(component_id, &props);
-    let attach_alias: Option<&str> = if attach.contains("AS duckle_src") {
-        Some("duckle_src")
-    } else if attach.contains("AS duckle_dst") {
-        Some("duckle_dst")
+    let attach_alias: Option<&str> = if attach.contains("AS quilt_src") {
+        Some("quilt_src")
+    } else if attach.contains("AS quilt_dst") {
+        Some("quilt_dst")
     } else {
         None
     };
@@ -1358,7 +1358,7 @@ fn build_stage(
                 })?;
             let schema = string_prop(&props, "schemaName").filter(|s| !s.is_empty());
             let target = relational_qualified(
-                "duckle_dst",
+                "quilt_dst",
                 component_id,
                 schema.as_deref(),
                 &table,
@@ -1903,7 +1903,7 @@ fn build_stage(
         let inline_model_name = string_prop(&props, "modelName")
             .filter(|s| !s.trim().is_empty())
             .map(|s| sanitize_dbt_model_name(&s))
-            .unwrap_or_else(|| "duckle_model".into());
+            .unwrap_or_else(|| "quilt_model".into());
         // In inline mode the node's natural output is the model it just built,
         // so default outputModel to the model name when not set.
         let output_model = string_prop(&props, "outputModel")
@@ -3007,13 +3007,13 @@ fn build_stage(
         // hit that limit when the consumer-count path picks VIEW.
         let uses_dynamic_pivot =
             matches!(component_id, "xf.transpose" | "xf.pivot");
-        // DUCKLE_FORCE_VIEWS=1 makes every eligible step a VIEW even when
+        // QUILT_FORCE_VIEWS=1 makes every eligible step a VIEW even when
         // multiple downstream nodes consume it (issue #5). The default
         // (single-consumer => VIEW, multi-consumer => TABLE) balances
         // recompute vs materialize; forcing views trades memory for
         // re-evaluation, which some users prefer to let DuckDB's
         // optimizer see the whole query.
-        let force_views = std::env::var("DUCKLE_FORCE_VIEWS")
+        let force_views = std::env::var("QUILT_FORCE_VIEWS")
             .map(|v| {
                 let v = v.trim();
                 v == "1" || v.eq_ignore_ascii_case("true")
@@ -3030,10 +3030,10 @@ fn build_stage(
         // consumed reject no longer forces the pass side to a table either.
         // An ATTACH-backed source (postgres / mysql / motherduck / ...) must
         // materialize as a TABLE, never a lazy view. Its body reads the
-        // process-local `duckle_src` alias created by the stage's ATTACH; a
+        // process-local `quilt_src` alias created by the stage's ATTACH; a
         // single-consumer VIEW would be inlined into a *downstream* stage
         // whose separate CLI process never ran that ATTACH, failing with
-        // "schema duckle_src does not exist". Materializing copies the rows
+        // "schema quilt_src does not exist". Materializing copies the rows
         // so downstream reads them with no attach needed - and matches how
         // the other external sources (Oracle / SQL Server / ADBC) already
         // behave. (Sinks take a different path and are unaffected.)
@@ -3052,7 +3052,7 @@ fn build_stage(
         // fills in the run-scoped temp path, so we hand it the prelude + body.
         //
         // Covers the relational / warehouse / catalog DBs (read via the
-        // duckle_src ATTACH alias) and the lakehouse formats (read via the
+        // quilt_src ATTACH alias) and the lakehouse formats (read via the
         // iceberg_scan / delta_scan functions - a plain VIEW would fail
         // downstream because the consumer's process never LOADed the extension,
         // so COPY-to-parquet is what makes them lazy at all). EXCLUDED: local

@@ -195,7 +195,7 @@ export default function BuildPipelineModal({
                                 />
                                 <div className="modal-tip">
                                     <span>
-                                        Secrets are encrypted into secrets.enc. Set DUCKLE_BUNDLE_PASSPHRASE in the
+                                        Secrets are encrypted into secrets.enc. Set QUILT_BUNDLE_PASSPHRASE in the
                                         server environment with this same value before running. The passphrase is
                                         never written into the file.
                                     </span>
