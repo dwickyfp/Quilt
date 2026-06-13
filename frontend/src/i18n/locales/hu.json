@@ -132,9 +132,9 @@
     "copySqlDesc": "Fordítás DuckDB SQL-be, másolás vágólapra",
     "exportSql": "Exportálás .sql formátumban",
     "exportSqlDesc": "Töltse le a lefordított SQL-t fájlként",
-    "exportJson": "Exportálás .quilt.json formátumban",
+    "exportJson": "Export",
     "exportJsonDesc": "Töltse le a csomópontokat + éleket hordozható JSON-ként",
-    "importJson": "Importálja a .quilt.json fájlt...",
+    "importJson": "Import",
     "importJsonDesc": "Nyisson meg egy hordozható JSON-t új folyamatként"
   },
   "properties": {

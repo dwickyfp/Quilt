@@ -132,9 +132,9 @@
     "copySqlDesc": "Compileren naar DuckDB SQL, kopiëren naar klembord",
     "exportSql": "Exporteren als .sql",
     "exportSqlDesc": "Download de gecompileerde SQL als bestand",
-    "exportJson": "Exporteer als .ducle.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Download knooppunten + randen als draagbare JSON",
-    "importJson": "Importeer .ducle.json...",
+    "importJson": "Import",
     "importJsonDesc": "Open een draagbare JSON als een nieuwe pijplijn"
   },
   "properties": {

@@ -43,9 +43,9 @@
     "copySqlDesc": "编译为DuckDB SQL ，复制到剪贴板",
     "exportSql": "导出为.sql",
     "exportSqlDesc": "将已编译的SQL下载为文件",
-    "exportJson": "导出为.quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "将节点+边缘下载为便携式JSON",
-    "importJson": "导入.quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "作为新管道打开可移植JSON"
   },
   "palette": {

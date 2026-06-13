@@ -132,9 +132,9 @@
     "copySqlDesc": "Zkompilujte do DuckDB SQL, zkopírujte do schránky",
     "exportSql": "Exportovat jako .sql",
     "exportSqlDesc": "Stáhněte zkompilovaný SQL jako soubor",
-    "exportJson": "Exportovat jako .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Stáhněte si uzly + hrany jako přenosný JSON",
-    "importJson": "Importovat .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Otevřete přenosný JSON jako nový kanál"
   },
   "properties": {

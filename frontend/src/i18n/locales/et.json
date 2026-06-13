@@ -43,9 +43,9 @@
     "copySqlDesc": "DuckDB SQL-i kompileerimine, lõikelauale kopeerimine",
     "exportSql": "Ekspordi .sql-vormingus",
     "exportSqlDesc": "Laadige kompileeritud SQL failina alla",
-    "exportJson": "Ekspordi failina .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Laadige sõlmed + servad alla kaasaskantava JSON-ina",
-    "importJson": "Importige fail .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Avage kaasaskantav JSON uue torujuhtmena"
   },
   "palette": {

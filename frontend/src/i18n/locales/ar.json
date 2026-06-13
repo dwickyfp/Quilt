@@ -43,9 +43,9 @@
     "copySqlDesc": "التحويل البرمجي إلى DuckDB SQL، والنسخ إلى الحافظة",
     "exportSql": "تصدير بتنسيق .sql",
     "exportSqlDesc": "تنزيل SQL المترجمة كملف",
-    "exportJson": "تصدير باسم .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "قم بتنزيل العقد + الحواف كجسون محمول",
-    "importJson": "استيراد .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "فتح JSON محمول كخط أنابيب جديد"
   },
   "palette": {

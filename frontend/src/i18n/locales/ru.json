@@ -43,9 +43,9 @@
     "copySqlDesc": "Скомпилировать в DuckDB SQL, скопировать в буфер обмена",
     "exportSql": "Экспортировать как .sql",
     "exportSqlDesc": "Загрузите скомпилированный SQL в виде файла",
-    "exportJson": "Экспортировать как .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Скачать узлы + края как переносимый JSON",
-    "importJson": "Импортировать .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Открыть переносимый JSON как новый конвейер"
   },
   "palette": {

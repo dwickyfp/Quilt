@@ -43,9 +43,9 @@
     "copySqlDesc": "ចងក្រងទៅ DuckDB SQL ចម្លងទៅក្ដារតម្បៀតខ្ទាស់",
     "exportSql": "នាំចេញជា .sql",
     "exportSqlDesc": "ទាញយក SQL ដែលបានចងក្រងជាឯកសារ",
-    "exportJson": "នាំចេញជា .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "ទាញយក nodes + edges ជា JSON ចល័ត",
-    "importJson": "នាំចូល .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "បើក JSON ចល័តជាបំពង់ថ្មី។"
   },
   "palette": {

@@ -43,9 +43,9 @@
     "copySqlDesc": "In DuckDB SQL kompilieren, in die Zwischenablage kopieren",
     "exportSql": "Als .sql exportieren",
     "exportSqlDesc": "Kompiliertes SQL als Datei herunterladen",
-    "exportJson": "Als .quilt.json exportieren",
+    "exportJson": "Export",
     "exportJsonDesc": "Knoten + Kanten als portables json herunterladen",
-    "importJson": ".quilt.json importieren...",
+    "importJson": "Import",
     "importJsonDesc": "Öffnen einer portablen json als neue Pipeline"
   },
   "palette": {

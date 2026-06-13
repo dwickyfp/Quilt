@@ -132,9 +132,9 @@
     "copySqlDesc": "Susun ke DuckDB SQL, salin ke papan keratan",
     "exportSql": "Eksport sebagai .sql",
     "exportSqlDesc": "Muat turun SQL yang disusun sebagai fail",
-    "exportJson": "Eksport sebagai .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Muat turun nod + tepi sebagai JSON mudah alih",
-    "importJson": "Import .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Buka JSON mudah alih sebagai saluran paip baharu"
   },
   "properties": {

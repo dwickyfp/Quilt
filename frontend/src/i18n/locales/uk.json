@@ -132,9 +132,9 @@
     "copySqlDesc": "Скомпілюйте в DuckDB SQL, скопіюйте в буфер обміну",
     "exportSql": "Експортувати як .sql",
     "exportSqlDesc": "Завантажте скомпільований SQL як файл",
-    "exportJson": "Експортуйте як .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Завантажте вузли + ребра як портативний JSON",
-    "importJson": "Імпортувати .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Відкрийте портативний JSON як новий конвеєр"
   },
   "properties": {

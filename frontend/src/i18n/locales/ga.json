@@ -43,9 +43,9 @@
     "copySqlDesc": "Tiomsaigh chuig DuckDB SQL, cóipeáil chuig an ngearrthaisce",
     "exportSql": "Easpórtáil mar .sql",
     "exportSqlDesc": "Íosluchtaigh sql tiomsaithe mar chomhad",
-    "exportJson": "Easpórtáil mar .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Íoslódáil nóid + imill mar JSON iniompartha",
-    "importJson": "Iompórtáil .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Oscail JSON iniompartha mar phíblíne nua"
   },
   "palette": {

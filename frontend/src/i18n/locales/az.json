@@ -43,9 +43,9 @@
     "copySqlDesc": "DuckDB SQL-ə tərtib edin, panoya kopyalayın",
     "exportSql": ".sql kimi ixrac edin",
     "exportSqlDesc": "Tərtib edilmiş SQL-i fayl kimi yükləyin",
-    "exportJson": ".quilt.json kimi ixrac edin",
+    "exportJson": "Export",
     "exportJsonDesc": "Düyünləri + kənarları portativ JSON kimi endirin",
-    "importJson": ".quilt.json faylını idxal edin...",
+    "importJson": "Import",
     "importJsonDesc": "Portativ JSON-u yeni boru kəməri kimi açın"
   },
   "palette": {

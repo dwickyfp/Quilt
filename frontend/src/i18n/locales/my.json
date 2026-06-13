@@ -43,9 +43,9 @@
     "copySqlDesc": "DuckDB SQL သို့ စုစည်းပါ၊ ကလစ်ဘုတ်သို့ ကူးယူပါ။",
     "exportSql": ".sql အဖြစ် ထုတ်ယူပါ။",
     "exportSqlDesc": "စုစည်းထားသော SQL ကို ဖိုင်တစ်ခုအနေဖြင့် ဒေါင်းလုဒ်လုပ်ပါ။",
-    "exportJson": ".quilt.json အဖြစ် ထုတ်ယူပါ။",
+    "exportJson": "Export",
     "exportJsonDesc": "သယ်ဆောင်ရနိုင်သော JSON အဖြစ် node + edges ကို ဒေါင်းလုဒ်လုပ်ပါ။",
-    "importJson": ".quilt.json ကိုတင်သွင်းပါ...",
+    "importJson": "Import",
     "importJsonDesc": "ပိုက်လိုင်းအသစ်အဖြစ် ခရီးဆောင် JSON ကိုဖွင့်ပါ။"
   },
   "palette": {

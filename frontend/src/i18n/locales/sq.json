@@ -43,9 +43,9 @@
     "copySqlDesc": "Përpiloni në DuckDB SQL, kopjoni në clipboard",
     "exportSql": "Eksporto si .sql",
     "exportSqlDesc": "Shkarkoni SQL-në e përpiluar si skedar",
-    "exportJson": "Eksporto si .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Shkarko nyjet + skajet si JSON portativ",
-    "importJson": "Importo .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Hapni një JSON portativ si një tubacion i ri"
   },
   "palette": {

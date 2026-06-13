@@ -43,9 +43,9 @@
     "copySqlDesc": "Stel saam na DuckDB SQL, kopieer na knipbord",
     "exportSql": "Voer uit as .sql",
     "exportSqlDesc": "Laai die saamgestelde SQL as 'n lêer af",
-    "exportJson": "Voer uit as .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Laai nodusse + rande af as draagbare JSON",
-    "importJson": "Voer .quilt.json in...",
+    "importJson": "Import",
     "importJsonDesc": "Maak 'n draagbare JSON oop as 'n nuwe pyplyn"
   },
   "palette": {

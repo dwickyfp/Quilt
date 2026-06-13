@@ -132,9 +132,9 @@
     "copySqlDesc": "הידור ל-DuckDB SQL, העתק ללוח",
     "exportSql": "ייצא כ-‎.sql",
     "exportSqlDesc": "הורד את ה-SQL המהודר כקובץ",
-    "exportJson": "ייצא כ-.quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "הורד צמתים + קצוות כ-JSON נייד",
-    "importJson": "ייבוא ​​‎.quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "פתח JSON נייד כצינור חדש"
   },
   "properties": {

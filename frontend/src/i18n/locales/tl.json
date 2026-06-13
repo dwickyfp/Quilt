@@ -132,9 +132,9 @@
     "copySqlDesc": "Mag-compile sa DuckDB SQL, kopyahin sa clipboard",
     "exportSql": "I-export bilang .sql",
     "exportSqlDesc": "I-download ang pinagsama-samang SQL bilang isang file",
-    "exportJson": "I-export bilang .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Mag-download ng mga node + edge bilang portable JSON",
-    "importJson": "Mag-import ng .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Magbukas ng portable JSON bilang bagong pipeline"
   },
   "properties": {

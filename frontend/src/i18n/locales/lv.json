@@ -43,9 +43,9 @@
     "copySqlDesc": "Kompilējiet DuckDB SQL, kopējiet starpliktuvē",
     "exportSql": "Eksportēt kā .sql",
     "exportSqlDesc": "Lejupielādējiet apkopoto SQL kā failu",
-    "exportJson": "Eksportēt kā .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Lejupielādējiet mezglus + malas kā pārnēsājamu JSON",
-    "importJson": "Importēt failu .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Atveriet portatīvo JSON kā jaunu konveijeru"
   },
   "palette": {

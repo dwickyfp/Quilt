@@ -43,9 +43,9 @@
     "copySqlDesc": "DuckDB SQL වෙත සම්පාදනය කරන්න, පසුරු පුවරුවට පිටපත් කරන්න",
     "exportSql": ".sql ලෙස අපනයනය කරන්න",
     "exportSqlDesc": "සම්පාදනය කරන ලද SQL ගොනුවක් ලෙස බාගන්න",
-    "exportJson": ".quilt.json ලෙස අපනයනය කරන්න",
+    "exportJson": "Export",
     "exportJsonDesc": "නෝඩ් + දාර අතේ ගෙන යා හැකි JSON ලෙස බාගන්න",
-    "importJson": "ආනයනය කරන්න .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "නව නල මාර්ගයක් ලෙස අතේ ගෙන යා හැකි JSON විවෘත කරන්න"
   },
   "palette": {

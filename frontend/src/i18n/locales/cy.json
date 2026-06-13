@@ -43,9 +43,9 @@
     "copySqlDesc": "Llunio i DuckDB SQL, copi i'r clipfwrdd",
     "exportSql": "Allforio fel .sql",
     "exportSqlDesc": "Lawrlwythwch y SQL a luniwyd fel ffeil",
-    "exportJson": "Allforio fel .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Dadlwythwch nodau + ymylon fel JSON cludadwy",
-    "importJson": "Mewnforio .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Agorwch JSON cludadwy fel piblinell newydd"
   },
   "palette": {

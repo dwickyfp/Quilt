@@ -132,9 +132,9 @@
     "copySqlDesc": "Skompiluj do DuckDB SQL, skopiuj do schowka",
     "exportSql": "Eksportuj jako .sql",
     "exportSqlDesc": "Pobierz skompilowany SQL jako plik",
-    "exportJson": "Eksportuj jako .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Pobierz węzły i krawędzie jako przenośny plik JSON",
-    "importJson": "Importuj plik .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Otwórz przenośny plik JSON jako nowy potok"
   },
   "properties": {

@@ -43,9 +43,9 @@
     "copySqlDesc": "DuckDB SQL жүйесіне құрастырыңыз, алмасу буферіне көшіріңіз",
     "exportSql": ".sql ретінде экспорттау",
     "exportSqlDesc": "Құрастырылған SQL файлын жүктеп алыңыз",
-    "exportJson": ".quilt.json ретінде экспорттау",
+    "exportJson": "Export",
     "exportJsonDesc": "Түйіндерді + жиектерді портативті JSON ретінде жүктеп алыңыз",
-    "importJson": ".quilt.json импорттау...",
+    "importJson": "Import",
     "importJsonDesc": "Портативті JSON файлын жаңа конвейер ретінде ашыңыз"
   },
   "palette": {

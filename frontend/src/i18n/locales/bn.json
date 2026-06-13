@@ -43,9 +43,9 @@
     "copySqlDesc": "DuckDB SQL-এ কম্পাইল করুন, ক্লিপবোর্ডে অনুলিপি করুন",
     "exportSql": ".sql হিসাবে রপ্তানি করুন",
     "exportSqlDesc": "একটি ফাইল হিসাবে সংকলিত SQL ডাউনলোড করুন",
-    "exportJson": ".quilt.json হিসাবে রপ্তানি করুন",
+    "exportJson": "Export",
     "exportJsonDesc": "পোর্টেবল JSON হিসাবে নোড + প্রান্তগুলি ডাউনলোড করুন",
-    "importJson": ".quilt.json আমদানি করুন...",
+    "importJson": "Import",
     "importJsonDesc": "একটি নতুন পাইপলাইন হিসাবে একটি পোর্টেবল JSON খুলুন"
   },
   "palette": {
