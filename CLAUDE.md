@@ -78,20 +78,34 @@ compiles a node graph to staged DuckDB SQL; React 19 + Vite + Tauri 2 frontend (
 4. Runtime: `crates/duckdb-engine/src/lib.rs` (only if a new `RuntimeSpec` variant is needed)
 
 **Verify after every change:**
-- Engine: `cargo test -p quilt-duckdb-engine` (baseline 116 lib + 216 integration, 0 failed)
+- Engine: `cargo test -p quilt-duckdb-engine` (baseline 130 lib + 225 integration, 0 failed).
+  Integration tests (`tests/execution.rs`) SOFT-SKIP unless `QUILT_DUCKDB_BIN` points to a
+  DuckDB CLI. On macOS arm64 the repo bundles only Windows `duckdb.exe`, so download the mac
+  CLI once into `.duckdb-cli-macos/` (gitignored) and `export QUILT_DUCKDB_BIN="$(pwd)/.duckdb-cli-macos/duckdb"`
+  to make them actually run (~11s vs 0.04s skip). See the `quilt-engine-development` skill.
 - Frontend: `cd frontend && npm run lint && npm run test && npm run build`
 
-**Pure-core + delegated-shell pattern** (proven, low-risk for FE features): extract all logic
-into a DOM-free `.ts` module with vitest tests written FIRST (RED → GREEN), then wire the React
-shell separately. Established cores:
-- `workflow-ui/lineage.ts` — column-level lineage (`buildLineage`, `traceColumn`).
-- `workflow-ui/stage-cache.ts` — incremental re-run keys (`computeCacheKeys`, `invalidatedNodes`, `staleNodes`).
-- `workflow-ui/pipeline-test.ts` — golden-dataset diff (`diffRows`, key + multiset modes).
-- `workflow-ui/component-def.ts` — reusable subgraph (`extractComponent`, `instantiateComponent`).
+**Engine env vars** (set by the Tauri app's `set_workspace`, or ad-hoc in tests):
+- `QUILT_DUCKDB_BIN` — path to the DuckDB CLI the engine shells out to.
+- `QUILT_WORKSPACE` / `QUILT_LOG_DIR` — workspace root + NDJSON run-log dir.
+- `QUILT_STAGE_CACHE_DIR` — opt-in incremental re-run cache (feature #1). Unset = no caching,
+  exact legacy behavior. Set = content-addressed Parquet stage cache (`plan/stage_cache.rs` +
+  the rewrite/write-back block in `execute_pipeline_with_events`). `QUILT_STAGE_CACHE_BUDGET_MB`
+  caps it (default 2048, LRU by mtime). Cache write-back is atomic (tmp + rename) and best-effort.
+- `QUILT_MEMORY_LIMIT` / `QUILT_THREADS` / `QUILT_TEMP_DIR` — DuckDB resource knobs.
 
-These four cores are TESTED LOGIC, not yet wired to the engine/UI — do not claim them as
-shipped features in the README until their execution path + React shell land. `xf.join.asof`
-(As-Of Join) IS shipped end-to-end (builder + dispatch + tests + palette/manifest).
+**Pure-core + delegated-shell pattern** (proven, low-risk): extract logic into a DOM-free `.ts`
+(or pure Rust) module with tests written FIRST (RED → GREEN), then wire the shell separately.
+
+**Shipped features #1–#5** (all verified with real DuckDB execution):
+- `xf.join.asof` — As-Of Join (builder + dispatch + exec test).
+- `workflow-ui/lineage.ts` + `LineagePanel.tsx` — column lineage in the Schema tab.
+- `qa.golden` — Golden Assert regression-test node (EXCEPT-both-ways vs a golden Parquet).
+- `plan/stage_cache.rs` + executor wiring — incremental re-run (opt-in, see env var above).
+- STILL FOUNDATIONAL (tested core, NOT wired): `workflow-ui/component-def.ts` (#2 reusable
+  subgraph) and `workflow-ui/pipeline-test.ts` (FE golden-diff core; the engine-side
+  regression test shipped instead as `qa.golden`). Don't claim #2 as shipped until its
+  engine inline + create-from-selection UI land.
 
 **Known trap:** the patch/write_file syntax checker mis-parses `crates/duckdb-engine/src/connectors.rs`
 as edition 2015 and emits a wall of false-positive errors. Ignore them; trust only `cargo` output.

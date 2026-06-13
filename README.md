@@ -61,7 +61,7 @@
 - [Sources](#sources-74-available)
 - [Transforms](#transforms-127-available)
 - [Sinks](#sinks-58-available)
-- [Data quality](#data-quality-12-available)
+- [Data quality](#data-quality-13-available)
 - [Custom code](#custom-code-7-available)
 - [Control flow](#control-flow-19-available)
 - [Machine learning](#machine-learning-10-available)
@@ -184,9 +184,9 @@ Quilt is in **public beta**. The visual designer, the DuckDB execution engine, t
 
 **Scope, stated plainly:** Quilt is a single-machine, embedded studio. If you outgrow one box, point Quilt's output at the system that scales (a warehouse, an object store, a lakehouse). It will not pretend to be a cluster.
 
-The component palette ships **314 nodes** so the roadmap is visible in the product itself:
+The component palette ships **315 nodes** so the roadmap is visible in the product itself:
 
-- **293 available** runs on the DuckDB engine today
+- **294 available** runs on the DuckDB engine today
 - **5 preview** is configurable in the designer (drag, wire, set properties); execution is being wired engine-by-engine
 - **16 planned** is reserved in the palette but not yet executable - see [`docs/roadmap.md`](docs/roadmap.md)
 
@@ -247,7 +247,7 @@ For CSV / TSV sources, the **Schema** panel accepts an optional per-column **For
 
 > **All 6 AI transforms ship today.** Three need a model API (LLM, Classify, Embeddings) and ride the apiKey-in-props pattern; three are pure-local (Chunk, PII Redact, Dedupe).
 
-### Data quality (12 available)
+### Data quality (13 available)
 
 Validators split their input: passing rows continue on the main port, failures route to a **reject** port you can sink, count, or inspect.
 
@@ -264,6 +264,7 @@ Validators split their input: passing rows continue on the main port, failures r
 | **Standardize** | Trim + case-normalize + collapse inner whitespace, in place |
 | **Fuzzy Deduplicate** | Keep the first row per near-duplicate cluster |
 | **Record Match** | Self-join: emit pairs of rows above a similarity threshold |
+| **Golden Assert** | Pipeline regression test: hard-fail the run if the input no longer matches a saved golden Parquet snapshot (order-insensitive multiset compare via `EXCEPT ALL` both ways). Rows pass through unchanged so it sits inline. |
 | **Address Cleanse** | Address parsing / normalization (planned - needs external lib) |
 
 ### Custom code (7 available)
@@ -376,6 +377,7 @@ Every node has an **Advanced** tab with fields the engine honours at run time:
 | **Context variables** | Per-environment variables; bind any field to one via a Manual / Context dropdown, or reference `${var}` inline. Resolved at run time. |
 | **Cloud credentials** | Saved S3 / GCS / Azure connections become DuckDB SECRETs; cloud reads / writes go through `httpfs`. S3-compatible endpoints (MinIO / R2 / B2) supported via `ENDPOINT` + `URL_STYLE`. |
 | **Column lineage** | On any node's **Schema** tab, see where each output column originates - traced back through the pipeline to its source node/column, with hop count. Impact analysis without leaving the canvas. |
+| **Incremental re-run** | Opt-in content-addressed stage cache (`QUILT_STAGE_CACHE_DIR`). Each stage's output is checkpointed to Parquet keyed by a content hash (component + config + source-file fingerprint + upstream chain). Editing one node re-executes only that node and its downstream; unchanged stages are served from cache and their dead upstreams pruned. Off by default - zero behavior change when unset. |
 | **Workspace** | Pipelines, connections, contexts, documents, and routines persist as plain JSON and Markdown files in a folder you choose. |
 
 ---
@@ -508,7 +510,7 @@ A wider tour of the workflow.
 |---|---|---|
 | **1. Sources** | Drag a source, point it at a file / DB / cloud URL / SaaS endpoint. Click **Autodetect schema** to read columns + a sample. | [Sources reference](#sources-74-available) |
 | **2. Transforms** | Wire transforms to source output ports. Configure in the Properties panel. **Preview** tab shows live rows; **Plan** tab shows generated SQL. | [Transforms reference](#transforms-127-available) |
-| **3. Data quality** | Drop in a validator (Not-Null, Range, Regex, Uniqueness). Passing rows continue on the main port; failures route to the **reject** port. | [Data quality reference](#data-quality-12-available) |
+| **3. Data quality** | Drop in a validator (Not-Null, Range, Regex, Uniqueness). Passing rows continue on the main port; failures route to the **reject** port. | [Data quality reference](#data-quality-13-available) |
 | **4. Sinks** | Finish with a sink (file, DB, cloud, vector DB, message bus, email). Set write mode (overwrite, append, truncate, upsert). | [Sinks reference](#sinks-58-available) |
 | **5. Run** | Press **Run** to execute on DuckDB. Nodes light up stage by stage; **Output** + **Console** show row counts, timing, errors. Stop button kills mid-run. | [Run feedback](#orchestration-and-workspace) |
 | **6. Ask Qunnie** | For anything you can describe in English, the AI assistant can sketch a pipeline. Iterate by editing the graph or asking follow-ups. | [Meet Qunnie](#meet-qunnie---the-ai-pipeline-assistant) |
