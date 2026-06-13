@@ -1224,6 +1224,15 @@ pub struct MlPredictSpec {
     pub output_column: String,
 }
 
+/// ml.model.writer: export the model artifact from an upstream Learner/Reader
+/// (located via `model_node_id`) to `path` for use on other platforms.
+#[derive(Debug, Clone)]
+pub struct ModelWriterSpec {
+    pub node_id: String,
+    pub model_node_id: String,
+    pub path: String,
+}
+
 /// ml.score: compare actual vs predicted columns and emit a metrics table.
 #[derive(Debug, Clone)]
 pub struct MlScoreSpec {

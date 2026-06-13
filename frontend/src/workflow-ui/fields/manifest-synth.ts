@@ -545,6 +545,14 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // Model Writer - model in only, exports to a file (terminal, no output).
+    if (id === 'ml.model.writer') {
+        return {
+            inputs: [MODEL_IN],
+            outputs: [],
+        };
+    }
+
     // Predictor - data in + model in, predictions out.
     if (id === 'ml.predict' || id === 'dl.onnx.predict') {
         return {
@@ -4777,6 +4785,28 @@ function synthMl(comp: ComponentDef): ComponentManifest {
         return base(comp, [{ label: 'Prediction', fields }], 'upstream');
     }
 
+    if (id === 'ml.model.writer') {
+        return base(comp, [
+            {
+                label: 'Output',
+                fields: [
+                    {
+                        key: 'path',
+                        label: 'Output file',
+                        kind: 'save-path',
+                        required: true,
+                        description: 'Where to write the exported model. Classic ML exports portable JSON; ONNX copies the .onnx file.',
+                        filters: [
+                            { name: 'JSON model', extensions: ['json'] },
+                            { name: 'ONNX model', extensions: ['onnx'] },
+                            { name: 'All files', extensions: ['*'] },
+                        ],
+                    },
+                ],
+            },
+        ], 'declared');
+    }
+
     if (id === 'ml.score') {
         return base(comp, [
             {
@@ -4882,7 +4912,7 @@ export function synthesizeManifest(componentId: string): ComponentManifest | und
     if (groupId === 'code.scripts') return synthCustomCode(comp);
 
     // Machine Learning / Deep Learning
-    if (groupId === 'ml.prep' || groupId === 'ml.learners' || groupId === 'ml.apply' || groupId === 'dl.onnx') {
+    if (groupId === 'ml.prep' || groupId === 'ml.learners' || groupId === 'ml.apply' || groupId === 'ml.export' || groupId === 'dl.onnx') {
         return synthMl(comp);
     }
 

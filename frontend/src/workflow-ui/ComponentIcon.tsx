@@ -24,6 +24,7 @@ import {
     Target,
     Gauge,
     Cpu,
+    FileDown,
 } from 'lucide-react';
 import { BRAND_ICONS, type BrandIcon } from './brand-icons.generated';
 import type { NodeKind } from './palette-data';
@@ -72,6 +73,7 @@ const BASE_FALLBACK: Record<string, ComponentType<IconProps>> = {
     learner: Brain,
     predict: Target,
     score: Gauge,
+    model: FileDown,
     onnx: Cpu,
 };
 

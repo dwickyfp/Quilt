@@ -811,6 +811,13 @@ export const PALETTE: Category[] = [
                     ml('ml.score', 'Scorer', 'available', 'Evaluate predictions against ground truth. Props: actualColumn, predictedColumn, task (`classification` or `regression`). Emits a metrics table: accuracy/precision/recall + confusion matrix for classification, RMSE/MAE/R² for regression.'),
                 ],
             },
+            {
+                id: 'ml.export',
+                label: 'Export',
+                components: [
+                    ml('ml.model.writer', 'Model Writer', 'available', 'Export a trained model to a file for use on other platforms. Wire a Learner or ONNX Reader into the model port. Classic ML → portable JSON (params + features + labels); ONNX → copies the .onnx file. Props: path (output file).'),
+                ],
+            },
         ],
     },
     {

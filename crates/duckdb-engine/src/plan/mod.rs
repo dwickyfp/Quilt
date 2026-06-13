@@ -162,6 +162,7 @@ pub enum RuntimeSpec {
     MlLearner(MlLearnerSpec),
     MlPredict(MlPredictSpec),
     MlScore(MlScoreSpec),
+    ModelWriter(ModelWriterSpec),
     OnnxReader(OnnxReaderSpec),
     OnnxPredict(OnnxPredictSpec),
 }
@@ -578,6 +579,7 @@ fn build_stage(
     let mut ml_learner: Option<MlLearnerSpec> = None;
     let mut ml_predict: Option<MlPredictSpec> = None;
     let mut ml_score: Option<MlScoreSpec> = None;
+    let mut model_writer: Option<ModelWriterSpec> = None;
     let mut onnx_reader: Option<OnnxReaderSpec> = None;
     let mut onnx_predict: Option<OnnxPredictSpec> = None;
     let mut wait_ms: Option<u64> = None;
@@ -3115,6 +3117,22 @@ fn build_stage(
                 .unwrap_or_else(|| "classification".into()),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "ml.model.writer" {
+        let model_node_id = model_input
+            .ok_or_else(|| EngineError::Config(format!(
+                "{}: connect a trained Learner or ONNX Reader to the model port",
+                component_id
+            )))?
+            .to_string();
+        let path = string_prop(&props, "path")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: path required (output file)", component_id)))?;
+        model_writer = Some(ModelWriterSpec {
+            node_id: node.id.clone(),
+            model_node_id,
+            path,
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "dl.onnx.reader" {
         let path = string_prop(&props, "path")
             .filter(|s| !s.is_empty())
@@ -3384,6 +3402,7 @@ fn build_stage(
         .or_else(|| ml_learner.map(RuntimeSpec::MlLearner))
         .or_else(|| ml_predict.map(RuntimeSpec::MlPredict))
         .or_else(|| ml_score.map(RuntimeSpec::MlScore))
+        .or_else(|| model_writer.map(RuntimeSpec::ModelWriter))
         .or_else(|| onnx_reader.map(RuntimeSpec::OnnxReader))
         .or_else(|| onnx_predict.map(RuntimeSpec::OnnxPredict))
         ;

@@ -2048,6 +2048,38 @@
     }
 
     #[test]
+    fn model_edge_orders_learner_before_writer() {
+        // ml.model.writer consumes a model via the model edge (no data edge),
+        // so the Learner must still be scheduled before it, and the writer's
+        // runtime spec must point back at the learner.
+        let doc = pipeline_from_json(
+            r#"{
+              "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/d.csv","hasHeader":true}}},
+                {"id":"l","position":{"x":0,"y":0},"data":{"label":"learn","componentId":"ml.learner.tree","properties":{"targetColumn":"label","featureColumns":["x"]}}},
+                {"id":"w","position":{"x":0,"y":0},"data":{"label":"write","componentId":"ml.model.writer","properties":{"path":"/tmp/model.json"}}}
+              ],
+              "edges":[
+                {"id":"e1","source":"s","target":"l","data":{"connectionType":"main"}},
+                {"id":"e2","source":"l","sourceHandle":"model","target":"w","targetHandle":"model","data":{"connectionType":"model"}}
+              ]
+            }"#,
+        );
+        let compiled = compile(&doc).expect("compile ok");
+        let pos = |id: &str| compiled.stages.iter().position(|s| s.node_id == id).unwrap();
+        assert!(pos("l") < pos("w"), "learner must be scheduled before writer");
+
+        let writer = compiled.stages.iter().find(|s| s.node_id == "w").unwrap();
+        match writer.runtime.as_ref() {
+            Some(RuntimeSpec::ModelWriter(spec)) => {
+                assert_eq!(spec.model_node_id, "l", "writer must read learner 'l' model");
+                assert_eq!(spec.path, "/tmp/model.json", "writer path comes from props");
+            }
+            other => panic!("expected ModelWriter runtime, got {:?}", other),
+        }
+    }
+
+    #[test]
     fn partition_emits_train_and_test_relations() {
         // ml.partition is pure SQL: the stage must create the train relation
         // (named after the node) and a complementary `<node>__test` relation.

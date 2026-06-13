@@ -25,4 +25,13 @@ export default defineConfig({
         minify: 'esbuild',
         sourcemap: false,
     },
+
+    // Match the build target during dependency pre-bundling. The default
+    // includes safari14, whose destructuring bug makes esbuild try (and fail)
+    // to lower `const {x} = module.exports` in deps like debug@4.4.x.
+    optimizeDeps: {
+        esbuildOptions: {
+            target: 'es2022',
+        },
+    },
 });

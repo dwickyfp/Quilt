@@ -866,6 +866,7 @@ impl DuckdbEngine {
                     Some(RuntimeSpec::MlLearner(spec)) => self.run_ml_learner(&db_path, spec),
                     Some(RuntimeSpec::MlPredict(spec)) => self.run_ml_predict(&db_path, spec),
                     Some(RuntimeSpec::MlScore(spec)) => self.run_ml_score(&db_path, spec),
+                    Some(RuntimeSpec::ModelWriter(spec)) => self.run_model_writer(&db_path, spec),
                     Some(RuntimeSpec::OnnxReader(spec)) => self.run_onnx_reader(&db_path, spec),
                     Some(RuntimeSpec::OnnxPredict(spec)) => self.run_onnx_predict(&db_path, spec),
                     Some(RuntimeSpec::EmailSource(spec)) => self.run_email_source(&db_path, spec),

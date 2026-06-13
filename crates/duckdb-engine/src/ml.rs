@@ -81,6 +81,34 @@ impl Model {
             | Model::KMeans { features, .. } => features,
         }
     }
+
+    fn algorithm_name(&self) -> &'static str {
+        match self {
+            Model::LinReg { .. } => "linreg",
+            Model::LogReg { .. } => "logreg",
+            Model::Tree { .. } => "tree",
+            Model::Forest { .. } => "forest",
+            Model::Knn { .. } => "knn",
+            Model::KMeans { .. } => "kmeans",
+        }
+    }
+
+    /// Serialize the model to a portable, self-describing JSON document other
+    /// platforms can read - the smartcore params (coefficients/tree/centroids)
+    /// plus the feature list and class labels, under a versioned header.
+    fn to_export_json(&self) -> Result<String, EngineError> {
+        let inner = serde_json::to_value(self)
+            .map_err(|e| EngineError::Query(format!("ml: serialize model to json: {}", e)))?;
+        let doc = json!({
+            "format": "quilt-ml-model/v1",
+            "framework": "smartcore",
+            "algorithm": self.algorithm_name(),
+            "features": self.features(),
+            "model": inner,
+        });
+        serde_json::to_string_pretty(&doc)
+            .map_err(|e| EngineError::Query(format!("ml: encode model json: {}", e)))
+    }
 }
 
 /// One numeric feature value out of a JSON cell. Booleans map to 0/1, numeric
@@ -446,6 +474,68 @@ impl DuckdbEngine {
             "ml.score ({}): {} metric row(s) -> {}",
             spec.task, count, spec.node_id
         ))
+    }
+
+    /// ml.model.writer: export the upstream model artifact to a file for use
+    /// on other platforms. Auto-detects the artifact type stored in the model
+    /// node's __quilt_model cell: a base64-bincode classic-ML bundle is decoded
+    /// and re-emitted as portable JSON; anything else is treated as an ONNX
+    /// file path and copied verbatim.
+    pub(crate) fn run_model_writer(
+        &self,
+        db: &Path,
+        spec: &plan::ModelWriterSpec,
+    ) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+        let rows = self.run_rows(
+            Some(db),
+            &format!(
+                "SELECT {} FROM {} LIMIT 1;",
+                plan::quote_ident(MODEL_COLUMN),
+                plan::quote_ident(&spec.model_node_id)
+            ),
+        )?;
+        let cell = rows
+            .first()
+            .and_then(|r| r.get(MODEL_COLUMN))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                EngineError::Query(format!(
+                    "ml.model.writer: no model at '{}' (did the upstream Learner/Reader run?)",
+                    spec.model_node_id
+                ))
+            })?;
+
+        // Classic ML: base64 -> bincode -> Model -> portable JSON.
+        if let Ok(bytes) = B64.decode(cell) {
+            if let Ok(model) = bincode::deserialize::<Model>(&bytes) {
+                let json = model.to_export_json()?;
+                std::fs::write(&spec.path, json).map_err(|e| {
+                    EngineError::Query(format!("ml.model.writer: write {}: {}", spec.path, e))
+                })?;
+                return Ok(format!(
+                    "ml.model.writer: exported {} model -> {}",
+                    model.algorithm_name(),
+                    spec.path
+                ));
+            }
+        }
+
+        // DL: the cell holds an ONNX file path; copy it as-is.
+        if Path::new(cell).is_file() {
+            std::fs::copy(cell, &spec.path).map_err(|e| {
+                EngineError::Query(format!(
+                    "ml.model.writer: copy ONNX model {} -> {}: {}",
+                    cell, spec.path, e
+                ))
+            })?;
+            return Ok(format!("ml.model.writer: copied ONNX model -> {}", spec.path));
+        }
+
+        Err(EngineError::Query(format!(
+            "ml.model.writer: unrecognized model artifact at '{}' (not a classic-ML bundle, and not an existing ONNX file path)",
+            spec.model_node_id
+        )))
     }
 
     /// Load a model bundle previously written by run_ml_learner.
