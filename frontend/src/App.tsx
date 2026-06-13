@@ -48,6 +48,7 @@ import { RunStatusContext, ProfileContext } from './canvas/run-status-context';
 import { validatePipeline } from './validation';
 import { expandComponentsForRun, resolveForRun } from './run-resolve';
 import type { SavedComponent } from './workflow-ui/component-expand';
+import { extractComponent } from './workflow-ui/component-def';
 import WorkspacePickerModal from './workflow-ui/WorkspacePickerModal';
 import {
     deleteItemPayload,
@@ -1313,6 +1314,55 @@ export default function App() {
                 case 'run-from-here':
                     handleRunFromHere(nodeId);
                     break;
+
+                case 'create-component': {
+                    const sel = nodes.filter(n => n.selected);
+                    if (sel.length < 2) break;
+                    const name = window.prompt('Component name:', 'My Component')?.trim();
+                    if (!name) break;
+                    const selIds = sel.map(n => n.id);
+                    const def = extractComponent(
+                        nodes.map(n => ({ id: n.id, data: { componentId: n.data.componentId, properties: n.data.properties } })),
+                        edges.map(e => ({ id: e.id, source: e.source, target: e.target, targetHandle: e.targetHandle ?? undefined })),
+                        selIds,
+                    );
+                    if (def.inputs.length > 1 || def.outputs.length > 1) {
+                        window.alert('Only single-input / single-output selections can become a component for now.');
+                        break;
+                    }
+                    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'component';
+                    const compId = `cmp.${slug}-${Date.now().toString(36)}`;
+                    setSavedComponents(cs => [...cs, { id: compId, label: name, def }]);
+                    // Collapse the selection into one instance node, rewiring
+                    // boundary edges (inverse of expansion).
+                    const instId = freshId('n');
+                    const selSet = new Set(selIds);
+                    const avgX = sel.reduce((s, n) => s + n.position.x, 0) / sel.length;
+                    const avgY = sel.reduce((s, n) => s + n.position.y, 0) / sel.length;
+                    const instNode: Node<QuiltNodeData> = {
+                        id: instId,
+                        type: 'transform',
+                        position: { x: avgX, y: avgY },
+                        data: { label: name, componentId: compId, properties: {} },
+                    };
+                    setNodes(ns => [...ns.filter(n => !selSet.has(n.id)), instNode]);
+                    setEdges(es =>
+                        es
+                            .filter(e => !(selSet.has(e.source) && selSet.has(e.target)))
+                            .map(e => {
+                                if (!selSet.has(e.source) && selSet.has(e.target)) {
+                                    return { ...e, target: instId };
+                                }
+                                if (selSet.has(e.source) && !selSet.has(e.target)) {
+                                    return { ...e, source: instId };
+                                }
+                                return e;
+                            }),
+                    );
+                    setSelectedId(instId);
+                    markDirty();
+                    break;
+                }
 
                 case 'copy-id':
                     void copyText(nodeId);

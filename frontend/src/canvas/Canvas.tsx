@@ -72,6 +72,7 @@ export type NodeAction =
     | 'rename'
     | 'duplicate'
     | 'copy'
+    | 'create-component'
     | 'toggle-disable'
     | 'autodetect'
     | 'run-from-here'
@@ -123,7 +124,7 @@ function CanvasInner({
     nodeAutodetectAvailable,
     pipelineId,
 }: Props) {
-    const { screenToFlowPosition, setViewport, fitView } = useReactFlow();
+    const { screenToFlowPosition, setViewport, fitView, getNodes } = useReactFlow();
     const { theme } = useTheme();
 
     // Remember pan/zoom per pipeline (per user = localStorage on this machine),
@@ -389,6 +390,17 @@ function CanvasInner({
                     shortcut: 'Ctrl+C',
                     onClick: () => onNodeAction('copy', node.id),
                 },
+                ...(getNodes().filter(nd => nd.selected).length >= 2
+                    ? [
+                          {
+                              kind: 'item' as const,
+                              key: 'create-component',
+                              label: 'Create component from selection',
+                              icon: <Package size={ICON_SIZE} />,
+                              onClick: () => onNodeAction('create-component', node.id),
+                          },
+                      ]
+                    : []),
                 {
                     kind: 'item',
                     key: 'toggle-disable',
