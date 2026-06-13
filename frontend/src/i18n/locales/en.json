@@ -115,6 +115,10 @@
   },
   "chat": {
     "title": "Qunnie AI Assistant",
+    "history": "History",
+    "historyEmpty": "No saved chats yet",
+    "newChat": "New chat",
+    "deleteChat": "Delete chat",
     "providerTag": "{{provider}} · {{model}}",
     "notConfiguredTitle": "Configure an AI provider",
     "notConfiguredBody": "Choose an AI provider and add your API key in Settings to start chatting.",
@@ -123,6 +127,12 @@
     "emptyHint": "The assistant outputs a Quilt pipeline you can click to insert into the canvas.",
     "insertIntoCanvas": "Insert into canvas",
     "thinking": "Thinking...",
+    "model": "Model",
+    "agentMode": "Agent mode",
+    "stop": "Stop",
+    "skillUsed": "Skill used",
+    "approve": "Approve",
+    "reject": "Reject",
     "placeholder": "Describe what you need...",
     "sendAria": "Send",
     "sendTooltip": "Send (Enter)",
@@ -245,6 +255,13 @@
     "testFailed": "Connection failed: {{error}}",
     "savedConfirm": "Settings saved.",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "addProvider": "Add provider",
+    "removeProvider": "Remove provider",
+    "models": "Models",
+    "addModel": "Add model",
+    "modelPlaceholder": "e.g. gpt-4o-mini",
+    "providerLabel": "Label",
+    "noModels": "No models yet"
   }
 }

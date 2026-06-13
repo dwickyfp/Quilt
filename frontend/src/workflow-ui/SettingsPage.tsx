@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Loader2, Save, Settings, X } from 'lucide-react';
+import { Loader2, Plus, Save, Settings, Trash2, X } from 'lucide-react';
+import { AI_PROVIDER_DEFAULTS, type AiProvider, type AiProviderConfig } from '../ai-provider';
 import {
-    AI_PROVIDER_DEFAULTS,
-    isAiConfigured,
-    loadAiProviderConfig,
-    saveAiProviderConfig,
-    type AiProvider,
-    type AiProviderConfig,
-} from '../ai-provider';
+    defaultLabel,
+    loadAiSettings,
+    newProviderId,
+    saveAiSettings,
+    type AiSettings,
+    type ProviderEntry,
+} from '../ai-settings';
 import { aiTestConnection } from '../tauri-bridge';
 
 type Props = {
@@ -18,21 +19,20 @@ type Props = {
 
 type TestState =
     | { phase: 'idle' }
-    | { phase: 'testing' }
-    | { phase: 'ok' }
-    | { phase: 'failed'; error: string };
+    | { phase: 'testing'; id: string }
+    | { phase: 'ok'; id: string }
+    | { phase: 'failed'; id: string; error: string };
 
 const PROVIDERS: AiProvider[] = ['openai', 'claude', 'openai-compatible'];
 
 export default function SettingsPage({ onClose }: Props) {
     const { t } = useTranslation();
-    const [config, setConfig] = useState<AiProviderConfig>(() => loadAiProviderConfig());
+    const [settings, setSettings] = useState<AiSettings>(() => loadAiSettings());
+    const [draftModel, setDraftModel] = useState<Record<string, string>>({});
     const [test, setTest] = useState<TestState>({ phase: 'idle' });
     const [saved, setSaved] = useState(false);
-    const apiKeyRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        setTimeout(() => apiKeyRef.current?.focus(), 30);
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
         };
@@ -40,45 +40,106 @@ export default function SettingsPage({ onClose }: Props) {
         return () => document.removeEventListener('keydown', onKey);
     }, [onClose]);
 
-    const handleProviderChange = (provider: AiProvider) => {
+    const dirty = () => {
         setTest({ phase: 'idle' });
         setSaved(false);
-        setConfig(prev => {
+    };
+
+    const patchEntry = (id: string, patch: (e: ProviderEntry) => ProviderEntry) => {
+        dirty();
+        setSettings(prev => ({
+            ...prev,
+            providers: prev.providers.map(e => (e.id === id ? patch(e) : e)),
+        }));
+    };
+
+    const changeProviderType = (id: string, provider: AiProvider) => {
+        patchEntry(id, e => {
             const defaults = AI_PROVIDER_DEFAULTS[provider];
-            // Only overwrite baseUrl/model if they still match another
-            // provider's default (or are empty), so we don't clobber a
-            // value the user typed by hand.
-            const isPreset = (field: 'baseUrl' | 'model', value: string) =>
-                value.trim() === '' ||
-                PROVIDERS.some(p => AI_PROVIDER_DEFAULTS[p][field] === value);
+            // Only overwrite baseUrl if it's empty or still matches a preset,
+            // so we don't clobber a value the user typed by hand.
+            const isPreset =
+                e.baseUrl.trim() === '' ||
+                PROVIDERS.some(p => AI_PROVIDER_DEFAULTS[p].baseUrl === e.baseUrl);
             return {
-                ...prev,
+                ...e,
                 provider,
-                baseUrl: isPreset('baseUrl', prev.baseUrl) ? defaults.baseUrl : prev.baseUrl,
-                model: isPreset('model', prev.model) ? defaults.model : prev.model,
+                baseUrl: isPreset ? defaults.baseUrl : e.baseUrl,
             };
         });
     };
 
-    const setField = (key: keyof AiProviderConfig, value: string) => {
-        setTest({ phase: 'idle' });
-        setSaved(false);
-        setConfig(prev => ({ ...prev, [key]: value }));
+    const addProvider = () => {
+        dirty();
+        setSettings(prev => ({
+            ...prev,
+            providers: [
+                ...prev.providers,
+                {
+                    id: newProviderId(),
+                    label: defaultLabel('openai'),
+                    provider: 'openai',
+                    apiKey: '',
+                    baseUrl: AI_PROVIDER_DEFAULTS.openai.baseUrl,
+                    models: [],
+                },
+            ],
+        }));
     };
 
-    const canSave = isAiConfigured(config);
+    const removeProvider = (id: string) => {
+        dirty();
+        setSettings(prev => ({
+            providers: prev.providers.filter(e => e.id !== id),
+            active: prev.active?.providerId === id ? null : prev.active,
+        }));
+    };
+
+    const addModel = (id: string) => {
+        const model = (draftModel[id] ?? '').trim();
+        if (!model) return;
+        patchEntry(id, e =>
+            e.models.includes(model) ? e : { ...e, models: [...e.models, model] },
+        );
+        setDraftModel(prev => ({ ...prev, [id]: '' }));
+    };
+
+    const removeModel = (id: string, model: string) => {
+        patchEntry(id, e => ({ ...e, models: e.models.filter(m => m !== model) }));
+    };
+
+    const canSave = settings.providers.some(p => p.models.length > 0 && p.baseUrl.trim());
 
     const handleSave = () => {
         if (!canSave) return;
-        saveAiProviderConfig(config);
+        let next = settings;
+        if (!next.active) {
+            const first = next.providers.find(p => p.models.length > 0);
+            if (first) {
+                next = { ...next, active: { providerId: first.id, model: first.models[0] } };
+            }
+        }
+        saveAiSettings(next);
+        setSettings(next);
         setSaved(true);
     };
 
-    const handleTest = async () => {
-        if (!canSave) return;
-        setTest({ phase: 'testing' });
+    const handleTest = async (entry: ProviderEntry) => {
+        if (!entry.models.length || !entry.baseUrl.trim()) return;
+        setSaved(false);
+        setTest({ phase: 'testing', id: entry.id });
+        const config: AiProviderConfig = {
+            provider: entry.provider,
+            apiKey: entry.apiKey,
+            baseUrl: entry.baseUrl,
+            model: entry.models[0],
+        };
         const result = await aiTestConnection(config);
-        setTest(result.ok ? { phase: 'ok' } : { phase: 'failed', error: result.error ?? '' });
+        setTest(
+            result.ok
+                ? { phase: 'ok', id: entry.id }
+                : { phase: 'failed', id: entry.id, error: result.error ?? '' },
+        );
     };
 
     return createPortal(
@@ -117,79 +178,211 @@ export default function SettingsPage({ onClose }: Props) {
                                 {t('settings.aiProvider')}
                             </div>
 
-                            <div className="modal-field">
-                                <label className="modal-field-label">
-                                    {t('settings.provider')}
-                                </label>
-                                <select
-                                    className="modal-input modal-select"
-                                    value={config.provider}
-                                    onChange={e =>
-                                        handleProviderChange(e.target.value as AiProvider)
-                                    }
-                                >
-                                    <option value="openai">{t('settings.providerOpenai')}</option>
-                                    <option value="claude">{t('settings.providerClaude')}</option>
-                                    <option value="openai-compatible">
-                                        {t('settings.providerCompatible')}
-                                    </option>
-                                </select>
-                                <div className="modal-field-hint">
-                                    {config.provider === 'openai'
-                                        ? t('settings.hintOpenai')
-                                        : config.provider === 'claude'
-                                          ? t('settings.hintClaude')
-                                          : t('settings.hintCompatible')}
+                            {settings.providers.map(entry => (
+                                <div key={entry.id} className="settings-provider-card">
+                                    <div className="settings-provider-head">
+                                        <div className="modal-field settings-provider-grow">
+                                            <label className="modal-field-label">
+                                                {t('settings.providerLabel')}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                className="modal-input"
+                                                value={entry.label}
+                                                onChange={e =>
+                                                    patchEntry(entry.id, p => ({
+                                                        ...p,
+                                                        label: e.target.value,
+                                                    }))
+                                                }
+                                                spellCheck={false}
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary settings-remove-provider"
+                                            onClick={() => removeProvider(entry.id)}
+                                            aria-label={t('settings.removeProvider')}
+                                            title={t('settings.removeProvider')}
+                                        >
+                                            <Trash2 size={13} />
+                                        </button>
+                                    </div>
+
+                                    <div className="modal-field">
+                                        <label className="modal-field-label">
+                                            {t('settings.provider')}
+                                        </label>
+                                        <select
+                                            className="modal-input modal-select"
+                                            value={entry.provider}
+                                            onChange={e =>
+                                                changeProviderType(
+                                                    entry.id,
+                                                    e.target.value as AiProvider,
+                                                )
+                                            }
+                                        >
+                                            <option value="openai">
+                                                {t('settings.providerOpenai')}
+                                            </option>
+                                            <option value="claude">
+                                                {t('settings.providerClaude')}
+                                            </option>
+                                            <option value="openai-compatible">
+                                                {t('settings.providerCompatible')}
+                                            </option>
+                                        </select>
+                                        <div className="modal-field-hint">
+                                            {entry.provider === 'openai'
+                                                ? t('settings.hintOpenai')
+                                                : entry.provider === 'claude'
+                                                  ? t('settings.hintClaude')
+                                                  : t('settings.hintCompatible')}
+                                        </div>
+                                    </div>
+
+                                    <div className="modal-field">
+                                        <label className="modal-field-label">
+                                            {t('settings.apiKey')}
+                                        </label>
+                                        <input
+                                            type="password"
+                                            className="modal-input"
+                                            value={entry.apiKey}
+                                            placeholder="••••••••"
+                                            onChange={e =>
+                                                patchEntry(entry.id, p => ({
+                                                    ...p,
+                                                    apiKey: e.target.value,
+                                                }))
+                                            }
+                                            spellCheck={false}
+                                            autoComplete="off"
+                                        />
+                                        {entry.provider === 'openai-compatible' ? (
+                                            <div className="modal-field-hint">
+                                                {t('settings.hintCompatible')}
+                                            </div>
+                                        ) : null}
+                                    </div>
+
+                                    <div className="modal-field">
+                                        <label className="modal-field-label">
+                                            {t('settings.baseUrl')}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            className="modal-input"
+                                            value={entry.baseUrl}
+                                            placeholder="https://api.openai.com"
+                                            onChange={e =>
+                                                patchEntry(entry.id, p => ({
+                                                    ...p,
+                                                    baseUrl: e.target.value,
+                                                }))
+                                            }
+                                            spellCheck={false}
+                                        />
+                                    </div>
+
+                                    <div className="modal-field settings-models">
+                                        <label className="modal-field-label">
+                                            {t('settings.models')}
+                                        </label>
+                                        {entry.models.length === 0 ? (
+                                            <div className="modal-field-hint">
+                                                {t('settings.noModels')}
+                                            </div>
+                                        ) : (
+                                            entry.models.map(model => (
+                                                <div key={model} className="settings-model-row">
+                                                    <span className="settings-model-name">
+                                                        {model}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-secondary settings-model-remove"
+                                                        onClick={() =>
+                                                            removeModel(entry.id, model)
+                                                        }
+                                                        aria-label={t('settings.removeProvider')}
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </div>
+                                            ))
+                                        )}
+                                        <div className="settings-model-add">
+                                            <input
+                                                type="text"
+                                                className="modal-input"
+                                                value={draftModel[entry.id] ?? ''}
+                                                placeholder={t('settings.modelPlaceholder')}
+                                                onChange={e =>
+                                                    setDraftModel(prev => ({
+                                                        ...prev,
+                                                        [entry.id]: e.target.value,
+                                                    }))
+                                                }
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        addModel(entry.id);
+                                                    }
+                                                }}
+                                                spellCheck={false}
+                                            />
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                onClick={() => addModel(entry.id)}
+                                            >
+                                                <Plus size={13} />
+                                                {t('settings.addModel')}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-provider-foot">
+                                        <button
+                                            type="button"
+                                            className="btn btn-secondary"
+                                            onClick={() => void handleTest(entry)}
+                                            disabled={
+                                                !entry.models.length ||
+                                                !entry.baseUrl.trim() ||
+                                                (test.phase === 'testing' && test.id === entry.id)
+                                            }
+                                        >
+                                            {test.phase === 'testing' && test.id === entry.id ? (
+                                                <Loader2 size={13} className="spin" />
+                                            ) : null}
+                                            {t('settings.test')}
+                                        </button>
+                                        {test.phase === 'ok' && test.id === entry.id ? (
+                                            <div className="settings-status settings-status-ok">
+                                                {t('settings.testOk')}
+                                            </div>
+                                        ) : test.phase === 'failed' && test.id === entry.id ? (
+                                            <div className="settings-status settings-status-error">
+                                                {t('settings.testFailed', { error: test.error })}
+                                            </div>
+                                        ) : null}
+                                    </div>
                                 </div>
-                            </div>
+                            ))}
 
-                            <div className="modal-field">
-                                <label className="modal-field-label">{t('settings.apiKey')}</label>
-                                <input
-                                    ref={apiKeyRef}
-                                    type="password"
-                                    className="modal-input"
-                                    value={config.apiKey}
-                                    placeholder="••••••••"
-                                    onChange={e => setField('apiKey', e.target.value)}
-                                    spellCheck={false}
-                                    autoComplete="off"
-                                />
-                            </div>
+                            <button
+                                type="button"
+                                className="btn btn-secondary settings-add-provider"
+                                onClick={addProvider}
+                            >
+                                <Plus size={13} />
+                                {t('settings.addProvider')}
+                            </button>
 
-                            <div className="modal-field">
-                                <label className="modal-field-label">{t('settings.baseUrl')}</label>
-                                <input
-                                    type="text"
-                                    className="modal-input"
-                                    value={config.baseUrl}
-                                    placeholder="https://api.openai.com"
-                                    onChange={e => setField('baseUrl', e.target.value)}
-                                    spellCheck={false}
-                                />
-                            </div>
-
-                            <div className="modal-field">
-                                <label className="modal-field-label">{t('settings.model')}</label>
-                                <input
-                                    type="text"
-                                    className="modal-input"
-                                    value={config.model}
-                                    placeholder="gpt-4o-mini"
-                                    onChange={e => setField('model', e.target.value)}
-                                    spellCheck={false}
-                                />
-                            </div>
-
-                            {test.phase === 'ok' ? (
-                                <div className="settings-status settings-status-ok">
-                                    {t('settings.testOk')}
-                                </div>
-                            ) : test.phase === 'failed' ? (
-                                <div className="settings-status settings-status-error">
-                                    {t('settings.testFailed', { error: test.error })}
-                                </div>
-                            ) : saved ? (
+                            {saved ? (
                                 <div className="settings-status settings-status-ok">
                                     {t('settings.savedConfirm')}
                                 </div>
@@ -199,17 +392,6 @@ export default function SettingsPage({ onClose }: Props) {
                 </div>
 
                 <footer className="modal-footer">
-                    <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => void handleTest()}
-                        disabled={!canSave || test.phase === 'testing'}
-                    >
-                        {test.phase === 'testing' ? (
-                            <Loader2 size={13} className="spin" />
-                        ) : null}
-                        {t('settings.test')}
-                    </button>
                     <button
                         type="button"
                         className="btn btn-primary"

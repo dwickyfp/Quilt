@@ -75,6 +75,10 @@
   },
   "chat": {
     "title": "Asisten AI Qunnie",
+    "history": "Riwayat",
+    "historyEmpty": "Belum ada chat tersimpan",
+    "newChat": "Chat baru",
+    "deleteChat": "Hapus chat",
     "localTag": "lokal",
     "checking": "Memeriksa mesin AI...",
     "installTitle": "Pasang Asisten AI Qunnie",
@@ -86,6 +90,12 @@
     "emptyHint": "Asisten mengeluarkan pipa Quilt yang dapat Anda klik untuk dimasukkan ke dalam kanvas.",
     "insertIntoCanvas": "Masukkan ke dalam kanvas",
     "thinking": "Berpikir...",
+    "model": "Model",
+    "agentMode": "Mode agen",
+    "stop": "Berhenti",
+    "skillUsed": "Skill dipakai",
+    "approve": "Setujui",
+    "reject": "Tolak",
     "placeholder": "Jelaskan apa yang perlu Anda lakukan",
     "sendAria": "Kirim",
     "sendTooltip": "Kirim (Enter)",
@@ -225,5 +235,14 @@
     "ok": "OKE",
     "colsSingular": "kol",
     "colsPlural": "kol"
+  },
+  "settings": {
+    "addProvider": "Tambah penyedia",
+    "removeProvider": "Hapus penyedia",
+    "models": "Model",
+    "addModel": "Tambah model",
+    "modelPlaceholder": "mis. gpt-4o-mini",
+    "providerLabel": "Label",
+    "noModels": "Belum ada model"
   }
 }
