@@ -71,7 +71,9 @@
       "devTools": "Alat Pengembang",
       "marketing": "Pemasaran",
       "communication": "Komunikasi"
-    }
+    },
+    "myComponents": "Komponen Saya",
+    "deleteComponent": "Hapus komponen"
   },
   "chat": {
     "title": "Asisten AI Qunnie",
@@ -150,9 +152,9 @@
     "copySqlDesc": "Kompilasi ke DuckDB SQL, salin ke clipboard",
     "exportSql": "Ekspor sebagai .sql",
     "exportSqlDesc": "Unduh SQL yang dikompilasi sebagai file",
-    "exportJson": "Ekspor sebagai .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Unduh node + edge sebagai JSON portabel",
-    "importJson": "Impor .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Buka JSON portabel sebagai saluran baru"
   },
   "properties": {

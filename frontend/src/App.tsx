@@ -1824,6 +1824,8 @@ export default function App() {
             <main className="workspace">
                 <LeftSidebar
                     repoItems={repo}
+                    savedComponents={savedComponents}
+                    onDeleteComponent={id => setSavedComponents(cs => cs.filter(c => c.id !== id))}
                     activeJobId={activeJobId}
                     openJobIds={openJobIds}
                     onOpenPipeline={handleOpenPipeline}

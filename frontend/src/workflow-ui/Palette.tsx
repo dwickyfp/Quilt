@@ -25,6 +25,9 @@ import {
 } from './palette-data';
 import ComponentIcon from './ComponentIcon';
 
+/** A saved reusable component, shown in the palette's "My Components" group. */
+export type PaletteSavedComponent = { id: string; label: string };
+
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
     sources: <ArrowDownToLine size={13} />,
     transforms: <Workflow size={13} />,
@@ -99,7 +102,10 @@ const GROUP_LABEL_KEY: Record<string, string> = {
     'Communication': 'palette.groups.communication',
 };
 
-export default function Palette() {
+export default function Palette({ savedComponents = [], onDeleteComponent }: {
+    savedComponents?: PaletteSavedComponent[];
+    onDeleteComponent?: (id: string) => void;
+}) {
     const { t } = useTranslation();
     const [query, setQuery] = useState('');
     const [expanded, setExpanded] = useState<Set<string>>(DEFAULT_EXPANDED);
@@ -191,6 +197,50 @@ export default function Palette() {
             </div>
 
             <div className="palette-body">
+                {savedComponents.length > 0 && !q ? (
+                    <div className="palette-category">
+                        <div className="palette-category-body">
+                            <div className="palette-group">
+                                <div className="palette-group-label">{t('palette.myComponents')}</div>
+                                {savedComponents.map(sc => (
+                                    <div
+                                        key={sc.id}
+                                        className="palette-component is-available"
+                                        draggable
+                                        onDragStart={e =>
+                                            onDragStart(e, {
+                                                id: sc.id,
+                                                label: sc.label,
+                                                kind: 'transform',
+                                                availability: 'available',
+                                            })
+                                        }
+                                        title={sc.label}
+                                    >
+                                        <ComponentIcon
+                                            componentId={sc.id}
+                                            kind="transform"
+                                            size={15}
+                                            className="palette-component-icon"
+                                        />
+                                        <span className="palette-component-label">{sc.label}</span>
+                                        {onDeleteComponent ? (
+                                            <button
+                                                type="button"
+                                                className="palette-component-del"
+                                                onClick={() => onDeleteComponent(sc.id)}
+                                                aria-label={t('palette.deleteComponent')}
+                                                title={t('palette.deleteComponent')}
+                                            >
+                                                <X size={11} />
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
                 {filtered.length === 0 ? (
                     <div className="palette-empty">
                         {t('palette.noMatch')} <span className="quote">{query}</span>

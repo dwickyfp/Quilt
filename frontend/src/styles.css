@@ -621,6 +621,32 @@ textarea:focus-visible {
     cursor: grabbing;
 }
 
+/* Saved "My Components": label grows so the delete button sits flush right,
+   and the button only shows on hover to keep the row clean. */
+.palette-component-del {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    padding: 2px;
+    border: none;
+    background: transparent;
+    color: var(--text-3);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 60ms ease, background 60ms ease, color 60ms ease;
+}
+
+.palette-component:hover .palette-component-del {
+    opacity: 1;
+}
+
+.palette-component-del:hover {
+    background: var(--bg-3);
+    color: var(--danger, #e5484d);
+}
+
 .palette-component.is-planned {
     color: var(--text-3);
 }

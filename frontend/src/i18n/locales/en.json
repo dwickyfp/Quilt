@@ -48,9 +48,9 @@
     "copySqlDesc": "Compile to DuckDB SQL, copy to clipboard",
     "exportSql": "Export as .sql",
     "exportSqlDesc": "Download the compiled SQL as a file",
-    "exportJson": "Export as .quilt.json",
+    "exportJson": "Export",
     "exportJsonDesc": "Download nodes + edges as portable JSON",
-    "importJson": "Import .quilt.json...",
+    "importJson": "Import",
     "importJsonDesc": "Open a portable JSON as a new pipeline"
   },
   "palette": {
@@ -111,7 +111,9 @@
       "devTools": "Dev Tools",
       "marketing": "Marketing",
       "communication": "Communication"
-    }
+    },
+    "myComponents": "My Components",
+    "deleteComponent": "Delete component"
   },
   "chat": {
     "title": "Qunnie AI Assistant",

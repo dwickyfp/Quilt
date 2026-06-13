@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Boxes, FolderTree } from 'lucide-react';
-import Palette from './Palette';
+import Palette, { type PaletteSavedComponent } from './Palette';
 import ProjectTree from './ProjectTree';
 import type { RepoItem } from '../repo-types';
 
@@ -9,6 +9,8 @@ type SideTab = 'project' | 'palette';
 
 type Props = {
     repoItems: RepoItem[];
+    savedComponents: PaletteSavedComponent[];
+    onDeleteComponent: (id: string) => void;
     activeJobId: string;
     openJobIds: Set<string>;
     onOpenPipeline: (id: string) => void;
@@ -29,6 +31,8 @@ type Props = {
 
 export default function LeftSidebar({
     repoItems,
+    savedComponents,
+    onDeleteComponent,
     activeJobId,
     openJobIds,
     onOpenPipeline,
@@ -75,7 +79,7 @@ export default function LeftSidebar({
             </div>
             <div className="left-sidebar-body">
                 {tab === 'palette' ? (
-                    <Palette />
+                    <Palette savedComponents={savedComponents} onDeleteComponent={onDeleteComponent} />
                 ) : (
                     <ProjectTree
                         items={repoItems}
