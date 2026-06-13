@@ -12,7 +12,7 @@ import {
     type OnSelectionChangeParams,
 } from '@xyflow/react';
 import type { ConnectionType } from './canvas/connection-types';
-import { Braces, FolderOpen, GitBranch, Moon, Sparkles, Sun } from 'lucide-react';
+import { Braces, FolderOpen, GitBranch, Moon, Settings, Sparkles, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import LanguageSelector from './i18n/LanguageSelector';
 import { UpdateBanner } from './UpdateBanner';
@@ -38,6 +38,7 @@ import { ClaudeIcon } from './workflow-ui/ClaudeIcon';
 import { QuiltLogo } from './workflow-ui/QuiltLogo';
 import EngineSetupModal from './workflow-ui/EngineSetupModal';
 import ChatPanel from './workflow-ui/ChatPanel';
+import SettingsPage from './workflow-ui/SettingsPage';
 import GitPanel from './workflow-ui/GitPanel';
 import CiStatusBadge from './workflow-ui/CiStatusBadge';
 import WindowControls from './workflow-ui/WindowControls';
@@ -223,6 +224,7 @@ export default function App() {
         () => (isInTauri() ? 'checking' : 'ready'),
     );
     const [showChatPanel, setShowChatPanel] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
     const [showGitPanel, setShowGitPanel] = useState(false);
 
     useEffect(() => {
@@ -1707,6 +1709,15 @@ export default function App() {
                 <button
                     type="button"
                     className="topbar-theme-toggle"
+                    onClick={() => setShowSettings(true)}
+                    title={t('topbar.settings')}
+                    aria-label={t('topbar.settingsAria')}
+                >
+                    <Settings size={14} />
+                </button>
+                <button
+                    type="button"
+                    className="topbar-theme-toggle"
                     onClick={toggleTheme}
                     title={theme === 'dark' ? t('topbar.switchLight') : t('topbar.switchDark')}
                     aria-label={t('topbar.themeAriaToggle')}
@@ -1829,8 +1840,14 @@ export default function App() {
                 <ChatPanel
                     onClose={() => setShowChatPanel(false)}
                     onInsertPipeline={handleInsertAiPipeline}
+                    onOpenSettings={() => {
+                        setShowChatPanel(false);
+                        setShowSettings(true);
+                    }}
                 />
             ) : null}
+
+            {showSettings ? <SettingsPage onClose={() => setShowSettings(false)} /> : null}
 
             {showGitPanel && workspacePathState ? (
                 <GitPanel

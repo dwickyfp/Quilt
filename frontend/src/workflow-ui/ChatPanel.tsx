@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, Loader2, Send, Sparkles, X, Workflow } from 'lucide-react';
+import { Loader2, Send, Settings, Sparkles, X, Workflow } from 'lucide-react';
 import {
     chatExtractPipeline,
     chatSend,
-    engineInstall,
-    engineStatus,
     type ChatMessage,
-    type EngineStatus,
-    type InstallProgress,
 } from '../tauri-bridge';
+import { isAiConfigured, loadAiProviderConfig, type AiProviderConfig } from '../ai-provider';
 
 type Props = {
     onClose: () => void;
     onInsertPipeline: (pipeline: unknown) => void;
+    onOpenSettings: () => void;
 };
 
 type Bubble = ChatMessage & {
@@ -23,12 +21,11 @@ type Bubble = ChatMessage & {
     pipeline?: unknown;
 };
 
-type SetupState =
-    | { phase: 'checking' }
-    | { phase: 'not-installed'; engine: EngineStatus }
-    | { phase: 'installing'; progress: InstallProgress | null }
-    | { phase: 'ready' }
-    | { phase: 'install-failed'; error: string };
+const PROVIDER_LABELS: Record<AiProviderConfig['provider'], string> = {
+    openai: 'OpenAI',
+    claude: 'Claude',
+    'openai-compatible': 'OpenAI-compatible',
+};
 
 const EXAMPLE_PROMPTS = [
     'Read orders.csv, filter where status = "shipped", write to shipped.parquet',
@@ -36,51 +33,27 @@ const EXAMPLE_PROMPTS = [
     'Embed the description column with OpenAI and dedupe near-duplicates',
 ];
 
-export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
+export default function ChatPanel({ onClose, onInsertPipeline, onOpenSettings }: Props) {
     const { t } = useTranslation();
-    const [setup, setSetup] = useState<SetupState>({ phase: 'checking' });
+    const [config, setConfig] = useState<AiProviderConfig>(() => loadAiProviderConfig());
     const [messages, setMessages] = useState<Bubble[]>([]);
     const [draft, setDraft] = useState('');
     const [busy, setBusy] = useState(false);
     const scrollRef = useRef<HTMLDivElement | null>(null);
 
-    // Detect the AI engine on mount so we can either show the chat
-    // UI or a clear install card. Without this the user clicks Send
-    // and gets a cryptic spawn error.
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            const list = await engineStatus();
-            const llama = list.find(e => e.id === 'llamacpp');
-            if (cancelled) return;
-            if (!llama) {
-                setSetup({ phase: 'install-failed', error: 'AI engine not registered.' });
-                return;
-            }
-            setSetup(llama.installed
-                ? { phase: 'ready' }
-                : { phase: 'not-installed', engine: llama });
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    const configured = isAiConfigured(config);
 
-    const installEngine = useCallback(async () => {
-        setSetup({ phase: 'installing', progress: null });
-        try {
-            await engineInstall('llamacpp', p => {
-                setSetup({ phase: 'installing', progress: p });
-            });
-            setSetup({ phase: 'ready' });
-        } catch (err) {
-            setSetup({ phase: 'install-failed', error: String(err) });
-        }
+    // Re-read the config whenever the panel regains focus, so a key
+    // just entered in Settings takes effect without a remount.
+    useEffect(() => {
+        const refresh = () => setConfig(loadAiProviderConfig());
+        window.addEventListener('focus', refresh);
+        return () => window.removeEventListener('focus', refresh);
     }, []);
 
     const send = useCallback(async (text?: string) => {
         const body = (text ?? draft).trim();
-        if (!body || busy || setup.phase !== 'ready') return;
+        if (!body || busy || !configured) return;
         if (!text) setDraft('');
         const userMsg: Bubble = { role: 'user', content: body };
         setMessages(prev => [...prev, userMsg, { role: 'assistant', content: '', streaming: true }]);
@@ -89,7 +62,7 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
             ...messages.map(m => ({ role: m.role, content: m.content })),
             { role: 'user', content: body },
         ];
-        await chatSend(history, ev => {
+        await chatSend(history, config, ev => {
             if (ev.kind === 'token') {
                 setMessages(prev => {
                     const out = prev.slice();
@@ -138,7 +111,7 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
                 setBusy(false);
             }
         });
-    }, [draft, busy, messages, setup.phase]);
+    }, [draft, busy, messages, config, configured]);
 
     // Esc closes the panel.
     useEffect(() => {
@@ -161,8 +134,13 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
                 <div className="chat-panel-title">
                     <Sparkles size={14} aria-hidden="true" />
                     <span>{t('chat.title')}</span>
-                    {setup.phase === 'ready' ? (
-                        <span className="chat-panel-tag">{t('chat.localTag')}</span>
+                    {configured ? (
+                        <span className="chat-panel-tag">
+                            {t('chat.providerTag', {
+                                provider: PROVIDER_LABELS[config.provider],
+                                model: config.model,
+                            })}
+                        </span>
                     ) : null}
                 </div>
                 <button
@@ -176,29 +154,20 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
                 </button>
             </header>
 
-            {setup.phase === 'checking' ? (
-                <div className="chat-panel-state">
-                    <Loader2 size={18} className="spin" />
-                    <span>{t('chat.checking')}</span>
-                </div>
-            ) : setup.phase === 'not-installed' ? (
-                <SetupCard
-                    title={t('chat.installTitle')}
-                    body={t('chat.installBody')}
-                    cta={t('chat.installCta')}
-                    onCta={installEngine}
-                />
-            ) : setup.phase === 'install-failed' ? (
-                <SetupCard
-                    title={t('chat.installFailedTitle')}
-                    body={setup.error}
-                    cta={t('chat.retry')}
-                    onCta={installEngine}
-                />
-            ) : setup.phase === 'installing' ? (
-                <div className="chat-panel-state chat-panel-state-install">
-                    <Loader2 size={18} className="spin" />
-                    <InstallProgressView progress={setup.progress} />
+            {!configured ? (
+                <div className="chat-panel-setup">
+                    <div className="chat-panel-setup-icon">
+                        <Sparkles size={20} />
+                    </div>
+                    <div className="chat-panel-setup-title">{t('chat.notConfiguredTitle')}</div>
+                    <div className="chat-panel-setup-body">{t('chat.notConfiguredBody')}</div>
+                    <button
+                        type="button"
+                        className="chat-panel-setup-cta"
+                        onClick={onOpenSettings}
+                    >
+                        <Settings size={14} /> {t('chat.openSettings')}
+                    </button>
                 </div>
             ) : (
                 <>
@@ -280,90 +249,5 @@ export default function ChatPanel({ onClose, onInsertPipeline }: Props) {
                 </>
             )}
         </aside>
-    );
-}
-
-function SetupCard({
-    title,
-    body,
-    cta,
-    onCta,
-}: {
-    title: string;
-    body: string;
-    cta: string;
-    onCta: () => void;
-}) {
-    return (
-        <div className="chat-panel-setup">
-            <div className="chat-panel-setup-icon">
-                <Sparkles size={20} />
-            </div>
-            <div className="chat-panel-setup-title">{title}</div>
-            <div className="chat-panel-setup-body">{body}</div>
-            <button type="button" className="chat-panel-setup-cta" onClick={onCta}>
-                <Download size={14} /> {cta}
-            </button>
-            <div className="chat-panel-setup-foot">
-                Runs on your CPU. No data leaves your machine.
-            </div>
-        </div>
-    );
-}
-
-function InstallProgressView({ progress }: { progress: InstallProgress | null }) {
-    if (!progress) return <span>Starting download...</span>;
-    let label = '';
-    let pct: number | null = null;
-    switch (progress.phase) {
-        case 'downloading': {
-            const mb = (progress.received / 1_000_000).toFixed(0);
-            if (progress.total) {
-                pct = Math.round((progress.received / progress.total) * 100);
-                const totalMb = (progress.total / 1_000_000).toFixed(0);
-                label = `Downloading server ${mb} / ${totalMb} MB`;
-            } else {
-                label = `Downloading server ${mb} MB`;
-            }
-            break;
-        }
-        case 'extracting':
-            label = 'Extracting...';
-            break;
-        case 'verifying':
-            label = 'Verifying...';
-            break;
-        case 'downloading_model': {
-            const mb = (progress.received / 1_000_000).toFixed(0);
-            if (progress.total) {
-                pct = Math.round((progress.received / progress.total) * 100);
-                const totalMb = (progress.total / 1_000_000).toFixed(0);
-                label = `Downloading model ${mb} / ${totalMb} MB`;
-            } else {
-                label = `Downloading model ${mb} MB`;
-            }
-            break;
-        }
-        case 'installing_extension':
-            label = `Installing extensions (${progress.index}/${progress.total})`;
-            break;
-        case 'done':
-            label = 'Ready';
-            break;
-        case 'failed':
-            label = progress.error;
-            break;
-    }
-    return (
-        <div className="chat-panel-install-progress">
-            <div className="chat-panel-install-bar">
-                <div
-                    className="chat-panel-install-fill"
-                    style={{ width: pct != null ? `${pct}%` : '30%' }}
-                    data-indeterminate={pct == null}
-                />
-            </div>
-            <div className="chat-panel-install-label">{label}</div>
-        </div>
     );
 }

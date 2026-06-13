@@ -10,6 +10,8 @@
     "switchLight": "Switch to light mode",
     "switchDark": "Switch to dark mode",
     "themeAriaToggle": "Toggle theme",
+    "settings": "Settings",
+    "settingsAria": "Open settings",
     "runtime": "runtime: {{name}}",
     "languageAriaLabel": "Choose language"
   },
@@ -111,13 +113,10 @@
   },
   "chat": {
     "title": "Duckie AI Assistant",
-    "localTag": "local",
-    "checking": "Checking AI engine...",
-    "installTitle": "Install the Duckie AI Assistant",
-    "installBody": "Quilt downloads a small local model (~1.1 GB) so the assistant runs entirely on your machine - no API keys, no cloud calls.",
-    "installCta": "Install (~1.1 GB)",
-    "installFailedTitle": "Install failed",
-    "retry": "Retry",
+    "providerTag": "{{provider}} · {{model}}",
+    "notConfiguredTitle": "Configure an AI provider",
+    "notConfiguredBody": "Choose an AI provider and add your API key in Settings to start chatting.",
+    "openSettings": "Open Settings",
     "emptyTitle": "Describe a pipeline",
     "emptyHint": "The assistant outputs a Quilt pipeline you can click to insert into the canvas.",
     "insertIntoCanvas": "Insert into canvas",
@@ -215,5 +214,26 @@
     "loading": "Loading...",
     "error": "Error",
     "success": "Success"
+  },
+  "settings": {
+    "title": "Settings",
+    "navAiProvider": "AI Provider",
+    "aiProvider": "AI Provider",
+    "provider": "Provider",
+    "apiKey": "API key",
+    "baseUrl": "Base URL",
+    "model": "Model",
+    "providerOpenai": "OpenAI",
+    "providerClaude": "Claude",
+    "providerCompatible": "OpenAI-compatible",
+    "hintOpenai": "Uses the OpenAI chat completions API. Get a key at platform.openai.com.",
+    "hintClaude": "Uses the Anthropic Messages API. Get a key at console.anthropic.com.",
+    "hintCompatible": "Any server exposing an OpenAI-compatible /v1/chat/completions endpoint (Ollama, LM Studio, vLLM, OpenRouter, etc.).",
+    "test": "Test connection",
+    "testOk": "Connection successful.",
+    "testFailed": "Connection failed: {{error}}",
+    "savedConfirm": "Settings saved.",
+    "save": "Save",
+    "cancel": "Cancel"
   }
 }

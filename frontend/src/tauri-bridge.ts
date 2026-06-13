@@ -1,5 +1,6 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { isTauri } from './tauri-dialog';
+import type { AiProviderConfig } from './ai-provider';
 import type { Column } from './pipeline-types';
 import type { Edge, Node } from '@xyflow/react';
 import type { QuiltNodeData } from './pipeline-types';
@@ -245,9 +246,6 @@ export type InstallProgress =
     | { phase: 'extracting' }
     | { phase: 'verifying' }
     | { phase: 'installing_extension'; name: string; index: number; total: number }
-    // llamacpp only: separate progress phase for the Qwen GGUF model
-    // (~1.1 GB, much larger than the binary itself).
-    | { phase: 'downloading_model'; received: number; total?: number }
     | { phase: 'done'; path: string }
     // Set by the frontend on a caught install error (the Rust command
     // returns Err rather than streaming this).
@@ -272,7 +270,7 @@ export async function engineInstall(
     return await invoke<string>('engine_install', { engine, onProgress: channel });
 }
 
-// ---- AI Chat (local Qwen via llama-server) -----------------------------
+// ---- AI Chat (hosted provider: OpenAI / Claude / OpenAI-compatible) -----
 
 export type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string };
 
@@ -282,11 +280,12 @@ export type ChatEvent =
     | { kind: 'error'; message: string };
 
 /**
- * Send a chat conversation to the local Qwen model. Tokens stream
+ * Send a chat conversation to the configured AI provider. Tokens stream
  * back via `onEvent`. The system prompt is added by the backend.
  */
 export async function chatSend(
     history: ChatMessage[],
+    config: AiProviderConfig,
     onEvent: (e: ChatEvent) => void,
 ): Promise<void> {
     if (!isTauri()) {
@@ -296,9 +295,40 @@ export async function chatSend(
     const channel = new Channel<ChatEvent>();
     channel.onmessage = onEvent;
     try {
-        await invoke('chat_send', { history, onEvent: channel });
+        await invoke('chat_send', {
+            history,
+            provider: config.provider,
+            apiKey: config.apiKey,
+            baseUrl: config.baseUrl,
+            model: config.model,
+            onEvent: channel,
+        });
     } catch (err) {
         onEvent({ kind: 'error', message: String(err) });
+    }
+}
+
+/**
+ * Probe the configured provider with one minimal request. Returns
+ * `{ ok: true }` on success or `{ ok: false, error }` with a readable
+ * message the Settings page can surface inline.
+ */
+export async function aiTestConnection(
+    config: AiProviderConfig,
+): Promise<{ ok: boolean; error?: string }> {
+    if (!isTauri()) {
+        return { ok: false, error: 'Only available in the desktop app.' };
+    }
+    try {
+        await invoke('ai_test_connection', {
+            provider: config.provider,
+            apiKey: config.apiKey,
+            baseUrl: config.baseUrl,
+            model: config.model,
+        });
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, error: String(err) };
     }
 }
 

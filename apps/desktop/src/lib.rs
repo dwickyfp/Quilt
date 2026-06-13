@@ -19,15 +19,15 @@ use tauri::ipc::Channel;
 use tauri::Manager;
 use tracing_subscriber::EnvFilter;
 
+mod ai_chat;
 mod ci_status;
 mod dbt_engine;
 mod engine_manager;
-mod llama_chat;
 mod secrets;
 mod update_check;
 mod workspace_git;
+use ai_chat::{ChatEvent, ChatMessage};
 use engine_manager::{EngineStatus, InstallProgress};
-use llama_chat::{ChatEvent, ChatMessage};
 
 /// The headless quilt-runner, embedded at compile time (apps/desktop/build.rs
 /// stages a freshly built runner and points QUILT_EMBEDDED_RUNNER at it).
@@ -147,6 +147,7 @@ pub fn run() {
             dbt_status,
             dbt_install,
             chat_send,
+            ai_test_connection,
             chat_extract_pipeline,
             workspace_git_status,
             workspace_git_init,
@@ -533,45 +534,57 @@ async fn dbt_install(app: tauri::AppHandle) -> Result<String, String> {
 
 // ---- AI chat assistant -------------------------------------------------
 
-/// Send a message to the local Qwen model and stream tokens back over
-/// the `on_event` channel. Lazy-boots `llama-server` on the first call
-/// of an app run; reuses the same subprocess for subsequent calls.
+/// Send a message to the configured AI provider (OpenAI / Claude /
+/// OpenAI-compatible) and stream tokens back over the `on_event`
+/// channel. The system prompt is prepended by the backend.
 #[tauri::command]
 async fn chat_send(
-    app: tauri::AppHandle,
     history: Vec<ChatMessage>,
+    provider: String,
+    api_key: String,
+    base_url: String,
+    model: String,
     on_event: Channel<ChatEvent>,
 ) -> Result<(), String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let bin = engine_manager::llamacpp_path(&dir);
-    let model = engine_manager::llama_model_path(&dir);
     tokio::task::spawn_blocking(move || {
-        // Lazy boot: hold the mutex only long enough to check + spawn.
-        let port = {
-            let mut guard = llama_chat::LLAMA_SERVER.lock().unwrap();
-            if guard.is_none() {
-                match llama_chat::LlamaServer::spawn(&bin, &model) {
-                    Ok(srv) => {
-                        let p = srv.port();
-                        *guard = Some(srv);
-                        p
-                    }
-                    Err(e) => {
-                        let _ = on_event.send(ChatEvent::Error { message: e.clone() });
-                        return Err(e);
-                    }
-                }
-            } else {
-                guard.as_ref().unwrap().port()
+        let provider = match ai_chat::Provider::parse(&provider) {
+            Ok(p) => p,
+            Err(e) => {
+                let _ = on_event.send(ChatEvent::Error { message: e.clone() });
+                return Err(e);
             }
         };
-        if let Err(e) = llama_chat::chat_stream(port, &history, |evt| {
-            let _ = on_event.send(evt);
-        }) {
+        if let Err(e) = ai_chat::chat_stream(
+            provider,
+            &api_key,
+            &base_url,
+            &model,
+            &history,
+            |evt| {
+                let _ = on_event.send(evt);
+            },
+        ) {
             let _ = on_event.send(ChatEvent::Error { message: e.clone() });
             return Err(e);
         }
         Ok::<(), String>(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Probe the configured provider with one minimal request so the
+/// Settings page can show a "connection successful / failed" result.
+#[tauri::command]
+async fn ai_test_connection(
+    provider: String,
+    api_key: String,
+    base_url: String,
+    model: String,
+) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        let provider = ai_chat::Provider::parse(&provider)?;
+        ai_chat::test_connection(provider, &api_key, &base_url, &model)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -582,7 +595,7 @@ async fn chat_send(
 /// Returns the parsed JSON for the frontend to merge into the canvas.
 #[tauri::command]
 fn chat_extract_pipeline(text: String) -> Result<JsonValue, String> {
-    llama_chat::extract_pipeline(&text)
+    ai_chat::extract_pipeline(&text)
 }
 
 // ---- In-app Git integration -------------------------------------------
