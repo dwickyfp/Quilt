@@ -3214,25 +3214,28 @@ pub(crate) fn db_attach(props: &JsonValue, extension: &str, default_port: u64, r
         .filter(|p| *p > 0)
         .unwrap_or(default_port);
     let db_key = if extension == "postgres" { "dbname" } else { "database" };
-    // Each value is single-quoted with libpq escaping so a value containing a
-    // space or special char can't inject extra `key=value` params (e.g. a
-    // password of `x sslmode=disable` downgrading TLS, or a host of
-    // `evil.com port=5432` redirecting the connection).
+    // Each value is quoted so a value containing a space or special char can't
+    // inject extra `key=value` params (e.g. a password of `x sslmode=disable`
+    // downgrading TLS, or a host of `evil.com port=5432` redirecting the
+    // connection). Postgres uses libpq single-quote escaping; the MySQL
+    // extension does not strip libpq quotes, so it uses double-quote escaping
+    // (both verified injection-safe against a live server).
+    let q: fn(&str) -> String = if extension == "postgres" { libpq_quote } else { mysql_quote };
     let mut parts = vec![
-        format!("host={}", libpq_quote(&host)),
+        format!("host={}", q(&host)),
         format!("port={}", port),
     ];
     if let Some(db) = string_prop(props, "database").filter(|s| !s.is_empty()) {
-        parts.push(format!("{}={}", db_key, libpq_quote(&db)));
+        parts.push(format!("{}={}", db_key, q(&db)));
     }
     if let Some(u) = string_prop(props, "user")
         .or_else(|| string_prop(props, "username"))
         .filter(|s| !s.is_empty())
     {
-        parts.push(format!("user={}", libpq_quote(&u)));
+        parts.push(format!("user={}", q(&u)));
     }
     if let Some(p) = string_prop(props, "password").filter(|s| !s.is_empty()) {
-        parts.push(format!("password={}", libpq_quote(&p)));
+        parts.push(format!("password={}", q(&p)));
     }
     let connstr = parts.join(" ");
     let (alias, mode) = if read_only {
@@ -5508,6 +5511,17 @@ pub(crate) fn quote_ident(s: &str) -> String {
 /// value can't introduce additional whitespace-separated parameters.
 pub(crate) fn libpq_quote(s: &str) -> String {
     format!("'{}'", s.replace('\\', "\\\\").replace('\'', "\\'"))
+}
+
+/// Quote a value for the DuckDB MySQL extension's `key=value` connection
+/// string. Unlike libpq, the MySQL parser does NOT strip libpq single-quotes
+/// (it would treat `'127.0.0.1'` as a host literally named with quotes), but it
+/// DOES honor double-quoted values: spaces inside `"..."` stay part of the one
+/// value (so no extra `key=value` param can be injected), and embedded `"` / `\`
+/// are backslash-escaped. Verified empirically against MySQL 8.4 via the
+/// DuckDB CLI.
+pub(crate) fn mysql_quote(s: &str) -> String {
+    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 /// Percent-encode a value for use inside a URL component (the MotherDuck
