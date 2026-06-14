@@ -128,21 +128,20 @@ Everything below is the full capability surface, kept intact and current.
 
 ## How it works
 
-From an empty folder to clean data on disk in five steps. The graph you draw compiles to plain SQL and runs on a real columnar engine — locally, with a live preview on every node.
+Quilt is a dataflow engine with a visual front end. Data moves left to right: pull from any **source**, reshape it by **drawing and wiring nodes** on a canvas, let Quilt compile that graph to SQL and execute it on **DuckDB**, then land the result in any **target** — all on your machine, no servers.
 
 <div align="center">
-<img src="docs/assets/how-it-works.svg" alt="How Quilt works: open a workspace, design on the canvas or via Qunnie, compile to SQL, run on DuckDB, then land and ship" width="100%"/>
+<img src="docs/assets/how-it-works.svg" alt="Sources flow into a canvas of wired nodes, compile to SQL, execute on the DuckDB engine, and land in targets" width="100%"/>
 </div>
 
-| Step | What happens | Why it matters |
-|---|---|---|
-| **1 · Open workspace** | Pick a folder. Pipelines, connections, context variables, and routines persist as plain JSON / Markdown files. | Diff them, branch them, review them — your data work is version-controllable from day one. |
-| **2 · Design** | Drag sources → transforms → validators → sinks onto the canvas and wire them, **or** describe the pipeline in plain English and let Qunnie build it. | Two ways in: visual for control, AI for speed. Both produce the same auditable graph. |
-| **3 · Compile** | Quilt compiles the graph to readable SQL, surfaced on every node's **Plan** tab. | No black box. You can read exactly what will run before it runs. |
-| **4 · Run** | DuckDB executes locally — vectorized, columnar, native speed — lighting up nodes stage by stage with live row counts and real mid-query cancel. | A job that crawls in a spreadsheet finishes in milliseconds, fully offline. |
-| **5 · Land & ship** | Write to files, databases, object storage, or vector stores. Save the pipeline, attach a schedule, or build it into one self-contained binary for a server. | The same pipeline goes from laptop to production with no rewrite. |
+| Stage | What happens |
+|---|---|
+| **Source** | Read from 290+ connectors — files, databases, cloud object stores, REST / GraphQL APIs, streaming brokers, NoSQL, vector DBs. Each source becomes a node on the canvas. |
+| **Draw & wire nodes** | Drag sources, transforms, validators, and sinks onto the canvas and connect their ports. Every node has a live **Preview** and the **SQL** it generates — zero hidden state. (Or describe it to Qunnie and let the AI draw the graph for you.) |
+| **DuckDB engine** | Quilt compiles the wired graph to plain SQL and runs it through DuckDB: vectorized, columnar, native speed, fully offline. Nodes light up stage by stage with live row counts; cancel mid-query at any time. |
+| **Target** | Write to 58 sinks — files, databases, cloud, or vector / AI stores — with append / overwrite / upsert and CDC delete propagation. Then save the pipeline, attach a schedule, or build it into one self-contained binary for a server. |
 
-Throughout steps 3–4, the **Preview** tab shows a live row sample and the generated SQL for whatever node you select — zero hidden state.
+The same graph runs identically from your laptop to a scheduled job to a server binary — no rewrite, no translation layer.
 
 ---
 
@@ -151,6 +150,10 @@ Throughout steps 3–4, the **Preview** tab shows a live row sample and the gene
 > Describe what you need. Qunnie builds, inspects, and fixes the pipeline with you.
 
 The sidebar on the right is **Qunnie**, Quilt's built-in AI assistant. It ships fully local - powered by **Qwen 2.5 Coder 1.5B** through **llama.cpp**, downloaded once (~1.1 GB) and run entirely on your CPU - and it can also drive any model you point it at. Ask in plain English; Qunnie can answer, generate a pipeline, modify the graph you already have, or work a multi-step task as an agent.
+
+<div align="center">
+<img src="docs/assets/qunnie-flow.svg" alt="Ask Qunnie in plain English; it builds, compiles, runs, and lands the pipeline with a human-in-the-loop approval step" width="100%"/>
+</div>
 
 ### Multiple providers, multiple models
 
