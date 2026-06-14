@@ -10,6 +10,9 @@
     "switchDark": "Beralih ke mode gelap",
     "themeAriaToggle": "Alihkan tema",
     "runtime": "waktu proses: {{name}}",
+    "runtimeLive": "Aktif",
+    "runtimeOffline": "Luring",
+    "runtimeConnecting": "Menghubungkan…",
     "languageAriaLabel": "Pilih bahasa"
   },
   "palette": {

@@ -1937,7 +1937,14 @@ export default function App() {
                     {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
                 </button>
                 <div className="status" data-state={runtime}>
-                    <span className="status-dot" /> {t('topbar.runtime', { name: runtime })}
+                    <span className="status-dot" aria-hidden="true" />
+                    <span className="status-label">
+                        {runtime === 'ready'
+                            ? t('topbar.runtimeLive', { defaultValue: 'Live' })
+                            : runtime === 'offline'
+                              ? t('topbar.runtimeOffline', { defaultValue: 'Offline' })
+                              : t('topbar.runtimeConnecting', { defaultValue: 'Connecting…' })}
+                    </span>
                 </div>
                 <WindowControls side="right" />
             </header>

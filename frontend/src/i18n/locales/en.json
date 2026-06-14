@@ -12,6 +12,9 @@
     "settings": "Settings",
     "settingsAria": "Open settings",
     "runtime": "runtime: {{name}}",
+    "runtimeLive": "Live",
+    "runtimeOffline": "Offline",
+    "runtimeConnecting": "Connecting…",
     "languageAriaLabel": "Choose language"
   },
   "sidebar": {

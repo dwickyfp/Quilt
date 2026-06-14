@@ -376,11 +376,24 @@ textarea:focus-visible {
     height: 8px;
     border-radius: 50%;
     background: var(--text-3);
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.status-label {
+    font-weight: 600;
+    letter-spacing: 0.01em;
 }
 
 .status[data-state='ready'] .status-dot {
-    background: var(--accent-source);
-    box-shadow: 0 0 0 2px rgba(46, 175, 255, 0.15);
+    background: #22c55e;
+    box-shadow:
+        0 0 0 3px rgba(34, 197, 94, 0.18),
+        0 0 8px 1px rgba(34, 197, 94, 0.65);
+    animation: status-pulse 2s ease-in-out infinite;
+}
+
+.status[data-state='ready'] .status-label {
+    color: #22c55e;
 }
 
 .status[data-state='connecting'] .status-dot {
@@ -390,7 +403,33 @@ textarea:focus-visible {
 
 .status[data-state='offline'] .status-dot {
     background: var(--danger);
-    box-shadow: 0 0 0 2px rgba(248, 81, 73, 0.15);
+    box-shadow:
+        0 0 0 3px rgba(248, 81, 73, 0.18),
+        0 0 6px 1px rgba(248, 81, 73, 0.5);
+}
+
+.status[data-state='offline'] .status-label {
+    color: var(--danger);
+}
+
+@keyframes status-pulse {
+    0%,
+    100% {
+        box-shadow:
+            0 0 0 3px rgba(34, 197, 94, 0.18),
+            0 0 8px 1px rgba(34, 197, 94, 0.65);
+    }
+    50% {
+        box-shadow:
+            0 0 0 4px rgba(34, 197, 94, 0.26),
+            0 0 12px 2px rgba(34, 197, 94, 0.85);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .status[data-state='ready'] .status-dot {
+        animation: none;
+    }
 }
 
 /* Workspace --------------------------------------------------------------- */
