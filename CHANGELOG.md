@@ -3,6 +3,29 @@
 All notable changes to Quilt are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.3] - 2026-06-14
+
+QA hardening for multi-workspace. No behaviour change for single-workspace use.
+
+### Fixed
+- **Per-workspace tree actions now target the clicked workspace.** The Project
+  root kebab ("New pipeline…", "New folder") and the folder context menus
+  derived their target from hardcoded bare ids (`root`, `pipelines`, …), so with
+  several workspaces open they could resolve against the wrong workspace or show
+  the wrong "New X" options. They now namespace by the clicked root's token and
+  compare on bare ids, so scope detection and item creation land in the right
+  workspace.
+- The global "+ New pipeline" defaults the folder dropdown to the active
+  workspace's pipelines folder.
+
+### Internal
+- Extracted the multi-workspace hydration merge into a pure, unit-tested
+  `mergeWorkspaces()` (namespacing, per-workspace open-tab restore, stale-tab
+  drop, null-state tolerance), removing untested logic from the React effect.
+- Verified end to end: lint, 191 unit tests, production build, and a browser
+  smoke pass (boot, WORKSPACES tree, root kebab menu, New-pipeline modal) with
+  zero console errors.
+
 ## [0.4.2] - 2026-06-14
 
 Multiple workspaces open at once.

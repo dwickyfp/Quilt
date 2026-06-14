@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import type { RepoItem, RepoItemType } from '../repo-types';
 import { useContextMenu, type MenuItem } from './ContextMenu';
+import { bareIdOf, tokenOf, nsId } from '../workspace-ns';
 
 const ICON_SIZE = 14;
 
@@ -103,11 +104,13 @@ export default function ProjectTree(props: Props) {
         onCloseWorkspace,
     } = props;
 
-    // Walk up to find which root folder this item lives under.
+    // Walk up to find which root folder this item lives under. Compare on the
+    // bare id (strip any workspace namespace) so this works in both single- and
+    // multi-workspace mode.
     const rootFolderOf = (itemId: string): string | null => {
         let current = items.find(i => i.id === itemId);
         while (current) {
-            if (current.parentId === 'root') return current.id;
+            if (current.parentId && bareIdOf(current.parentId) === 'root') return current.id;
             if (!current.parentId) return null;
             current = items.find(i => i.id === current!.parentId);
         }
@@ -159,31 +162,39 @@ export default function ProjectTree(props: Props) {
 
     // Menu for the workspace (project root) kebab + context menu: create items
     // and close the workspace. Mirrors the actions previously in the toolbar.
-    const buildWorkspaceMenu = (item: RepoItem): MenuItem[] => [
-        { kind: 'header', key: 'h', label: item.name },
-        {
-            kind: 'item',
-            key: 'new-pipeline',
-            label: 'New pipeline…',
-            icon: <FileCog size={ICON_SIZE} />,
-            onClick: () => onNewPipeline('pipelines'),
-        },
-        {
-            kind: 'item',
-            key: 'new-folder',
-            label: 'New folder',
-            icon: <FolderPlus size={ICON_SIZE} />,
-            onClick: () => onNewFolder('root'),
-        },
-        { kind: 'separator', key: 's1' },
-        {
-            kind: 'item',
-            key: 'close-workspace',
-            label: 'Close workspace',
-            icon: <LogOut size={ICON_SIZE} />,
-            onClick: () => onCloseWorkspace(item.id),
-        },
-    ];
+    // New items target THIS workspace's pipelines/root folder (namespaced by
+    // the project node's token) so they land in the clicked workspace, not the
+    // active one.
+    const buildWorkspaceMenu = (item: RepoItem): MenuItem[] => {
+        const tok = tokenOf(item.id);
+        const pipelinesId = tok ? nsId(tok, 'pipelines') : 'pipelines';
+        const rootId = tok ? nsId(tok, 'root') : 'root';
+        return [
+            { kind: 'header', key: 'h', label: item.name },
+            {
+                kind: 'item',
+                key: 'new-pipeline',
+                label: 'New pipeline…',
+                icon: <FileCog size={ICON_SIZE} />,
+                onClick: () => onNewPipeline(pipelinesId),
+            },
+            {
+                kind: 'item',
+                key: 'new-folder',
+                label: 'New folder',
+                icon: <FolderPlus size={ICON_SIZE} />,
+                onClick: () => onNewFolder(rootId),
+            },
+            { kind: 'separator', key: 's1' },
+            {
+                kind: 'item',
+                key: 'close-workspace',
+                label: 'Close workspace',
+                icon: <LogOut size={ICON_SIZE} />,
+                onClick: () => onCloseWorkspace(item.id),
+            },
+        ];
+    };
 
     const openWorkspaceMenu = (e: React.MouseEvent, item: RepoItem) => {
         menu.open(e, buildWorkspaceMenu(item));
@@ -200,11 +211,14 @@ export default function ProjectTree(props: Props) {
 
     const buildFolderMenu = (item: RepoItem): MenuItem[] => {
         const root = item.type === 'project' ? null : rootFolderOf(item.id) ?? item.id;
-        const isPipelinesScope = item.id === 'pipelines' || root === 'pipelines';
-        const isConnectionsScope = item.id === 'connections' || root === 'connections';
-        const isContextsScope = item.id === 'contexts' || root === 'contexts';
-        const isRoutinesScope = item.id === 'routines' || root === 'routines';
-        const isDocsScope = item.id === 'docs' || root === 'docs';
+        // Compare on bare ids so scope detection works under namespacing.
+        const bareItem = bareIdOf(item.id);
+        const bareRoot = root ? bareIdOf(root) : null;
+        const isPipelinesScope = bareItem === 'pipelines' || bareRoot === 'pipelines';
+        const isConnectionsScope = bareItem === 'connections' || bareRoot === 'connections';
+        const isContextsScope = bareItem === 'contexts' || bareRoot === 'contexts';
+        const isRoutinesScope = bareItem === 'routines' || bareRoot === 'routines';
+        const isDocsScope = bareItem === 'docs' || bareRoot === 'docs';
 
         const newItems: MenuItem[] = [];
         if (item.type === 'project' || isPipelinesScope) {

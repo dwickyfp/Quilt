@@ -116,3 +116,54 @@ export function denamespacePipelineData<T>(
     }
     return out;
 }
+
+/** One workspace loaded from disk, ready to merge. */
+export type LoadedWorkspace<P, J extends { id: string }> = {
+    token: string;
+    name: string;
+    state: {
+        repo?: RepoItem[];
+        pipelineData?: Record<string, P>;
+        jobs?: J[];
+        activeJobId?: string;
+    } | null;
+};
+
+/**
+ * Merge several loaded workspaces into ONE namespaced repo + pipelineData +
+ * open-tab (jobs) list. This is the pure core of the multi-workspace hydration
+ * (App.tsx calls it after loading each workspace from disk). Behaviour:
+ *  - each workspace's repo/pipelineData is namespaced by its token (no id
+ *    collisions even when two folders ship identical bare ids);
+ *  - the project-root node's display name is set to the workspace folder name;
+ *  - open editor tabs (`jobs`) are restored per workspace and namespaced, but
+ *    only kept if the pipeline they point at actually exists (stale tabs drop);
+ *  - `firstActive` is the first workspace's saved activeJobId (namespaced), used
+ *    as a fallback for which tab to focus.
+ */
+export function mergeWorkspaces<P, J extends { id: string }>(
+    workspaces: Array<LoadedWorkspace<P, J>>,
+): { repo: RepoItem[]; pipelineData: Record<string, P>; jobs: J[]; firstActive: string | null } {
+    const repo: RepoItem[] = [];
+    const pipelineData: Record<string, P> = {};
+    const jobs: J[] = [];
+    let firstActive: string | null = null;
+    for (const ws of workspaces) {
+        const repoItems = ws.state?.repo ?? [];
+        const named = repoItems.map(it =>
+            it.type === 'project' ? { ...it, name: ws.name } : it,
+        );
+        repo.push(...namespaceRepo(ws.token, named));
+        const data = ws.state?.pipelineData ?? {};
+        Object.assign(pipelineData, namespacePipelineData(ws.token, data));
+        const wsJobs = ws.state?.jobs ?? [];
+        for (const j of wsJobs) {
+            const id = nsId(ws.token, j.id);
+            if (pipelineData[id]) jobs.push({ ...j, id });
+        }
+        if (!firstActive && ws.state?.activeJobId) {
+            firstActive = nsId(ws.token, ws.state.activeJobId);
+        }
+    }
+    return { repo, pipelineData, jobs, firstActive };
+}

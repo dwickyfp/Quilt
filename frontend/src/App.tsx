@@ -69,9 +69,8 @@ import {
     tokenOf,
     nsId,
     bareIdOf,
-    namespaceRepo,
     denamespaceRepo,
-    namespacePipelineData,
+    mergeWorkspaces,
 } from './workspace-ns';
 import LeftSidebar from './workflow-ui/LeftSidebar';
 import PropertiesPanel from './workflow-ui/PropertiesPanel';
@@ -325,34 +324,25 @@ export default function App() {
         }
         let cancelled = false;
         void (async () => {
-            const mergedRepo: RepoItem[] = [];
-            const mergedData: Record<string, PipelineState> = {};
-            const mergedJobs: Job[] = [];
-            let firstActive: string | null = null;
+            const loaded = [];
             for (const ws of openWorkspaces) {
                 const state = await loadWorkspace(ws.path);
                 if (cancelled) return;
-                const repoItems = (state?.repo as RepoItem[] | undefined) ?? [];
-                // Set the project-root node's display name to the workspace
-                // folder name so each root in the tree is identifiable.
-                const named = repoItems.map(it =>
-                    it.type === 'project' ? { ...it, name: ws.name } : it,
-                );
-                mergedRepo.push(...namespaceRepo(ws.token, named));
-                const data = (state?.pipelineData as Record<string, PipelineState> | undefined) ?? {};
-                Object.assign(mergedData, namespacePipelineData(ws.token, data));
-                // Restore this workspace's open editor tabs (its saved `jobs`),
-                // namespaced. Keep only tabs whose pipeline still exists.
-                const wsJobs = (state?.jobs as Job[] | undefined) ?? [];
-                for (const j of wsJobs) {
-                    const id = nsId(ws.token, j.id);
-                    if (mergedData[id]) mergedJobs.push({ ...j, id });
-                }
-                if (!firstActive && state?.activeJobId) {
-                    firstActive = nsId(ws.token, state.activeJobId);
-                }
+                loaded.push({
+                    token: ws.token,
+                    name: ws.name,
+                    state: state as {
+                        repo?: RepoItem[];
+                        pipelineData?: Record<string, PipelineState>;
+                        jobs?: Job[];
+                        activeJobId?: string;
+                    } | null,
+                });
             }
             if (cancelled) return;
+            // Pure, unit-tested merge: namespaces + restores open tabs.
+            const { repo: mergedRepo, pipelineData: mergedData, jobs: mergedJobs, firstActive } =
+                mergeWorkspaces<PipelineState, Job>(loaded);
             setRepo(mergedRepo);
             setPipelineData(mergedData);
             setJobs(mergedJobs);
@@ -885,12 +875,19 @@ export default function App() {
         [nodes, selectedId],
     );
 
-    const openNewPipelineModal = useCallback((parentId: string = 'pipelines') => {
-        setNewPipelineModal({ open: true, defaultParent: parentId });
-    }, []);
+    const openNewPipelineModal = useCallback(
+        (parentId?: string) => {
+            // Default to the active workspace's pipelines folder so the modal's
+            // folder dropdown pre-selects the right (namespaced) folder.
+            const tok = tokenOf(activeJobId);
+            const fallback = tok ? nsId(tok, 'pipelines') : 'pipelines';
+            setNewPipelineModal({ open: true, defaultParent: parentId ?? fallback });
+        },
+        [activeJobId],
+    );
 
     const handleNewJob = useCallback(() => {
-        openNewPipelineModal('pipelines');
+        openNewPipelineModal();
     }, [openNewPipelineModal]);
 
     const handleCloseJob = useCallback(
