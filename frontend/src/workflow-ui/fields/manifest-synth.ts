@@ -3249,6 +3249,59 @@ function synthNumericTransform(comp: ComponentDef): ComponentManifest {
             },
         ], 'upstream');
     }
+    if (comp.id === 'xf.num.normalize') {
+        return base(comp, [
+            {
+                label: 'Min-Max Normalize',
+                fields: [
+                    { key: 'column', label: 'Column', kind: 'column', required: true },
+                    { key: 'outputColumn', label: 'Output column', kind: 'text', placeholder: '<column>_norm' },
+                ],
+            },
+        ], 'upstream');
+    }
+    if (comp.id === 'xf.encode.label') {
+        return base(comp, [
+            {
+                label: 'Label Encode',
+                fields: [
+                    { key: 'column', label: 'Column', kind: 'column', required: true },
+                    { key: 'outputColumn', label: 'Output column', kind: 'text', placeholder: '<column>_label' },
+                ],
+            },
+        ], 'upstream');
+    }
+    if (comp.id === 'xf.impute') {
+        return base(comp, [
+            {
+                label: 'Impute Missing',
+                fields: [
+                    { key: 'column', label: 'Column', kind: 'column', required: true },
+                    { key: 'strategy', label: 'Strategy', kind: 'select', options: ['mean', 'median'], defaultValue: 'mean' },
+                ],
+            },
+        ], 'upstream');
+    }
+    if (comp.id === 'xf.stat.summary') {
+        return base(comp, [
+            {
+                label: 'Descriptive Summary',
+                fields: [
+                    { key: 'columns', label: 'Columns', kind: 'columns', required: true },
+                ],
+            },
+        ], 'upstream');
+    }
+    if (comp.id === 'xf.stat.correlate') {
+        return base(comp, [
+            {
+                label: 'Pairwise Correlation',
+                fields: [
+                    { key: 'columns', label: 'Columns', kind: 'columns', required: true },
+                ],
+            },
+        ], 'upstream');
+    }
     if (comp.id === 'xf.num.bucketize') {
         return base(comp, [
             {

@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 355,
+  "componentCount": 360,
   "components": [
     {
       "id": "src.csv",
@@ -19816,6 +19816,383 @@
                 "label": "Output column",
                 "kind": "text",
                 "placeholder": "<column>_sign"
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "xf.num.normalize",
+      "label": "Min-Max Normalize",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "Scale a column to [0,1] via (x - min) / (max - min) across the whole input. Constant column -> NULL. Props: column, outputColumn.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "xf.num.normalize",
+        "kind": "transform",
+        "label": "Min-Max Normalize",
+        "description": "Scale a column to [0,1] via (x - min) / (max - min) across the whole input. Constant column -> NULL. Props: column, outputColumn.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Min-Max Normalize",
+            "fields": [
+              {
+                "key": "column",
+                "label": "Column",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "outputColumn",
+                "label": "Output column",
+                "kind": "text",
+                "placeholder": "<column>_norm"
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "xf.encode.label",
+      "label": "Label Encode",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "Map each distinct value of a categorical column to a stable integer 0..N-1 (dense_rank). Turns string classes into numeric codes for ML learners. Props: column, outputColumn.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "xf.encode.label",
+        "kind": "transform",
+        "label": "Label Encode",
+        "description": "Map each distinct value of a categorical column to a stable integer 0..N-1 (dense_rank). Turns string classes into numeric codes for ML learners. Props: column, outputColumn.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Label Encode",
+            "fields": [
+              {
+                "key": "column",
+                "label": "Column",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "outputColumn",
+                "label": "Output column",
+                "kind": "text",
+                "placeholder": "<column>_label"
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "xf.impute",
+      "label": "Impute Missing",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "Fill NULLs in a numeric column with mean (default) or median over the whole input. Distribution-based fill for ML preprocessing. Props: column, strategy (mean|median).",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "xf.impute",
+        "kind": "transform",
+        "label": "Impute Missing",
+        "description": "Fill NULLs in a numeric column with mean (default) or median over the whole input. Distribution-based fill for ML preprocessing. Props: column, strategy (mean|median).",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Impute Missing",
+            "fields": [
+              {
+                "key": "column",
+                "label": "Column",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "strategy",
+                "label": "Strategy",
+                "kind": "select",
+                "options": [
+                  "mean",
+                  "median"
+                ],
+                "defaultValue": "mean"
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "xf.stat.summary",
+      "label": "Descriptive Summary",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "One row per selected numeric column with count / mean / stddev / min / median / max. Props: columns (array).",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "xf.stat.summary",
+        "kind": "transform",
+        "label": "Descriptive Summary",
+        "description": "One row per selected numeric column with count / mean / stddev / min / median / max. Props: columns (array).",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Descriptive Summary",
+            "fields": [
+              {
+                "key": "columns",
+                "label": "Columns",
+                "kind": "columns",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "xf.stat.correlate",
+      "label": "Pairwise Correlation",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "Pearson r for every unique pair of selected numeric columns (col_x / col_y / correlation). Props: columns (array, >=2).",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "xf.stat.correlate",
+        "kind": "transform",
+        "label": "Pairwise Correlation",
+        "description": "Pearson r for every unique pair of selected numeric columns (col_x / col_y / correlation). Props: columns (array, >=2).",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Pairwise Correlation",
+            "fields": [
+              {
+                "key": "columns",
+                "label": "Columns",
+                "kind": "columns",
+                "required": true
               }
             ]
           }

@@ -155,6 +155,11 @@ pub(crate) fn build_view_sql(
         | "xf.num.log" => build_numeric(inputs, props, component_id),
         "xf.num.bucketize" => build_bucketize(inputs, props),
         "xf.num.zscore" => build_zscore(inputs, props),
+        "xf.num.normalize" => build_minmax_normalize(inputs, props),
+        "xf.encode.label" => build_label_encode(inputs, props),
+        "xf.impute" => build_impute(inputs, props),
+        "xf.stat.summary" => build_stat_summary(inputs, props),
+        "xf.stat.correlate" => build_stat_correlate(inputs, props),
         "xf.num.clamp" => build_clamp(inputs, props),
         "xf.num.sign" => build_sign(inputs, props),
         "xf.rank.filter" => build_rank_filter(inputs, props),
@@ -3851,6 +3856,124 @@ pub(crate) fn build_zscore(inputs: &NodeInputs, props: &JsonValue) -> Result<Str
         out = quote_ident(&output),
         up = quote_ident(upstream)
     ))
+}
+
+/// Min-Max Normalize: scale a column to [0,1] via (x - min) / (max - min)
+/// over the whole partition. If max == min (constant column), result is
+/// NULL rather than divide-by-zero. Mirrors build_zscore's single-pass
+/// window approach; the standard alternative scaler to z-score.
+pub(crate) fn build_minmax_normalize(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.num.normalize"))?;
+    let column = string_prop(props, "column")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Normalize needs a column".to_string())?;
+    let output = string_prop(props, "outputColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| format!("{}_norm", column));
+    let col = quote_ident(&column);
+    Ok(format!(
+        "SELECT *, CASE WHEN max(CAST({col} AS DOUBLE)) OVER () = min(CAST({col} AS DOUBLE)) OVER () THEN NULL ELSE (CAST({col} AS DOUBLE) - min(CAST({col} AS DOUBLE)) OVER ()) / (max(CAST({col} AS DOUBLE)) OVER () - min(CAST({col} AS DOUBLE)) OVER ()) END AS {out} FROM {up}",
+        col = col,
+        out = quote_ident(&output),
+        up = quote_ident(upstream)
+    ))
+}
+
+/// Label Encode: map each distinct value of a (usually categorical)
+/// column to a stable integer 0..N-1 via dense_rank()-1 ordered by the
+/// value. Turns string classes into the numeric codes ML learners
+/// consume. Single window pass.
+pub(crate) fn build_label_encode(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.encode.label"))?;
+    let column = string_prop(props, "column")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Label Encode needs a column".to_string())?;
+    let output = string_prop(props, "outputColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| format!("{}_label", column));
+    let col = quote_ident(&column);
+    Ok(format!(
+        "SELECT *, dense_rank() OVER (ORDER BY {col}) - 1 AS {out} FROM {up}",
+        col = col,
+        out = quote_ident(&output),
+        up = quote_ident(upstream)
+    ))
+}
+
+/// Impute: fill NULLs in a numeric column with a statistic computed over
+/// the whole partition. strategy = "mean" (default) or "median". Unlike
+/// fill_forward/backward (time-series order-based), this is a
+/// distribution-based fill for ML preprocessing. Writes in place.
+pub(crate) fn build_impute(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.impute"))?;
+    let column = string_prop(props, "column")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Impute needs a column".to_string())?;
+    let strategy = string_prop(props, "strategy").unwrap_or_else(|| "mean".to_string());
+    let col = quote_ident(&column);
+    let stat = match strategy.as_str() {
+        "median" => format!("median(CAST({col} AS DOUBLE)) OVER ()", col = col),
+        _ => format!("avg(CAST({col} AS DOUBLE)) OVER ()", col = col),
+    };
+    Ok(format!(
+        "SELECT * REPLACE (coalesce(CAST({col} AS DOUBLE), {stat}) AS {col}) FROM {up}",
+        col = col,
+        stat = stat,
+        up = quote_ident(upstream)
+    ))
+}
+
+/// Descriptive Summary: reshape to one row per selected numeric column
+/// with count / mean / stddev / min / median / max. Emits a tidy stats
+/// table (one SELECT per column UNION ALL'd). DuckDB native aggregates.
+pub(crate) fn build_stat_summary(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.stat.summary"))?;
+    let columns = columns_list(props, "columns");
+    if columns.is_empty() {
+        return Err("Summary needs at least one column".to_string());
+    }
+    let up = quote_ident(upstream);
+    let selects: Vec<String> = columns
+        .iter()
+        .map(|c| {
+            let col = quote_ident(c);
+            format!(
+                "SELECT '{name}' AS column, count(CAST({col} AS DOUBLE)) AS count, avg(CAST({col} AS DOUBLE)) AS mean, stddev_samp(CAST({col} AS DOUBLE)) AS stddev, min(CAST({col} AS DOUBLE)) AS min, median(CAST({col} AS DOUBLE)) AS median, max(CAST({col} AS DOUBLE)) AS max FROM {up}",
+                name = sql_escape(c),
+                col = col,
+                up = up
+            )
+        })
+        .collect();
+    Ok(selects.join("\nUNION ALL\n"))
+}
+
+/// Pairwise Correlation: Pearson r for every unique pair of selected
+/// numeric columns. Emits col_x / col_y / correlation rows. DuckDB
+/// native corr() aggregate. Fills the antar-column gap qa.profile leaves.
+pub(crate) fn build_stat_correlate(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.stat.correlate"))?;
+    let columns = columns_list(props, "columns");
+    if columns.len() < 2 {
+        return Err("Correlate needs at least two columns".to_string());
+    }
+    let up = quote_ident(upstream);
+    let mut selects: Vec<String> = Vec::new();
+    for i in 0..columns.len() {
+        for j in (i + 1)..columns.len() {
+            let cx = quote_ident(&columns[i]);
+            let cy = quote_ident(&columns[j]);
+            selects.push(format!(
+                "SELECT '{nx}' AS col_x, '{ny}' AS col_y, corr(CAST({cx} AS DOUBLE), CAST({cy} AS DOUBLE)) AS correlation FROM {up}",
+                nx = sql_escape(&columns[i]),
+                ny = sql_escape(&columns[j]),
+                cx = cx,
+                cy = cy,
+                up = up
+            ));
+        }
+    }
+    Ok(selects.join("\nUNION ALL\n"))
 }
 
 /// Literal Replace: DuckDB replace(string, search, replacement).

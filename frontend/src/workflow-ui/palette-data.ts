@@ -382,6 +382,11 @@ export const PALETTE: Category[] = [
                     xf('num.zscore', 'Z-Score', 'available', 'Per-row standardized value: (value - mean) / stddev across the whole input'),
                     xf('num.clamp', 'Clamp', 'available', 'Clip values to a [low, high] range - cap outliers before stats'),
                     xf('num.sign', 'Sign', 'available', 'Sign of a number: -1, 0, or +1'),
+                    xf('num.normalize', 'Min-Max Normalize', 'available', 'Scale a column to [0,1] via (x - min) / (max - min) across the whole input. Constant column -> NULL. Props: column, outputColumn.'),
+                    xf('encode.label', 'Label Encode', 'available', 'Map each distinct value of a categorical column to a stable integer 0..N-1 (dense_rank). Turns string classes into numeric codes for ML learners. Props: column, outputColumn.'),
+                    xf('impute', 'Impute Missing', 'available', 'Fill NULLs in a numeric column with mean (default) or median over the whole input. Distribution-based fill for ML preprocessing. Props: column, strategy (mean|median).'),
+                    xf('stat.summary', 'Descriptive Summary', 'available', 'One row per selected numeric column with count / mean / stddev / min / median / max. Props: columns (array).'),
+                    xf('stat.correlate', 'Pairwise Correlation', 'available', 'Pearson r for every unique pair of selected numeric columns (col_x / col_y / correlation). Props: columns (array, >=2).'),
                 ],
             },
             {
