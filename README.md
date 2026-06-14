@@ -473,7 +473,7 @@ When the installer downloads the DuckDB CLI it also pre-fetches the extensions Q
 
 ## Download / Install
 
-Pick the binary for your OS from the [latest release](https://github.com/dwickyfp/Quilt/releases/tag/v0.4.0):
+Pick the binary for your OS from the [latest release](https://github.com/dwickyfp/Quilt/releases/tag/v0.5.0):
 
 | OS | Asset | How to run |
 |---|---|---|
