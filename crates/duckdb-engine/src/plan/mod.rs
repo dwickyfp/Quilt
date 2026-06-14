@@ -165,6 +165,7 @@ pub enum RuntimeSpec {
     MlCrossval(MlCrossvalSpec),
     MlFeatureSelect(MlFeatureSelectSpec),
     MlPca(MlPcaSpec),
+    MlOneHot(MlOneHotSpec),
     StatTest(StatTestSpec),
     ModelWriter(ModelWriterSpec),
     OnnxReader(OnnxReaderSpec),
@@ -586,6 +587,7 @@ fn build_stage(
     let mut ml_crossval: Option<MlCrossvalSpec> = None;
     let mut ml_featureselect: Option<MlFeatureSelectSpec> = None;
     let mut ml_pca: Option<MlPcaSpec> = None;
+    let mut ml_onehot: Option<MlOneHotSpec> = None;
     let mut stat_test: Option<StatTestSpec> = None;
     let mut model_writer: Option<ModelWriterSpec> = None;
     let mut onnx_reader: Option<OnnxReaderSpec> = None;
@@ -3211,6 +3213,25 @@ fn build_stage(
             drop_features: props.get("dropFeatures").and_then(|v| v.as_bool()).unwrap_or(false),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "ml.onehot" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let columns = columns_list(&props, "columns");
+        if columns.is_empty() {
+            return Err(EngineError::Config(format!(
+                "{}: at least one column to encode is required",
+                component_id
+            )));
+        }
+        ml_onehot = Some(MlOneHotSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            columns,
+            max_categories: props.get("maxCategories").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
+            drop_original: props.get("dropOriginal").and_then(|v| v.as_bool()).unwrap_or(false),
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "xf.stat.test" {
         let from_view = inputs
             .main()
@@ -3814,6 +3835,7 @@ fn build_stage(
         .or_else(|| ml_crossval.map(RuntimeSpec::MlCrossval))
         .or_else(|| ml_featureselect.map(RuntimeSpec::MlFeatureSelect))
         .or_else(|| ml_pca.map(RuntimeSpec::MlPca))
+        .or_else(|| ml_onehot.map(RuntimeSpec::MlOneHot))
         .or_else(|| stat_test.map(RuntimeSpec::StatTest))
         .or_else(|| model_writer.map(RuntimeSpec::ModelWriter))
         .or_else(|| onnx_reader.map(RuntimeSpec::OnnxReader))

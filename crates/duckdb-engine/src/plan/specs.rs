@@ -1364,6 +1364,24 @@ pub struct MlPcaSpec {
     pub drop_features: bool,
 }
 
+/// ml.onehot: one-hot encode categorical columns. A single transform node —
+/// for each source column it appends one 0/1 indicator column per distinct
+/// value seen in the data (<col>_<value>), optionally capping the number of
+/// categories. Same multi-output shape as ml.pca: no model round-trip, the
+/// runtime-dependent column count is just extra keys on each output row.
+#[derive(Debug, Clone)]
+pub struct MlOneHotSpec {
+    pub node_id: String,
+    pub from_view: String,
+    /// Categorical columns to encode; must be non-empty.
+    pub columns: Vec<String>,
+    /// Cap on distinct categories per column (0 = no cap). Rare values beyond
+    /// the cap are folded into a single "<col>_other" indicator.
+    pub max_categories: usize,
+    /// Drop the original source columns from the output.
+    pub drop_original: bool,
+}
+
 /// xf.stat.test: run a statistical hypothesis test over the upstream rows and
 /// emit a small (metric, value) table. `test` selects ttest / anova / chi2.
 #[derive(Debug, Clone)]

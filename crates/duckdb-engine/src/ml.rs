@@ -1249,6 +1249,108 @@ impl DuckdbEngine {
         ))
     }
 
+    /// ml.onehot: one-hot encode categorical columns. A single transform node —
+    /// for each source column it appends one 0/1 indicator column per distinct
+    /// value (<col>_<value>). With max_categories > 0, only the most frequent N
+    /// values get their own column and the rest fold into <col>_other. Same
+    /// multi-output shape as ml.pca: no model round-trip, the runtime-dependent
+    /// column count is just extra keys on each output row.
+    pub(crate) fn run_ml_onehot(
+        &self,
+        db: &Path,
+        spec: &plan::MlOneHotSpec,
+    ) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+        let rows = self.run_rows(
+            Some(db),
+            &format!("SELECT * FROM {};", plan::quote_ident(&spec.from_view)),
+        )?;
+        if rows.is_empty() {
+            return Err(EngineError::Query(format!(
+                "ml.onehot: no rows from {}",
+                spec.from_view
+            )));
+        }
+
+        // For each column, work out the category set (first-seen order) and the
+        // frequency of each value, then decide which values keep their own
+        // indicator vs. fold into "<col>_other".
+        let mut kept: Vec<(String, Vec<String>, bool)> = Vec::new(); // (col, kept_values, has_other)
+        for col in &spec.columns {
+            let mut order: Vec<String> = Vec::new();
+            let mut counts: std::collections::HashMap<String, usize> =
+                std::collections::HashMap::new();
+            for row in &rows {
+                let v = label_of(row.get(col));
+                if v.is_empty() {
+                    continue;
+                }
+                if !counts.contains_key(&v) {
+                    order.push(v.clone());
+                }
+                *counts.entry(v).or_insert(0) += 1;
+            }
+            let (keep, has_other) = if spec.max_categories > 0 && order.len() > spec.max_categories {
+                // Rank by frequency (desc), then first-seen order for ties.
+                let mut ranked = order.clone();
+                ranked.sort_by(|a, b| {
+                    counts[b]
+                        .cmp(&counts[a])
+                        .then_with(|| {
+                            order.iter().position(|x| x == a).cmp(&order.iter().position(|x| x == b))
+                        })
+                });
+                ranked.truncate(spec.max_categories);
+                // Restore first-seen order among the kept values for stable columns.
+                let keep: Vec<String> =
+                    order.iter().filter(|v| ranked.contains(v)).cloned().collect();
+                (keep, true)
+            } else {
+                (order, false)
+            };
+            kept.push((col.clone(), keep, has_other));
+        }
+
+        // Emit one indicator column per kept value (+ optional _other), appended
+        // in column/value order so the output schema is deterministic.
+        let mut out: Vec<JsonValue> = Vec::with_capacity(rows.len());
+        let mut added_cols = 0usize;
+        for row in &rows {
+            let mut obj = match row.as_object() {
+                Some(o) => o.clone(),
+                None => serde_json::Map::new(),
+            };
+            for (col, values, has_other) in &kept {
+                let cell = label_of(row.get(col));
+                for v in values {
+                    let key = format!("{}_{}", col, v);
+                    obj.insert(key, json!(if &cell == v { 1 } else { 0 }));
+                }
+                if *has_other {
+                    let is_other = !cell.is_empty() && !values.contains(&cell);
+                    obj.insert(format!("{}_other", col), json!(if is_other { 1 } else { 0 }));
+                }
+                if spec.drop_original {
+                    obj.remove(col);
+                }
+            }
+            out.push(JsonValue::Object(obj));
+        }
+        for (_, values, has_other) in &kept {
+            added_cols += values.len() + usize::from(*has_other);
+        }
+
+        let count = out.len();
+        materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &out)?;
+        Ok(format!(
+            "ml.onehot: {} rows, {} column(s) -> {} indicator column(s) -> {}",
+            count,
+            spec.columns.len(),
+            added_cols,
+            spec.node_id
+        ))
+    }
+
     /// xf.stat.test: run a hypothesis test over the upstream rows and emit a
     /// small (metric, value) table. Mirrors run_ml_score's shape; the actual
     /// statistics + p-values live in the dependency-free `crate::stats` module.

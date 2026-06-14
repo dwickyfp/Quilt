@@ -600,6 +600,14 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // One-Hot Encoder - data in, same rows with indicator columns appended out.
+    if (id === 'ml.onehot') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [MAIN_OUT],
+        };
+    }
+
     // Viz charts - terminal: one main input, no output (renders a chart).
     if (comp.kind === 'viz') {
         return {
@@ -5277,6 +5285,37 @@ function synthMl(comp: ComponentDef): ComponentManifest {
                         kind: 'bool',
                         defaultValue: false,
                         description: 'Remove the original feature columns from the output.',
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
+
+    if (id === 'ml.onehot') {
+        return base(comp, [
+            {
+                label: 'One-Hot Encoding',
+                fields: [
+                    {
+                        key: 'columns',
+                        label: 'Columns to encode',
+                        kind: 'columns',
+                        required: true,
+                        description: 'Categorical columns to one-hot encode.',
+                    },
+                    {
+                        key: 'maxCategories',
+                        label: 'Max categories per column',
+                        kind: 'integer',
+                        defaultValue: 0,
+                        description: 'Cap distinct values per column; rarer values fold into <col>_other. 0 = no cap.',
+                    },
+                    {
+                        key: 'dropOriginal',
+                        label: 'Drop source columns',
+                        kind: 'bool',
+                        defaultValue: false,
+                        description: 'Remove the original categorical columns from the output.',
                     },
                 ],
             },

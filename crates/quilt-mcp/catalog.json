@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 373,
+  "componentCount": 374,
   "components": [
     {
       "id": "src.csv",
@@ -44190,6 +44190,80 @@
                 "kind": "bool",
                 "defaultValue": false,
                 "description": "Remove the original feature columns from the output."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.onehot",
+      "label": "One-Hot Encoder",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "One-hot encode categorical columns — a single transform node that appends one 0/1 indicator column per distinct value (<col>_<value>). Props: columns (categorical columns to encode, required), maxCategories (cap distinct values per column; rare ones fold into <col>_other, 0 = no cap), dropOriginal (drop the source columns, default false). Wire the data into main.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.onehot",
+        "kind": "ml",
+        "label": "One-Hot Encoder",
+        "description": "One-hot encode categorical columns — a single transform node that appends one 0/1 indicator column per distinct value (<col>_<value>). Props: columns (categorical columns to encode, required), maxCategories (cap distinct values per column; rare ones fold into <col>_other, 0 = no cap), dropOriginal (drop the source columns, default false). Wire the data into main.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "One-Hot Encoding",
+            "fields": [
+              {
+                "key": "columns",
+                "label": "Columns to encode",
+                "kind": "columns",
+                "required": true,
+                "description": "Categorical columns to one-hot encode."
+              },
+              {
+                "key": "maxCategories",
+                "label": "Max categories per column",
+                "kind": "integer",
+                "defaultValue": 0,
+                "description": "Cap distinct values per column; rarer values fold into <col>_other. 0 = no cap."
+              },
+              {
+                "key": "dropOriginal",
+                "label": "Drop source columns",
+                "kind": "bool",
+                "defaultValue": false,
+                "description": "Remove the original categorical columns from the output."
               }
             ]
           }
