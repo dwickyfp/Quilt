@@ -14,7 +14,7 @@
   },
   "sidebar": {
     "ariaLabel": "サイドバー",
-    "project": "プロジェクト",
+    "project": "ワークスペース",
     "components": "コンポーネント"
   },
   "editorTabs": {

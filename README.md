@@ -83,12 +83,10 @@
 - [Troubleshooting](#troubleshooting)
 - [CI / CD](#ci--cd)
 - [Status](#status)
-- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [Sponsor Quilt](SPONSORS.md)
 - [License](#license)
 - [Releases](https://github.com/dwickyfp/Quilt/releases)
-- [Roadmap doc](docs/roadmap.md)
 - [Contributing doc](CONTRIBUTING.md)
 
 </td>
@@ -1124,20 +1122,6 @@ git push origin main vX.Y.Z
 # GitHub gets the binaries uploaded; un-draft + mark Latest with:
 gh release edit vX.Y.Z --draft=false --latest
 ```
-
----
-
-## Roadmap
-
-A complete planned-component breakdown lives in [`docs/roadmap.md`](docs/roadmap.md). Highlights:
-
-- [ ] **Multi-shard Kinesis** and **Pulsar** streaming (Pulsar blocked on `protoc` at build time)
-- [ ] **Apache ORC** read / write (blocked on the Arrow version conflict between `orc-rust` and our workspace pin)
-- [x] **SFTP** source (shipped - `russh` + `russh-sftp` on the ring backend, password / key auth, host-fingerprint pin)
-- [ ] **OAuth-heavy SaaS** (Google Sheets, Excel Online, full Salesforce OAuth, Gmail / O365 IMAP)
-- [ ] **Embedded Python / Rust** code stages (current code.* family: SQL, Shell, JavaScript, WebAssembly all ship)
-- [ ] **Hosted documentation site**
-- [ ] **Plugin marketplace** via the connector SDK
 
 ---
 

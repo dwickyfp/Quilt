@@ -16,7 +16,7 @@
   },
   "sidebar": {
     "ariaLabel": "Sidebar",
-    "project": "Project",
+    "project": "Workspaces",
     "components": "Components"
   },
   "editorTabs": {
