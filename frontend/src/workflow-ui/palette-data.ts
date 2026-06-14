@@ -829,6 +829,9 @@ export const PALETTE: Category[] = [
                     ml('ml.learner.forest', 'Random Forest Learner', 'available', 'Train a random forest classifier. Props: targetColumn, featureColumns, nTrees (default 100), maxDepth. Outputs a model on the model port.'),
                     ml('ml.learner.knn', 'k-NN Learner', 'available', 'Train a k-nearest-neighbors classifier. Props: targetColumn, featureColumns, k (neighbors, default 5). Outputs a model on the model port.'),
                     ml('ml.learner.kmeans', 'k-Means Learner', 'available', 'Fit a k-means clustering model (unsupervised). Props: featureColumns, k (clusters, default 3), maxIter. Outputs a model on the model port; predict appends a cluster id.'),
+                    ml('ml.learner.tree.reg', 'Decision Tree Regressor', 'available', 'Train a decision tree regressor (numeric target). Props: targetColumn (numeric), featureColumns, maxDepth (default 10). Outputs a model on the model port; predict appends a numeric prediction.'),
+                    ml('ml.learner.forest.reg', 'Random Forest Regressor', 'available', 'Train a random forest regressor (numeric target). Props: targetColumn (numeric), featureColumns, nTrees (default 100), maxDepth. Outputs a model on the model port.'),
+                    ml('ml.learner.knn.reg', 'k-NN Regressor', 'available', 'Train a k-nearest-neighbors regressor (numeric target). Props: targetColumn (numeric), featureColumns, k (neighbors, default 5). Outputs a model on the model port.'),
                 ],
             },
             {

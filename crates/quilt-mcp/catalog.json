@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 329,
+  "componentCount": 350,
   "components": [
     {
       "id": "src.csv",
@@ -13669,6 +13669,132 @@
                 "label": "Send unmatched to reject port",
                 "kind": "bool",
                 "defaultValue": false
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "driving",
+              "type": "main"
+            },
+            {
+              "id": "lookup",
+              "label": "lookup",
+              "type": "lookup"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "matched",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "unmatched",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "xf.join.asof",
+      "label": "As-Of Join",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "Time-series merge: match each driving row to the nearest right-side row by an ordered/time column (no exact key needed). Direction backward (nearest prior, default) or forward (nearest next); optional equality keys to match within groups. Compiles to DuckDB ASOF JOIN.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "driving",
+            "type": "main"
+          },
+          {
+            "id": "lookup",
+            "label": "lookup",
+            "type": "lookup"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "matched",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "unmatched",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "xf.join.asof",
+        "kind": "transform",
+        "label": "As-Of Join",
+        "description": "Time-series merge: match each driving row to the nearest right-side row by an ordered/time column (no exact key needed). Direction backward (nearest prior, default) or forward (nearest next); optional equality keys to match within groups. Compiles to DuckDB ASOF JOIN.",
+        "schemaSource": "declared",
+        "sections": [
+          {
+            "label": "As-of (time-series) join",
+            "fields": [
+              {
+                "key": "leftTime",
+                "label": "Left ordered/time column",
+                "kind": "text",
+                "required": true,
+                "placeholder": "trades.ts"
+              },
+              {
+                "key": "rightTime",
+                "label": "Right ordered/time column",
+                "kind": "text",
+                "required": true,
+                "placeholder": "quotes.ts"
+              },
+              {
+                "key": "direction",
+                "label": "Match direction",
+                "kind": "select",
+                "defaultValue": "backward",
+                "options": [
+                  {
+                    "label": "Backward (nearest prior right row, left.t >= right.t)",
+                    "value": "backward"
+                  },
+                  {
+                    "label": "Forward (nearest next right row, left.t <= right.t)",
+                    "value": "forward"
+                  }
+                ]
+              },
+              {
+                "key": "joinType",
+                "label": "Join type",
+                "kind": "select",
+                "defaultValue": "inner",
+                "options": [
+                  {
+                    "label": "INNER (drop unmatched left rows)",
+                    "value": "inner"
+                  },
+                  {
+                    "label": "LEFT (keep unmatched left rows, right cols null)",
+                    "value": "left"
+                  }
+                ]
+              },
+              {
+                "key": "matchKeys",
+                "label": "Equality keys (optional, left,right pairs)",
+                "kind": "key-value"
               }
             ]
           }
@@ -32949,6 +33075,72 @@
       }
     },
     {
+      "id": "qa.golden",
+      "label": "Golden Assert",
+      "kind": "quality",
+      "availability": "available",
+      "summary": "Pipeline regression test: hard-fail the run if the input no longer matches a saved golden snapshot (Parquet). Compares both ways with DuckDB EXCEPT (order-insensitive); optional key columns surface row-level changes. Capture the golden once by pointing a Parquet sink at the same path. Passing rows flow through unchanged so it can sit inline.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "pass",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "qa.golden",
+        "kind": "transform",
+        "label": "Golden Assert",
+        "description": "Pipeline regression test: hard-fail the run if the input no longer matches a saved golden snapshot (Parquet). Compares both ways with DuckDB EXCEPT (order-insensitive); optional key columns surface row-level changes. Capture the golden once by pointing a Parquet sink at the same path. Passing rows flow through unchanged so it can sit inline.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Golden snapshot",
+            "fields": [
+              {
+                "key": "goldenPath",
+                "label": "Golden file (.parquet)",
+                "kind": "text",
+                "required": true,
+                "placeholder": "tests/orders.golden.parquet"
+              },
+              {
+                "key": "message",
+                "label": "Failure message (optional)",
+                "kind": "text",
+                "placeholder": "Output drifted from golden snapshot"
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "pass",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "qa.profile",
       "label": "Column Profile",
       "kind": "quality",
@@ -33508,6 +33700,339 @@
               "type": "reject"
             }
           ]
+        }
+      }
+    },
+    {
+      "id": "viz.bar",
+      "label": "Bar Chart",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Aggregate a measure by a dimension and render bars",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.bar",
+        "kind": "viz",
+        "label": "Bar Chart",
+        "description": "Aggregate a measure by a dimension and render bars",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "x",
+                "label": "X (dimension)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "y",
+                "label": "Y (measure)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "agg",
+                "label": "Aggregation",
+                "kind": "select",
+                "defaultValue": "sum",
+                "options": [
+                  {
+                    "label": "SUM",
+                    "value": "sum"
+                  },
+                  {
+                    "label": "AVG",
+                    "value": "avg"
+                  },
+                  {
+                    "label": "COUNT",
+                    "value": "count"
+                  },
+                  {
+                    "label": "MIN",
+                    "value": "min"
+                  },
+                  {
+                    "label": "MAX",
+                    "value": "max"
+                  }
+                ]
+              },
+              {
+                "key": "series",
+                "label": "Series (optional group-by)",
+                "kind": "column"
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.line",
+      "label": "Line Chart",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Aggregate a measure by a dimension and render a line",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.line",
+        "kind": "viz",
+        "label": "Line Chart",
+        "description": "Aggregate a measure by a dimension and render a line",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "x",
+                "label": "X (dimension)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "y",
+                "label": "Y (measure)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "agg",
+                "label": "Aggregation",
+                "kind": "select",
+                "defaultValue": "sum",
+                "options": [
+                  {
+                    "label": "SUM",
+                    "value": "sum"
+                  },
+                  {
+                    "label": "AVG",
+                    "value": "avg"
+                  },
+                  {
+                    "label": "COUNT",
+                    "value": "count"
+                  },
+                  {
+                    "label": "MIN",
+                    "value": "min"
+                  },
+                  {
+                    "label": "MAX",
+                    "value": "max"
+                  }
+                ]
+              },
+              {
+                "key": "series",
+                "label": "Series (optional group-by)",
+                "kind": "column"
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.scatter",
+      "label": "Scatter Plot",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Plot raw x vs y points to inspect correlation",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.scatter",
+        "kind": "viz",
+        "label": "Scatter Plot",
+        "description": "Plot raw x vs y points to inspect correlation",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "x",
+                "label": "X (dimension)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "y",
+                "label": "Y (measure)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "agg",
+                "label": "Aggregation",
+                "kind": "select",
+                "defaultValue": "sum",
+                "options": [
+                  {
+                    "label": "SUM",
+                    "value": "sum"
+                  },
+                  {
+                    "label": "AVG",
+                    "value": "avg"
+                  },
+                  {
+                    "label": "COUNT",
+                    "value": "count"
+                  },
+                  {
+                    "label": "MIN",
+                    "value": "min"
+                  },
+                  {
+                    "label": "MAX",
+                    "value": "max"
+                  }
+                ]
+              },
+              {
+                "key": "series",
+                "label": "Series (optional group-by)",
+                "kind": "column"
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.histogram",
+      "label": "Histogram",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Count rows per dimension value",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.histogram",
+        "kind": "viz",
+        "label": "Histogram",
+        "description": "Count rows per dimension value",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "x",
+                "label": "X (dimension)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
         }
       }
     },
@@ -40769,6 +41294,1112 @@
               "label": "reject",
               "type": "reject",
               "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.partition",
+      "label": "Partition",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Split rows into a train set (main output) and a test set (test output). Props: ratio (0-1, fraction going to train; default 0.7), method (`random` or `stratified`), stratifyColumn (for stratified), seed (deterministic split). Pure SQL - uses a hashed/random row ordering. Feed train into a Learner and test into Predict + Score.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "train",
+            "type": "main"
+          },
+          {
+            "id": "test",
+            "label": "test",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.partition",
+        "kind": "ml",
+        "label": "Partition",
+        "description": "Split rows into a train set (main output) and a test set (test output). Props: ratio (0-1, fraction going to train; default 0.7), method (`random` or `stratified`), stratifyColumn (for stratified), seed (deterministic split). Pure SQL - uses a hashed/random row ordering. Feed train into a Learner and test into Predict + Score.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Split",
+            "fields": [
+              {
+                "key": "ratio",
+                "label": "Train ratio",
+                "kind": "number",
+                "defaultValue": 0.7,
+                "description": "Fraction of rows in the train set (main output). The rest go to the test output. 0-1."
+              },
+              {
+                "key": "method",
+                "label": "Method",
+                "kind": "select",
+                "defaultValue": "random",
+                "options": [
+                  {
+                    "label": "Random",
+                    "value": "random"
+                  },
+                  {
+                    "label": "Stratified",
+                    "value": "stratified"
+                  }
+                ]
+              },
+              {
+                "key": "stratifyColumn",
+                "label": "Stratify by column",
+                "kind": "column",
+                "description": "For stratified splits: preserve this column's class distribution across train/test."
+              },
+              {
+                "key": "seed",
+                "label": "Seed",
+                "kind": "integer",
+                "defaultValue": 42,
+                "description": "Deterministic split seed."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "train",
+              "type": "main"
+            },
+            {
+              "id": "test",
+              "label": "test",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.linreg",
+      "label": "Linear Regression Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train an ordinary least-squares linear regression. Props: targetColumn (numeric target), featureColumns (comma-separated; blank = all other numeric columns). Outputs a model on the model port. Pair with ml.predict for inference.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.linreg",
+        "kind": "ml",
+        "label": "Linear Regression Learner",
+        "description": "Train an ordinary least-squares linear regression. Props: targetColumn (numeric target), featureColumns (comma-separated; blank = all other numeric columns). Outputs a model on the model port. Pair with ml.predict for inference.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.logreg",
+      "label": "Logistic Regression Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a logistic regression classifier. Props: targetColumn (categorical/binary), featureColumns. Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.logreg",
+        "kind": "ml",
+        "label": "Logistic Regression Learner",
+        "description": "Train a logistic regression classifier. Props: targetColumn (categorical/binary), featureColumns. Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.tree",
+      "label": "Decision Tree Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a decision tree classifier. Props: targetColumn, featureColumns, maxDepth (default 10). Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.tree",
+        "kind": "ml",
+        "label": "Decision Tree Learner",
+        "description": "Train a decision tree classifier. Props: targetColumn, featureColumns, maxDepth (default 10). Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "maxDepth",
+                "label": "Max depth",
+                "kind": "integer",
+                "defaultValue": 10
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.forest",
+      "label": "Random Forest Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a random forest classifier. Props: targetColumn, featureColumns, nTrees (default 100), maxDepth. Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.forest",
+        "kind": "ml",
+        "label": "Random Forest Learner",
+        "description": "Train a random forest classifier. Props: targetColumn, featureColumns, nTrees (default 100), maxDepth. Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "maxDepth",
+                "label": "Max depth",
+                "kind": "integer",
+                "defaultValue": 10
+              },
+              {
+                "key": "nTrees",
+                "label": "Number of trees",
+                "kind": "integer",
+                "defaultValue": 100
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.knn",
+      "label": "k-NN Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a k-nearest-neighbors classifier. Props: targetColumn, featureColumns, k (neighbors, default 5). Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.knn",
+        "kind": "ml",
+        "label": "k-NN Learner",
+        "description": "Train a k-nearest-neighbors classifier. Props: targetColumn, featureColumns, k (neighbors, default 5). Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "k",
+                "label": "Neighbors (k)",
+                "kind": "integer",
+                "defaultValue": 5
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.kmeans",
+      "label": "k-Means Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Fit a k-means clustering model (unsupervised). Props: featureColumns, k (clusters, default 3), maxIter. Outputs a model on the model port; predict appends a cluster id.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.kmeans",
+        "kind": "ml",
+        "label": "k-Means Learner",
+        "description": "Fit a k-means clustering model (unsupervised). Props: featureColumns, k (clusters, default 3), maxIter. Outputs a model on the model port; predict appends a cluster id.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "k",
+                "label": "Clusters (k)",
+                "kind": "integer",
+                "defaultValue": 3
+              },
+              {
+                "key": "maxIter",
+                "label": "Max iterations",
+                "kind": "integer",
+                "defaultValue": 100
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.tree.reg",
+      "label": "Decision Tree Regressor",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a decision tree regressor (numeric target). Props: targetColumn (numeric), featureColumns, maxDepth (default 10). Outputs a model on the model port; predict appends a numeric prediction.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.tree.reg",
+        "kind": "ml",
+        "label": "Decision Tree Regressor",
+        "description": "Train a decision tree regressor (numeric target). Props: targetColumn (numeric), featureColumns, maxDepth (default 10). Outputs a model on the model port; predict appends a numeric prediction.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "maxDepth",
+                "label": "Max depth",
+                "kind": "integer",
+                "defaultValue": 10
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.forest.reg",
+      "label": "Random Forest Regressor",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a random forest regressor (numeric target). Props: targetColumn (numeric), featureColumns, nTrees (default 100), maxDepth. Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.forest.reg",
+        "kind": "ml",
+        "label": "Random Forest Regressor",
+        "description": "Train a random forest regressor (numeric target). Props: targetColumn (numeric), featureColumns, nTrees (default 100), maxDepth. Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "maxDepth",
+                "label": "Max depth",
+                "kind": "integer",
+                "defaultValue": 10
+              },
+              {
+                "key": "nTrees",
+                "label": "Number of trees",
+                "kind": "integer",
+                "defaultValue": 100
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.knn.reg",
+      "label": "k-NN Regressor",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a k-nearest-neighbors regressor (numeric target). Props: targetColumn (numeric), featureColumns, k (neighbors, default 5). Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.knn.reg",
+        "kind": "ml",
+        "label": "k-NN Regressor",
+        "description": "Train a k-nearest-neighbors regressor (numeric target). Props: targetColumn (numeric), featureColumns, k (neighbors, default 5). Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "k",
+                "label": "Neighbors (k)",
+                "kind": "integer",
+                "defaultValue": 5
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.predict",
+      "label": "Predictor",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Apply a trained model (model port) to incoming rows. Appends a prediction column (default `prediction`). Props: outputColumn. Wire the data into main and the Learner into the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.predict",
+        "kind": "ml",
+        "label": "Predictor",
+        "description": "Apply a trained model (model port) to incoming rows. Appends a prediction column (default `prediction`). Props: outputColumn. Wire the data into main and the Learner into the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Prediction",
+            "fields": [
+              {
+                "key": "outputColumn",
+                "label": "Output column",
+                "kind": "text",
+                "defaultValue": "prediction",
+                "description": "Name of the appended prediction column."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.score",
+      "label": "Scorer",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Evaluate predictions against ground truth. Props: actualColumn, predictedColumn, task (`classification` or `regression`). Emits a metrics table: accuracy/precision/recall + confusion matrix for classification, RMSE/MAE/R² for regression.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.score",
+        "kind": "ml",
+        "label": "Scorer",
+        "description": "Evaluate predictions against ground truth. Props: actualColumn, predictedColumn, task (`classification` or `regression`). Emits a metrics table: accuracy/precision/recall + confusion matrix for classification, RMSE/MAE/R² for regression.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Evaluation",
+            "fields": [
+              {
+                "key": "actualColumn",
+                "label": "Actual column",
+                "kind": "column",
+                "required": true,
+                "description": "Ground-truth label/value column."
+              },
+              {
+                "key": "predictedColumn",
+                "label": "Predicted column",
+                "kind": "column",
+                "required": true,
+                "defaultValue": "prediction",
+                "description": "Column holding the model prediction."
+              },
+              {
+                "key": "task",
+                "label": "Task",
+                "kind": "select",
+                "defaultValue": "classification",
+                "options": [
+                  {
+                    "label": "Classification",
+                    "value": "classification"
+                  },
+                  {
+                    "label": "Regression",
+                    "value": "regression"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.model.writer",
+      "label": "Model Writer",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Export a trained model to a file for use on other platforms. Wire a Learner or ONNX Reader into the model port. Classic ML → portable JSON (params + features + labels); ONNX → copies the .onnx file. Props: path (output file).",
+      "ports": {
+        "inputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "ml.model.writer",
+        "kind": "ml",
+        "label": "Model Writer",
+        "description": "Export a trained model to a file for use on other platforms. Wire a Learner or ONNX Reader into the model port. Classic ML → portable JSON (params + features + labels); ONNX → copies the .onnx file. Props: path (output file).",
+        "schemaSource": "declared",
+        "sections": [
+          {
+            "label": "Output",
+            "fields": [
+              {
+                "key": "path",
+                "label": "Output file",
+                "kind": "save-path",
+                "required": true,
+                "description": "Where to write the exported model. Classic ML exports portable JSON; ONNX copies the .onnx file.",
+                "filters": [
+                  {
+                    "name": "JSON model",
+                    "extensions": [
+                      "json"
+                    ]
+                  },
+                  {
+                    "name": "ONNX model",
+                    "extensions": [
+                      "onnx"
+                    ]
+                  },
+                  {
+                    "name": "All files",
+                    "extensions": [
+                      "*"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "dl.onnx.reader",
+      "label": "ONNX Model Reader",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Load a pre-trained ONNX model file from disk. Props: path (.onnx file). Outputs a model on the model port. Runs locally via the ONNX Runtime (installed on first use); no Python required.",
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "dl.onnx.reader",
+        "kind": "ml",
+        "label": "ONNX Model Reader",
+        "description": "Load a pre-trained ONNX model file from disk. Props: path (.onnx file). Outputs a model on the model port. Runs locally via the ONNX Runtime (installed on first use); no Python required.",
+        "schemaSource": "declared",
+        "sections": [
+          {
+            "label": "Model",
+            "fields": [
+              {
+                "key": "path",
+                "label": "ONNX model path",
+                "kind": "file-path",
+                "required": true,
+                "filters": [
+                  {
+                    "name": "ONNX model",
+                    "extensions": [
+                      "onnx"
+                    ]
+                  },
+                  {
+                    "name": "All files",
+                    "extensions": [
+                      "*"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "dl.onnx.predict",
+      "label": "ONNX Predictor",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Run inference with a loaded ONNX model (model port) over incoming rows. Props: featureColumns (model inputs, in order), outputColumn (default `prediction`). Appends the model output to each row.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "dl.onnx.predict",
+        "kind": "ml",
+        "label": "ONNX Predictor",
+        "description": "Run inference with a loaded ONNX model (model port) over incoming rows. Props: featureColumns (model inputs, in order), outputColumn (default `prediction`). Appends the model output to each row.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Prediction",
+            "fields": [
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "required": true,
+                "description": "Columns fed to the model inputs, in order."
+              },
+              {
+                "key": "outputColumn",
+                "label": "Output column",
+                "kind": "text",
+                "defaultValue": "prediction",
+                "description": "Name of the appended prediction column."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
             }
           ]
         }

@@ -26,8 +26,15 @@ use smartcore::linear::linear_regression::{LinearRegression, LinearRegressionPar
 use smartcore::linear::logistic_regression::{LogisticRegression, LogisticRegressionParameters};
 use smartcore::metrics::distance::euclidian::Euclidian;
 use smartcore::neighbors::knn_classifier::{KNNClassifier, KNNClassifierParameters};
+use smartcore::neighbors::knn_regressor::{KNNRegressor, KNNRegressorParameters};
 use smartcore::tree::decision_tree_classifier::{
     DecisionTreeClassifier, DecisionTreeClassifierParameters,
+};
+use smartcore::ensemble::random_forest_regressor::{
+    RandomForestRegressor, RandomForestRegressorParameters,
+};
+use smartcore::tree::decision_tree_regressor::{
+    DecisionTreeRegressor, DecisionTreeRegressorParameters,
 };
 
 /// Column where a learner stashes the serialized model bundle.
@@ -68,6 +75,18 @@ enum Model {
         features: Vec<String>,
         model: KMeans<f64, i64, Matrix, Vec<i64>>,
     },
+    TreeReg {
+        features: Vec<String>,
+        model: DecisionTreeRegressor<f64, f64, Matrix, Vec<f64>>,
+    },
+    ForestReg {
+        features: Vec<String>,
+        model: RandomForestRegressor<f64, f64, Matrix, Vec<f64>>,
+    },
+    KnnReg {
+        features: Vec<String>,
+        model: KNNRegressor<f64, f64, Matrix, Vec<f64>, Euclidian<f64>>,
+    },
 }
 
 impl Model {
@@ -78,7 +97,10 @@ impl Model {
             | Model::Tree { features, .. }
             | Model::Forest { features, .. }
             | Model::Knn { features, .. }
-            | Model::KMeans { features, .. } => features,
+            | Model::KMeans { features, .. }
+            | Model::TreeReg { features, .. }
+            | Model::ForestReg { features, .. }
+            | Model::KnnReg { features, .. } => features,
         }
     }
 
@@ -90,6 +112,9 @@ impl Model {
             Model::Forest { .. } => "forest",
             Model::Knn { .. } => "knn",
             Model::KMeans { .. } => "kmeans",
+            Model::TreeReg { .. } => "tree.reg",
+            Model::ForestReg { .. } => "forest.reg",
+            Model::KnnReg { .. } => "knn.reg",
         }
     }
 
@@ -305,6 +330,36 @@ impl DuckdbEngine {
                 let m = KMeans::fit(&x, params).map_err(fit_failed)?;
                 Model::KMeans { features, model: m }
             }
+            "tree.reg" => {
+                let y: Vec<f64> = rows
+                    .iter()
+                    .map(|r| cell_to_f64(r.get(&spec.target_column)))
+                    .collect();
+                let params = DecisionTreeRegressorParameters::default()
+                    .with_max_depth(spec.max_depth.max(1) as u16);
+                let m = DecisionTreeRegressor::fit(&x, &y, params).map_err(fit_failed)?;
+                Model::TreeReg { features, model: m }
+            }
+            "forest.reg" => {
+                let y: Vec<f64> = rows
+                    .iter()
+                    .map(|r| cell_to_f64(r.get(&spec.target_column)))
+                    .collect();
+                let params = RandomForestRegressorParameters::default()
+                    .with_n_trees(spec.n_trees.max(1))
+                    .with_max_depth(spec.max_depth.max(1) as u16);
+                let m = RandomForestRegressor::fit(&x, &y, params).map_err(fit_failed)?;
+                Model::ForestReg { features, model: m }
+            }
+            "knn.reg" => {
+                let y: Vec<f64> = rows
+                    .iter()
+                    .map(|r| cell_to_f64(r.get(&spec.target_column)))
+                    .collect();
+                let params = KNNRegressorParameters::default().with_k(spec.k.max(1));
+                let m = KNNRegressor::fit(&x, &y, params).map_err(fit_failed)?;
+                Model::KnnReg { features, model: m }
+            }
             other => {
                 return Err(EngineError::Config(format!(
                     "ml.learner: unknown algorithm '{}'",
@@ -375,6 +430,24 @@ impl DuckdbEngine {
                 .map_err(fit_failed)?
                 .into_iter()
                 .map(|c| json!(c))
+                .collect(),
+            Model::TreeReg { model, .. } => model
+                .predict(&x)
+                .map_err(fit_failed)?
+                .into_iter()
+                .map(|v| json!(v))
+                .collect(),
+            Model::ForestReg { model, .. } => model
+                .predict(&x)
+                .map_err(fit_failed)?
+                .into_iter()
+                .map(|v| json!(v))
+                .collect(),
+            Model::KnnReg { model, .. } => model
+                .predict(&x)
+                .map_err(fit_failed)?
+                .into_iter()
+                .map(|v| json!(v))
                 .collect(),
         };
 

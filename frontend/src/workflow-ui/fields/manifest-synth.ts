@@ -4785,7 +4785,7 @@ function synthMl(comp: ComponentDef): ComponentManifest {
             kind: 'columns',
             description: 'Predictor columns. Leave empty to use all other numeric columns.',
         });
-        if (id === 'ml.learner.tree' || id === 'ml.learner.forest') {
+        if (id === 'ml.learner.tree' || id === 'ml.learner.forest' || id === 'ml.learner.tree.reg' || id === 'ml.learner.forest.reg') {
             fields.push({
                 key: 'maxDepth',
                 label: 'Max depth',
@@ -4793,7 +4793,7 @@ function synthMl(comp: ComponentDef): ComponentManifest {
                 defaultValue: 10,
             });
         }
-        if (id === 'ml.learner.forest') {
+        if (id === 'ml.learner.forest' || id === 'ml.learner.forest.reg') {
             fields.push({
                 key: 'nTrees',
                 label: 'Number of trees',
@@ -4801,7 +4801,7 @@ function synthMl(comp: ComponentDef): ComponentManifest {
                 defaultValue: 100,
             });
         }
-        if (id === 'ml.learner.knn') {
+        if (id === 'ml.learner.knn' || id === 'ml.learner.knn.reg') {
             fields.push({
                 key: 'k',
                 label: 'Neighbors (k)',
