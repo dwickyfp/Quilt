@@ -2,9 +2,9 @@
 
 <img src="docs/assets/hero.svg" alt="Quilt" width="100%"/>
 
-<h3>Pipelines you can see. Data that stays yours.</h3>
+<h3>Pipelines you can see — ETL, statistics, machine learning, and deep learning on one canvas.</h3>
 
-<p><b>Quilt</b> is an open-source, offline-first desktop studio for visual ETL / ELT. Drag a pipeline onto the canvas, or just describe what you need in plain English to <b>Qunnie</b> — the on-device AI assistant — and execute at native speed through DuckDB. 290+ connectors, 136 transforms, a built-in scheduler, and an AI that runs entirely on your own CPU. Ships as a ~65&nbsp;MB single-file desktop app. No cloud, no servers, no lock-in, no telemetry.</p>
+<p><b>Quilt</b> is an open-source desktop studio for visual data work: <b>ETL / ELT plus statistics, machine learning, and deep learning</b>, all on one canvas. Drag a pipeline together, or just describe what you need in plain English to <b>Qunnie</b> — the built-in AI assistant — and execute at native speed through DuckDB. 290+ connectors, 136 transforms, in-engine statistics and 24 ML nodes, ONNX deep-learning inference, 10 inline charts, and a built-in scheduler. Ships as a ~65&nbsp;MB single-file desktop app.</p>
 
 <p>
 <img alt="status" src="https://img.shields.io/badge/status-beta-6366F1"/>
@@ -65,9 +65,10 @@
 - [Data quality](#data-quality-13-available)
 - [Custom code](#custom-code-7-available)
 - [Control flow](#control-flow-19-available)
-- [Machine learning](#machine-learning-18-available)
+- [Machine learning](#machine-learning-24-available)
 - [Deep learning](#deep-learning-2-available)
-- [Visualization](#visualization-4-available)
+- [Statistics](#statistics-in-engine)
+- [Visualization](#visualization-10-available)
 - [Advanced settings](#advanced-settings-per-node)
 - [Engines](#engines)
 - [Configuration](#configuration)
@@ -99,17 +100,17 @@
 
 ## What is Quilt?
 
-A visual data pipeline studio that runs on your laptop. Drag sources, transforms, validators, and sinks onto a canvas. Wire them together. Press **Run**. Quilt compiles the graph to SQL and executes it through a real columnar engine, with live previews, generated SQL on every node, and zero hidden state.
+A visual data studio that runs on your desktop. Drag sources, transforms, statistics, ML learners, validators, charts, and sinks onto a canvas. Wire them together. Press **Run**. Quilt compiles the graph to SQL (and in-engine ML) and executes it through a real columnar engine, with live previews, generated SQL on every node, and zero hidden state.
 
 <div align="center">
 <img src="docs/assets/screenshot.png" alt="The Quilt desktop app: a node-based RFM segmentation pipeline on the canvas, with the components palette on the left and a run-output panel showing 35 nodes and 6,692 rows written" width="100%"/>
 </div>
 
-Three things make Quilt different from the heavyweights and the toy ETL tools:
+Quilt is more than an ETL tool. The same canvas that moves and reshapes data also **runs descriptive statistics and hypothesis tests, trains and evaluates machine-learning models, and runs deep-learning inference** — no Python runtime, no separate notebook. Three things set it apart:
 
-1. **An AI assistant that ships in the box.** Describe the pipeline you want in English; Qunnie writes the JSON and drops it onto the canvas. The model runs locally - no API key, no telemetry, no cloud round-trip.
+1. **An AI assistant that ships in the box.** Describe the pipeline you want in English; Qunnie writes the JSON and drops it onto the canvas, no API key required.
 2. **290+ connectors at install time.** Files, lakehouses, SQL databases, warehouses, NoSQL, vector DBs, streaming brokers, SaaS REST/GraphQL APIs, even FTP and IMAP - working today, not coming-soon.
-3. **A self-contained binary you can audit.** ~65 MB download. Engines install on first launch. Workspaces are plain files in a folder you choose. Diff them, branch them, ship them.
+3. **Data science on the same graph.** Statistics (summary, correlation, t-test / ANOVA / chi-square), 24 ML nodes (learners, cross-validation, feature selection, PCA, one-hot, scoring), ONNX deep-learning inference, and 10 inline charts all live in the palette next to the ETL nodes.
 
 <div align="center">
 <img src="docs/assets/flow.svg" alt="Sources flow through 136 transforms into files, databases, object storage, vector stores, and AI" width="100%"/>
@@ -119,7 +120,7 @@ Three things make Quilt different from the heavyweights and the toy ETL tools:
 
 ## How it works
 
-Quilt is a dataflow engine with a visual front end. Data moves left to right: pull from any **source**, reshape it by **drawing and wiring nodes** on a canvas, let Quilt compile that graph to SQL and execute it on **DuckDB**, then land the result in any **target** — all on your machine, no servers.
+Quilt is a dataflow engine with a visual front end. Data moves left to right: pull from any **source**, reshape it by **drawing and wiring nodes** on a canvas, let Quilt compile that graph to SQL and execute it on **DuckDB**, then land the result in any **target**. The same canvas also fits statistics, ML, and inline charts between the source and the target.
 
 <div align="center">
 <img src="docs/assets/how-it-works.svg" alt="Sources flow into a canvas of wired nodes, compile to SQL, execute on the DuckDB engine, and land in targets" width="100%"/>
@@ -140,7 +141,7 @@ The same graph runs identically from your laptop to a scheduled job to a server 
 
 > Describe what you need. Qunnie builds, inspects, and fixes the pipeline with you.
 
-The sidebar on the right is **Qunnie**, Quilt's built-in AI assistant. It ships fully local - powered by **Qwen 2.5 Coder 1.5B** through **llama.cpp**, downloaded once (~1.1 GB) and run entirely on your CPU - and it can also drive any model you point it at. Ask in plain English; Qunnie can answer, generate a pipeline, modify the graph you already have, or work a multi-step task as an agent.
+The sidebar on the right is **Qunnie**, Quilt's built-in AI assistant. It comes with a bundled **Qwen 2.5 Coder 1.5B** model through **llama.cpp** (downloaded once, ~1.1 GB, runs on your CPU) and can also drive any model you point it at. Ask in plain English; Qunnie can answer, generate a pipeline, modify the graph you already have, or work a multi-step task as an agent.
 
 <div align="center">
 <img src="docs/assets/qunnie-flow.svg" alt="Ask Qunnie in plain English; it builds, compiles, runs, and lands the pipeline with a human-in-the-loop approval step" width="100%"/>
@@ -152,7 +153,7 @@ Qunnie is no longer tied to one model. In **Settings -> AI** you can register se
 
 | | |
 |---|---|
-| **Local by default** | The Qwen model runs as a `llama-server` subprocess on `127.0.0.1`. No API keys, no network calls - disconnect your wifi and it keeps working. |
+| **Bundled model** | The Qwen model runs as a `llama-server` subprocess on `127.0.0.1`, with no API key. Use it as-is, or point Qunnie at a hosted model instead. |
 | **Bring your own** | Add OpenAI, Claude, or any **OpenAI-compatible** endpoint (Ollama, LM Studio, vLLM, llama.cpp, Cohere, Voyage). OpenAI-compatible endpoints can be saved **without an API key** for keyless local servers. |
 | **Per-model switching** | Configure `gpt-4o`, `claude-sonnet`, and a local model side by side; pick the right one per task from the chat dropdown. |
 
@@ -194,7 +195,8 @@ Because the assistant can now propose edits, it ships with layered guardrails:
 | | |
 |---|---|
 | **Visual, never opaque** | The canvas compiles to SQL you can read, and every node has a live preview tab. No black box. |
-| **Local-first AI** | An assistant that runs on your laptop without an API key. Your prompts, your data, your machine. |
+| **AI in the box** | A built-in assistant with a bundled model (no API key needed), or point it at OpenAI / Claude / any OpenAI-compatible endpoint. |
+| **More than ETL** | Descriptive statistics, hypothesis tests, 24 ML nodes (train / cross-validate / select features / PCA / one-hot / score), and ONNX deep-learning inference run on the same canvas — no Python runtime. |
 | **Single-file binary, no bundled DB** | ~65 MB app (it embeds the headless runner + MCP server). DuckDB downloads on first launch with a guided step. AI engine is opt-in. |
 | **Native speed** | Execution runs through DuckDB: vectorized, columnar, local. A clean-and-export job that crawls in a spreadsheet finishes in milliseconds. |
 | **Git-friendly by design** | Pipelines, connections, contexts, and routines persist as plain files in a folder you pick. Diff them, branch them, review them. |
@@ -207,13 +209,13 @@ Because the assistant can now propose edits, it ships with layered guardrails:
 
 ## Status
 
-Quilt is in **public beta**. The visual designer, the DuckDB execution engine, the scheduler, the cloud connectors, and the Qunnie AI assistant all work today and are covered by 170+ integration tests across Linux, macOS, and Windows. The catalog is still growing and APIs may evolve before 1.0, but the day-to-day surface is stable enough for real work.
+Quilt is in **public beta**. The visual designer, the DuckDB execution engine, the scheduler, the cloud connectors, the in-engine statistics / ML / deep-learning nodes, and the Qunnie AI assistant all work today and are covered by 230+ integration tests across Linux, macOS, and Windows. The catalog is still growing and APIs may evolve before 1.0, but the day-to-day surface is stable enough for real work.
 
 **Scope, stated plainly:** Quilt is a single-machine, embedded studio. If you outgrow one box, point Quilt's output at the system that scales (a warehouse, an object store, a lakehouse). It will not pretend to be a cluster.
 
-The component palette ships **362 nodes** so the roadmap is visible in the product itself:
+The component palette ships **374 nodes** so the roadmap is visible in the product itself:
 
-- **341 available** runs on the DuckDB engine today
+- **353 available** runs on the DuckDB engine today
 - **5 preview** is configurable in the designer (drag, wire, set properties); execution is being wired engine-by-engine
 - **16 planned** is reserved in the palette but not yet executable - see [`docs/roadmap.md`](docs/roadmap.md)
 
@@ -221,7 +223,7 @@ The component palette ships **362 nodes** so the roadmap is visible in the produ
 
 ## Capabilities
 
-Quilt is not a CSV tool with extras. It reads a broad set of formats and sources, ships a deep transform library, trains and applies ML / deep-learning models, renders charts inline, and writes to files, databases, object storage, vector DBs, message buses, and email.
+Quilt is not a CSV tool with extras. It reads a broad set of formats and sources, ships a deep transform library, runs descriptive statistics and hypothesis tests, trains and applies ML / deep-learning models, renders charts inline, and writes to files, databases, object storage, vector DBs, message buses, and email.
 
 ### Sources (74 available)
 
@@ -353,15 +355,15 @@ Validators split their input: passing rows continue on the main port, failures r
 | **Die / Fail** | Stop the run with a message: always, only when the input has rows, or only when empty (`ctl.die`) |
 | **Schedule** | Cron / interval / file-watch triggers via the orchestration crate |
 
-### Machine learning (18 available)
+### Machine learning (24 available)
 
-Train, apply, and evaluate classic ML models directly on the canvas - in-engine, no Python runtime. Learners emit a model on a dedicated **model** port; wire it into a Predictor (and feed a held-out set into a Scorer) to close the loop.
+Train, apply, and evaluate classic ML models directly on the canvas - in-engine, no Python runtime. Learners emit a model on a dedicated **model** port; wire it into a Predictor (and feed a held-out set into a Scorer) to close the loop. Cross-validation, feature selection, and the preprocessing transforms (PCA, one-hot) run as their own nodes on the same graph.
 
 | Group | Components |
 |---|---|
-| **Preparation** | Partition (train / test split: `random` or `stratified`, seeded for reproducibility) |
-| **Learners (train)** | Linear Regression, Ridge, Lasso, ElasticNet, Logistic Regression, Gaussian Naive Bayes, Decision Tree (classifier + regressor), Random Forest (classifier + regressor), k-NN (classifier + regressor), k-Means + DBSCAN (unsupervised clustering) |
-| **Apply & evaluate** | Predictor (append a prediction column from a trained model), Scorer (accuracy / precision / recall + confusion matrix for classification; RMSE / MAE / R² for regression) |
+| **Preparation** | Partition (train / test split: `random` or `stratified`, seeded for reproducibility), One-Hot Encoder (append a 0/1 indicator column per category, with an optional `maxCategories` cap that folds rare values into `_other`), PCA (fit + transform in one node — appends `pc1..pcN` principal components) |
+| **Learners (train)** | Linear Regression, Ridge, Lasso, ElasticNet, Logistic Regression, Gaussian Naive Bayes, Decision Tree (classifier + regressor), Random Forest (classifier + regressor), k-NN (classifier + regressor), **Gradient Boosting** (classifier + regressor, pure-Rust GBDT), k-Means + DBSCAN (unsupervised clustering) |
+| **Apply & evaluate** | Predictor (append a prediction column from a trained model), Scorer (accuracy / precision / recall + confusion matrix for classification; RMSE / MAE / R² for regression), **Cross-Validator** (automated k-fold CV for any learner — emits per-fold scores plus mean + std), **Feature Selector** (greedy forward selection driven by k-fold CV) |
 | **Export** | Model Writer (classic ML → portable JSON params + features + labels; ONNX → copies the `.onnx` file) |
 
 ### Deep learning (2 available)
@@ -373,9 +375,25 @@ Run pre-trained neural networks locally via the ONNX Runtime (fetched on first u
 | **ONNX Model Reader** | Load a pre-trained `.onnx` model file from disk; outputs a model on the model port |
 | **ONNX Predictor** | Run inference with a loaded ONNX model over incoming rows; maps `featureColumns` (in order) to the model inputs and appends the output column |
 
-### Visualization (4 available)
+### Statistics (in-engine)
 
-Terminal chart nodes that aggregate upstream data and render it inline - inspect results without leaving the canvas or exporting to a BI tool.
+Run descriptive statistics and inferential tests directly on the canvas — every result is plain SQL over DuckDB, no Python, no export to a notebook. These live in the **Statistics & ML prep** transform group and feed naturally into the ML and chart nodes.
+
+| Component | What it does |
+|---|---|
+| **Descriptive Summary** | One row per selected numeric column with count / mean / stddev / min / median / max |
+| **Pairwise Correlation** | Pearson r for every unique pair of selected numeric columns |
+| **Hypothesis Test** | Independent t-test, one-way ANOVA, or chi-square independence — emits statistic + df + p-value (verified against SciPy) |
+| **K-Fold Assign** | Stamp each row with a stable, seeded fold id `0..folds-1` for reproducible cross-validation |
+| **Impute Missing** | Fill NULLs in a numeric column with mean (default) or median |
+| **Label Encode** | Map categories to integer codes |
+| **Z-Score / Min-Max Normalize** | Standardize or rescale a numeric column against the dataset |
+
+> Cross-validation, feature selection, PCA, and one-hot encoding are first-class ML nodes — see [Machine learning](#machine-learning-24-available).
+
+### Visualization (10 available)
+
+Terminal chart nodes that aggregate upstream data and render it inline - inspect results without leaving the canvas or exporting to a BI tool. Rendered with ECharts.
 
 | Component | What it does |
 |---|---|
@@ -383,6 +401,12 @@ Terminal chart nodes that aggregate upstream data and render it inline - inspect
 | **Line Chart** | Aggregate a measure by a dimension and render a line |
 | **Scatter Plot** | Plot raw x vs y points to inspect correlation |
 | **Histogram** | Count rows per dimension value |
+| **Pie / Donut** | Aggregate a measure by a dimension and render proportional slices |
+| **Box Plot** | Five-number summary (min / Q1 / median / Q3 / max) of a measure, optionally grouped |
+| **Heatmap** | Aggregate a measure over two dimensions (x + series) into a colored grid |
+| **ROC Curve** | Plot true-positive vs false-positive rate over a score column — evaluate a classifier |
+| **Precision-Recall Curve** | Plot precision vs recall over a score column |
+| **Scatter Matrix (SPLOM)** | Pairwise scatter plots of 2+ numeric columns in an N×N grid |
 
 ### Advanced settings (per-node)
 
@@ -1073,7 +1097,7 @@ No. Once `llama-server` and the Qwen GGUF are downloaded into your app-data dire
 <details>
 <summary><b>Why DuckDB and not Polars / Apache Spark / X?</b></summary>
 
-DuckDB's SQL surface is wide enough to express most ETL work, it's vectorized and fast on a laptop, it has first-class Iceberg/Delta/Parquet readers, and its extension model lets us add vector + full-text + Postgres ATTACH without code changes. Polars is great but doesn't ship the cloud/format/extension breadth we need; Spark is a great cluster but overkill for the local-first niche we're in.
+DuckDB's SQL surface is wide enough to express most ETL work, it's vectorized and fast on a single machine, it has first-class Iceberg/Delta/Parquet readers, and its extension model lets us add vector + full-text + Postgres ATTACH without code changes. Polars is great but doesn't ship the cloud/format/extension breadth we need; Spark is a great cluster but overkill for the single-machine, embedded niche Quilt targets.
 
 </details>
 
@@ -1165,7 +1189,7 @@ Contributions, issues, and ideas are welcome. Quilt is young and there is a lot 
 
 Quilt stands on the shoulders of excellent open-source work.
 
-- **[duckle](https://github.com/SouravRoy-ETL/duckle)** — the upstream project Quilt was forked from. Quilt keeps its spirit (local-first visual ETL on DuckDB) and builds its own identity, multi-workspace support, and roadmap on top.
+- **[duckle](https://github.com/SouravRoy-ETL/duckle)** — the upstream project Quilt was forked from. Quilt keeps its spirit (visual ETL on DuckDB) and builds its own identity, multi-workspace support, the statistics / ML / deep-learning nodes, and roadmap on top.
 - **[DuckDB](https://duckdb.org)** — the vectorized, columnar engine every pipeline runs on.
 - **[Tauri](https://tauri.app)**, **[React](https://react.dev)**, and **[Rust](https://www.rust-lang.org)** — the desktop shell, UI, and core.
 - **[llama.cpp](https://github.com/ggml-org/llama.cpp)** + **[Qwen 2.5 Coder](https://github.com/QwenLM/Qwen2.5-Coder)** — the on-device engine and model behind Qunnie.
@@ -1182,4 +1206,4 @@ Licensed under either of **MIT** or **Apache-2.0** at your option.
 <sub>Built with Rust, Tauri, React, and DuckDB by <a href="https://github.com/dwickyfp">Dwicky Feri</a></sub>
 </div>
 
-<!-- Suggested GitHub topics: etl, elt, data-engineering, data-pipeline, duckdb, rust, tauri, react, typescript, local-first, embedded, drag-and-drop, data-cleaning, vector-database, ai, ai-assistant, llm, llama-cpp, qwen, desktop-app, no-code, low-code, sql, pipeline-builder -->
+<!-- Suggested GitHub topics: etl, elt, data-engineering, data-pipeline, duckdb, rust, tauri, react, typescript, statistics, machine-learning, deep-learning, onnx, embedded, drag-and-drop, data-cleaning, vector-database, ai, ai-assistant, llm, llama-cpp, qwen, desktop-app, no-code, low-code, sql, pipeline-builder -->
