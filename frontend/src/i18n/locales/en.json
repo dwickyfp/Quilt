@@ -206,7 +206,8 @@
     "nodes": "nodes",
     "edges": "edges",
     "engineLabel": "Engine:",
-    "runtimeLabel": "Runtime:"
+    "runtimeLabel": "Runtime:",
+    "versionLabel": "Version"
   },
   "engine": {
     "label": "Engine",

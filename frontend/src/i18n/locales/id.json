@@ -211,7 +211,8 @@
     "nodes": "node",
     "edges": "tepian",
     "engineLabel": "Mesin:",
-    "runtimeLabel": "Waktu tayang:"
+    "runtimeLabel": "Waktu tayang:",
+    "versionLabel": "Versi"
   },
   "engine": {
     "label": "Mesin",
