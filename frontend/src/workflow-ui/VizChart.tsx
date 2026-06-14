@@ -1,18 +1,49 @@
 import { useEffect, useRef } from 'react';
-import uPlot from 'uplot';
-import 'uplot/dist/uPlot.min.css';
-import { rowsToSeries, type VizRow } from './viz-chart-data';
+import * as echarts from 'echarts/core';
+import {
+    BarChart,
+    LineChart,
+    ScatterChart,
+    PieChart,
+    BoxplotChart,
+    HeatmapChart,
+} from 'echarts/charts';
+import {
+    GridComponent,
+    TooltipComponent,
+    LegendComponent,
+    VisualMapComponent,
+    TitleComponent,
+} from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
+import { buildVizOption, type VizRow } from './viz-chart-data';
+
+echarts.use([
+    BarChart,
+    LineChart,
+    ScatterChart,
+    PieChart,
+    BoxplotChart,
+    HeatmapChart,
+    GridComponent,
+    TooltipComponent,
+    LegendComponent,
+    VisualMapComponent,
+    TitleComponent,
+    CanvasRenderer,
+]);
 
 type Props = {
     chart: string;
     rows: VizRow[];
 };
 
-const CHART_HEIGHT = 240;
+const CHART_HEIGHT = 260;
 
 /**
- * Renders a NodePreview for a viz node as a uPlot chart. Pure data-shaping
- * lives in viz-chart-data.ts; this component owns only the DOM lifecycle.
+ * Renders a NodePreview for a viz node as an Apache ECharts chart. Pure
+ * option-building lives in viz-chart-data.ts; this component owns only the
+ * DOM lifecycle (init, resize, dispose).
  */
 export default function VizChart({ chart, rows }: Props) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -21,53 +52,27 @@ export default function VizChart({ chart, rows }: Props) {
         const container = containerRef.current;
         if (!container || rows.length === 0) return;
 
-        const { data, labels } = rowsToSeries(rows, chart);
-        const width = container.clientWidth || 320;
-
-        const isScatter = chart === 'scatter';
-        const isBars = chart === 'bar' || chart === 'histogram';
-
-        const opts: uPlot.Options = {
-            width,
+        const instance = echarts.init(container, null, {
+            renderer: 'canvas',
             height: CHART_HEIGHT,
-            // Axis labels: categorical charts map indices back to their x label.
-            axes: [
-                isScatter
-                    ? {}
-                    : {
-                          values: (_u, splits) =>
-                              splits.map(s => labels[s] ?? ''),
-                      },
-                {},
-            ],
-            scales: { x: { time: false } },
-            series: [
-                {},
-                isScatter
-                    ? {
-                          // Points only: no connecting line.
-                          paths: () => null,
-                          points: { show: true, size: 6 },
-                          stroke: '#a371f7',
-                      }
-                    : isBars
-                      ? {
-                            paths: uPlot.paths.bars?.({ size: [0.6, 100] }),
-                            stroke: '#a371f7',
-                            fill: 'rgba(163, 113, 247, 0.4)',
-                        }
-                      : {
-                            // line chart
-                            stroke: '#a371f7',
-                            width: 2,
-                            points: { show: true, size: 4 },
-                        },
-            ],
-            legend: { show: false },
-        };
+        });
+        const option = buildVizOption(rows, chart);
+        // Dark-theme axis/label defaults applied globally so each builder stays
+        // focused on data, not chrome.
+        instance.setOption({
+            backgroundColor: 'transparent',
+            textStyle: { color: '#8b949e' },
+            ...option,
+        });
 
-        const plot = new uPlot(opts, data, container);
-        return () => plot.destroy();
+        const resize = () => instance.resize();
+        const ro = new ResizeObserver(resize);
+        ro.observe(container);
+
+        return () => {
+            ro.disconnect();
+            instance.dispose();
+        };
     }, [chart, rows]);
 
     if (rows.length === 0) {
@@ -77,6 +82,7 @@ export default function VizChart({ chart, rows }: Props) {
     return (
         <div
             ref={containerRef}
+            style={{ width: '100%', height: CHART_HEIGHT }}
             role="img"
             aria-label={`${chart} chart of the node preview, ${rows.length} data point${rows.length === 1 ? '' : 's'}`}
         />

@@ -1,14 +1,32 @@
 // Pure data-shaping helpers for VizChart. Kept DOM-free so they can be
 // unit-tested without jsdom / a canvas. The engine emits NodePreview rows
-// with `x` / `y` columns (bar/line/histogram) or raw `x` / `y` (scatter).
+// whose shape depends on the chart:
+//   bar / line / histogram -> { x (label), y (number), series? (label) }
+//   scatter                -> { x (number), y (number), series? (label) }
+//   pie                    -> { x (label), y (number) }
+//   box                    -> { x (label), min, q1, median, q3, max }
+//   heatmap                -> { x (label), y (label), value (number) }
+//   roc                    -> { fpr (number), tpr (number) }  (+ a meta AUC row)
+//
+// buildVizOption() returns a plain ECharts option object (no echarts runtime
+// import) so it can be asserted in unit tests; VizChart.tsx owns the DOM
+// lifecycle and feeds the option to an ECharts instance.
 
 export type VizRow = Record<string, unknown>;
 
-// uPlot expects data as [xValues, ySeries1, ySeries2, ...]; for our charts
-// we only ever build a single y series.
-export type UPlotData = [number[], number[]];
+// Minimal structural type for what we build — avoids a hard echarts type dep
+// in the pure module. VizChart casts this to echarts' EChartsOption.
+export type VizOption = Record<string, unknown>;
 
-function toNumber(v: unknown): number {
+const ACCENT = '#a371f7';
+const ACCENT_FILL = 'rgba(163, 113, 247, 0.4)';
+// Categorical palette for multi-series / pie slices (accent-led, color-safe).
+const PALETTE = [
+    '#a371f7', '#3fb950', '#f0883e', '#58a6ff', '#db61a2',
+    '#e3b341', '#39c5cf', '#ff7b72', '#bc8cff', '#7ee787',
+];
+
+export function toNumber(v: unknown): number {
     if (typeof v === 'number') return v;
     if (typeof v === 'string') {
         const n = Number(v);
@@ -17,46 +35,284 @@ function toNumber(v: unknown): number {
     return NaN;
 }
 
+export function toLabel(v: unknown): string {
+    return v === null || v === undefined ? '' : String(v);
+}
+
+const BASE_GRID = { left: 48, right: 16, top: 24, bottom: 36 };
+
 /**
- * Bar / line / histogram: the x column is categorical, so we plot against
- * row indices (0, 1, 2, …) and keep the original x values as labels for the
- * axis. Returns the numeric data uPlot needs plus the string labels.
+ * Bar / line / histogram. The x column is categorical. When a `series` column
+ * is present the rows are pivoted into one ECharts series per distinct series
+ * value (grouped bars / multi-line); otherwise a single series is built.
  */
-export function rowsToCategorical(rows: VizRow[]): { data: UPlotData; labels: string[] } {
+function buildCategorical(rows: VizRow[], chart: string): VizOption {
+    const seriesType = chart === 'line' ? 'line' : 'bar';
+    const hasSeries = rows.some(r => r.series !== undefined && r.series !== null);
+
+    // Preserve first-seen order for both axis labels and series names.
     const labels: string[] = [];
-    const xs: number[] = [];
-    const ys: number[] = [];
-    rows.forEach((r, i) => {
-        labels.push(r.x === null || r.x === undefined ? '' : String(r.x));
-        xs.push(i);
-        ys.push(toNumber(r.y));
-    });
-    return { data: [xs, ys], labels };
-}
+    const labelIndex = new Map<string, number>();
+    const pushLabel = (l: string) => {
+        if (!labelIndex.has(l)) {
+            labelIndex.set(l, labels.length);
+            labels.push(l);
+        }
+        return labelIndex.get(l)!;
+    };
 
-/**
- * Scatter: both axes are numeric. Returns [xNums, yNums] directly.
- */
-export function rowsToScatter(rows: VizRow[]): UPlotData {
-    const xs: number[] = [];
-    const ys: number[] = [];
+    if (!hasSeries) {
+        const values: number[] = [];
+        for (const r of rows) {
+            pushLabel(toLabel(r.x));
+            values.push(toNumber(r.y));
+        }
+        return {
+            grid: BASE_GRID,
+            tooltip: { trigger: 'axis' },
+            xAxis: { type: 'category', data: labels },
+            yAxis: { type: 'value' },
+            series: [
+                seriesType === 'bar'
+                    ? {
+                          type: 'bar',
+                          data: values,
+                          itemStyle: { color: ACCENT },
+                      }
+                    : {
+                          type: 'line',
+                          data: values,
+                          lineStyle: { color: ACCENT, width: 2 },
+                          itemStyle: { color: ACCENT },
+                      },
+            ],
+        };
+    }
+
+    // Multi-series: pivot (x, series) -> value matrix.
+    const seriesNames: string[] = [];
+    const seriesIndex = new Map<string, number>();
+    const matrix: number[][] = []; // matrix[seriesIdx][labelIdx]
     for (const r of rows) {
-        xs.push(toNumber(r.x));
-        ys.push(toNumber(r.y));
+        const li = pushLabel(toLabel(r.x));
+        const sName = toLabel(r.series);
+        if (!seriesIndex.has(sName)) {
+            seriesIndex.set(sName, seriesNames.length);
+            seriesNames.push(sName);
+            matrix.push([]);
+        }
+        const si = seriesIndex.get(sName)!;
+        matrix[si][li] = toNumber(r.y);
     }
-    return [xs, ys];
+    const series = seriesNames.map((name, si) => ({
+        name,
+        type: seriesType,
+        data: labels.map((_, li) => matrix[si][li] ?? 0),
+        itemStyle: { color: PALETTE[si % PALETTE.length] },
+        ...(seriesType === 'line'
+            ? { lineStyle: { color: PALETTE[si % PALETTE.length], width: 2 } }
+            : {}),
+    }));
+    return {
+        grid: BASE_GRID,
+        tooltip: { trigger: 'axis' },
+        legend: { show: true, top: 0, textStyle: { color: '#8b949e' } },
+        xAxis: { type: 'category', data: labels },
+        yAxis: { type: 'value' },
+        series,
+    };
 }
 
 /**
- * Dispatch by chart type. Scatter shapes to numeric x/y; everything else
- * (bar / line / histogram) shapes to categorical indices + labels.
+ * Scatter: both axes numeric. Optional `series` column splits points into
+ * colored groups.
  */
-export function rowsToSeries(
-    rows: VizRow[],
-    chart: string,
-): { data: UPlotData; labels: string[] } {
-    if (chart === 'scatter') {
-        return { data: rowsToScatter(rows), labels: [] };
+function buildScatter(rows: VizRow[]): VizOption {
+    const hasSeries = rows.some(r => r.series !== undefined && r.series !== null);
+    if (!hasSeries) {
+        const points = rows.map(r => [toNumber(r.x), toNumber(r.y)]);
+        return {
+            grid: BASE_GRID,
+            tooltip: { trigger: 'item' },
+            xAxis: { type: 'value' },
+            yAxis: { type: 'value' },
+            series: [{ type: 'scatter', symbolSize: 8, data: points, itemStyle: { color: ACCENT } }],
+        };
     }
-    return rowsToCategorical(rows);
+    const groups = new Map<string, number[][]>();
+    for (const r of rows) {
+        const name = toLabel(r.series);
+        if (!groups.has(name)) groups.set(name, []);
+        groups.get(name)!.push([toNumber(r.x), toNumber(r.y)]);
+    }
+    const series = [...groups.entries()].map(([name, data], i) => ({
+        name,
+        type: 'scatter',
+        symbolSize: 8,
+        data,
+        itemStyle: { color: PALETTE[i % PALETTE.length] },
+    }));
+    return {
+        grid: BASE_GRID,
+        tooltip: { trigger: 'item' },
+        legend: { show: true, top: 0, textStyle: { color: '#8b949e' } },
+        xAxis: { type: 'value' },
+        yAxis: { type: 'value' },
+        series,
+    };
+}
+
+/**
+ * Pie / donut: one slice per row, name = x, value = y.
+ */
+function buildPie(rows: VizRow[]): VizOption {
+    const data = rows.map((r, i) => ({
+        name: toLabel(r.x),
+        value: toNumber(r.y),
+        itemStyle: { color: PALETTE[i % PALETTE.length] },
+    }));
+    return {
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        legend: { show: true, bottom: 0, textStyle: { color: '#8b949e' } },
+        series: [
+            {
+                type: 'pie',
+                radius: ['40%', '70%'], // donut; set ['0','70%'] for full pie
+                center: ['50%', '45%'],
+                data,
+                label: { color: '#c9d1d9' },
+            },
+        ],
+    };
+}
+
+/**
+ * Box plot: the engine emits per-category five-number summaries
+ * (min / q1 / median / q3 / max). ECharts boxplot wants
+ * [min, Q1, median, Q3, max] arrays aligned to a category axis.
+ */
+function buildBox(rows: VizRow[]): VizOption {
+    const labels: string[] = [];
+    const boxes: number[][] = [];
+    for (const r of rows) {
+        labels.push(toLabel(r.x));
+        boxes.push([
+            toNumber(r.min),
+            toNumber(r.q1),
+            toNumber(r.median),
+            toNumber(r.q3),
+            toNumber(r.max),
+        ]);
+    }
+    return {
+        grid: BASE_GRID,
+        tooltip: { trigger: 'item' },
+        xAxis: { type: 'category', data: labels },
+        yAxis: { type: 'value' },
+        series: [
+            {
+                type: 'boxplot',
+                data: boxes,
+                itemStyle: { color: ACCENT_FILL, borderColor: ACCENT },
+            },
+        ],
+    };
+}
+
+/**
+ * Heatmap: rows carry x (col label), y (row label), value. Build two category
+ * axes and [xIdx, yIdx, value] triples.
+ */
+function buildHeatmap(rows: VizRow[]): VizOption {
+    const xLabels: string[] = [];
+    const yLabels: string[] = [];
+    const xi = new Map<string, number>();
+    const yi = new Map<string, number>();
+    const idx = (l: string, labels: string[], map: Map<string, number>) => {
+        if (!map.has(l)) { map.set(l, labels.length); labels.push(l); }
+        return map.get(l)!;
+    };
+    const data: number[][] = [];
+    let min = Infinity, max = -Infinity;
+    for (const r of rows) {
+        const x = idx(toLabel(r.x), xLabels, xi);
+        const y = idx(toLabel(r.y), yLabels, yi);
+        const v = toNumber(r.value);
+        if (Number.isFinite(v)) { min = Math.min(min, v); max = Math.max(max, v); }
+        data.push([x, y, v]);
+    }
+    if (!Number.isFinite(min)) { min = 0; max = 1; }
+    return {
+        grid: { left: 60, right: 16, top: 24, bottom: 60 },
+        tooltip: { position: 'top' },
+        xAxis: { type: 'category', data: xLabels, splitArea: { show: true } },
+        yAxis: { type: 'category', data: yLabels, splitArea: { show: true } },
+        visualMap: {
+            min, max, calculable: true, orient: 'horizontal', left: 'center', bottom: 0,
+            inRange: { color: ['#0d1117', '#3b2d6b', '#a371f7', '#e3b341'] },
+            textStyle: { color: '#8b949e' },
+        },
+        series: [{ type: 'heatmap', data, label: { show: false } }],
+    };
+}
+
+/**
+ * ROC / PR curve: rows carry fpr/tpr (ROC) or recall/precision (PR). A diagonal
+ * reference line is added for ROC. AUC, if present on rows, is surfaced in the
+ * title by VizChart (not here, to keep this pure).
+ */
+function buildRoc(rows: VizRow[], chart: string): VizOption {
+    const isPr = chart === 'pr';
+    const xKey = isPr ? 'recall' : 'fpr';
+    const yKey = isPr ? 'precision' : 'tpr';
+    const points = rows
+        .filter(r => r[xKey] !== undefined && r[yKey] !== undefined)
+        .map(r => [toNumber(r[xKey]), toNumber(r[yKey])]);
+    const series: Record<string, unknown>[] = [
+        {
+            type: 'line',
+            data: points,
+            showSymbol: false,
+            lineStyle: { color: ACCENT, width: 2 },
+            areaStyle: { color: ACCENT_FILL },
+        },
+    ];
+    if (!isPr) {
+        series.push({
+            type: 'line',
+            data: [[0, 0], [1, 1]],
+            showSymbol: false,
+            lineStyle: { color: '#6e7681', type: 'dashed', width: 1 },
+        });
+    }
+    return {
+        grid: BASE_GRID,
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'value', min: 0, max: 1, name: isPr ? 'Recall' : 'FPR' },
+        yAxis: { type: 'value', min: 0, max: 1, name: isPr ? 'Precision' : 'TPR' },
+        series,
+    };
+}
+
+/**
+ * Dispatch by chart type. Returns a plain ECharts option object.
+ */
+export function buildVizOption(rows: VizRow[], chart: string): VizOption {
+    switch (chart) {
+        case 'scatter':
+            return buildScatter(rows);
+        case 'pie':
+        case 'donut':
+            return buildPie(rows);
+        case 'box':
+            return buildBox(rows);
+        case 'heatmap':
+            return buildHeatmap(rows);
+        case 'roc':
+        case 'pr':
+            return buildRoc(rows, chart);
+        default:
+            // bar / line / histogram
+            return buildCategorical(rows, chart);
+    }
 }
