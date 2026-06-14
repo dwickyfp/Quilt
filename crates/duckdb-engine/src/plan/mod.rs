@@ -3315,6 +3315,64 @@ fn build_stage(
                 from = qfrom,
                 n = limit
             )
+        } else if chart == "roc" || chart == "pr" {
+            // ROC / PR curve. x = continuous score column, y = label column,
+            // series (optional) = the positive-class value (default "1").
+            // Pure SQL: sort by score desc, take cumulative TP/FP via a window
+            // (RANGE framing groups tied scores), derive the rates.
+            let score = spec
+                .x
+                .as_str()
+                .trim();
+            // x already validated non-empty above; y (label) required here.
+            let label = spec
+                .y
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| {
+                    EngineError::Config(format!(
+                        "{}: y (label column) required for {} curve",
+                        component_id, chart
+                    ))
+                })?;
+            let pos = spec
+                .series
+                .as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .unwrap_or("1")
+                // Escape single quotes for the SQL string literal.
+                .replace('\'', "''");
+            let qscore = quote_ident(score);
+            let qlabel = quote_ident(label);
+            let rates = if chart == "roc" {
+                "cum_fp / nullif(tot.n, 0) AS \"fpr\", cum_tp / nullif(tot.p, 0) AS \"tpr\""
+            } else {
+                // PR: recall on x, precision on y.
+                "cum_tp / nullif(tot.p, 0) AS \"recall\", cum_tp / nullif(cum_tp + cum_fp, 0) AS \"precision\""
+            };
+            format!(
+                "WITH scored AS (\
+                   SELECT CAST({score} AS DOUBLE) AS s, \
+                          CASE WHEN CAST({label} AS VARCHAR) = '{pos}' THEN 1 ELSE 0 END AS is_pos \
+                   FROM {from} WHERE {score} IS NOT NULL\
+                 ), tot AS (\
+                   SELECT sum(is_pos)::DOUBLE AS p, sum(1 - is_pos)::DOUBLE AS n FROM scored\
+                 ), cum AS (\
+                   SELECT s, \
+                          sum(is_pos) OVER (ORDER BY s DESC)::DOUBLE AS cum_tp, \
+                          sum(1 - is_pos) OVER (ORDER BY s DESC)::DOUBLE AS cum_fp \
+                   FROM scored\
+                 ), dedup AS (SELECT DISTINCT s, cum_tp, cum_fp FROM cum) \
+                 SELECT {rates} FROM dedup, tot ORDER BY dedup.s DESC LIMIT {n}",
+                score = qscore,
+                label = qlabel,
+                pos = pos,
+                from = qfrom,
+                rates = rates,
+                n = limit
+            )
         } else {
             // bar / line / scatter need a measure column.
             let y = spec

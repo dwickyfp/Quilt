@@ -706,6 +706,8 @@ export const PALETTE: Category[] = [
                     viz('pie', 'Pie / Donut', 'available', 'Aggregate a measure by a dimension and render proportional slices'),
                     viz('box', 'Box Plot', 'available', 'Five-number summary (min / Q1 / median / Q3 / max) of a measure per category'),
                     viz('heatmap', 'Heatmap', 'available', 'Aggregate a measure over two dimensions (x + series) into a color-coded grid'),
+                    viz('roc', 'ROC Curve', 'available', 'Plot true-positive vs false-positive rate over a continuous score column (x=score, y=label, series=positive-class value, default "1")'),
+                    viz('pr', 'Precision-Recall Curve', 'available', 'Plot precision vs recall over a continuous score column (x=score, y=label, series=positive-class value, default "1")'),
                 ],
             },
         ],

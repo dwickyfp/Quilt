@@ -4677,6 +4677,7 @@ function synthViz(comp: ComponentDef): ComponentManifest {
     const isBox = comp.id === 'viz.box';
     const isHeatmap = comp.id === 'viz.heatmap';
     const isPie = comp.id === 'viz.pie' || comp.id === 'viz.donut';
+    const isCurve = comp.id === 'viz.roc' || comp.id === 'viz.pr';
 
     const aggField: Field = {
         key: 'agg',
@@ -4710,6 +4711,13 @@ function synthViz(comp: ComponentDef): ComponentManifest {
             { key: 'x', label: 'Slice (dimension)', kind: 'column', required: true },
             { key: 'y', label: 'Value (measure)', kind: 'column', required: true },
             aggField,
+        ];
+    } else if (isCurve) {
+        // ROC / PR: continuous score (x), binary label (y), positive-class value.
+        fields = [
+            { key: 'x', label: 'Score (continuous)', kind: 'column', required: true },
+            { key: 'y', label: 'Label', kind: 'column', required: true },
+            { key: 'series', label: 'Positive class value', kind: 'text', placeholder: '1', description: 'The label value treated as the positive class (default "1").' },
         ];
     } else {
         // bar / line / scatter: dimension + measure + agg + optional series.

@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 365,
+  "componentCount": 367,
   "components": [
     {
       "id": "src.csv",
@@ -34821,6 +34821,140 @@
                     "value": "max"
                   }
                 ]
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.roc",
+      "label": "ROC Curve",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Plot true-positive vs false-positive rate over a continuous score column (x=score, y=label, series=positive-class value, default \"1\")",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.roc",
+        "kind": "viz",
+        "label": "ROC Curve",
+        "description": "Plot true-positive vs false-positive rate over a continuous score column (x=score, y=label, series=positive-class value, default \"1\")",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "x",
+                "label": "Score (continuous)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "y",
+                "label": "Label",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "series",
+                "label": "Positive class value",
+                "kind": "text",
+                "placeholder": "1",
+                "description": "The label value treated as the positive class (default \"1\")."
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.pr",
+      "label": "Precision-Recall Curve",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Plot precision vs recall over a continuous score column (x=score, y=label, series=positive-class value, default \"1\")",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.pr",
+        "kind": "viz",
+        "label": "Precision-Recall Curve",
+        "description": "Plot precision vs recall over a continuous score column (x=score, y=label, series=positive-class value, default \"1\")",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "x",
+                "label": "Score (continuous)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "y",
+                "label": "Label",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "series",
+                "label": "Positive class value",
+                "kind": "text",
+                "placeholder": "1",
+                "description": "The label value treated as the positive class (default \"1\")."
               },
               {
                 "key": "limit",
