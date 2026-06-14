@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" preserveAspectRatio="xMidYMid meet" fill="none" role="img" aria-label="Quilt - pipelines you can see, data that stays yours">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" preserveAspectRatio="xMidYMid meet" fill="none" role="img" aria-label="Quilt - pipelines you can see: visual ETL plus statistics, ML, and deep learning">
   <defs>
     <linearGradient id="aurora" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#2DD4BF"/>
@@ -38,9 +38,9 @@
   <text x="162" y="112" font-family="'Segoe UI', system-ui, Arial, sans-serif" font-size="58" font-weight="800" fill="url(#wm)">Quilt</text>
 
   <!-- tagline + subtitle -->
-  <text x="58" y="178" font-family="'Segoe UI', system-ui, Arial, sans-serif" font-size="24" font-weight="700" fill="#CFE0FF">Pipelines you can see. Data that stays yours.</text>
-  <text x="58" y="212" font-family="'Segoe UI', system-ui, Arial, sans-serif" font-size="15.5" font-weight="400" fill="#8A97AE">Offline-first visual ETL with an on-device AI. Read files, databases,</text>
-  <text x="58" y="234" font-family="'Segoe UI', system-ui, Arial, sans-serif" font-size="15.5" font-weight="400" fill="#8A97AE">and the cloud, reshape with 127 transforms, land clean data anywhere.</text>
+  <text x="58" y="178" font-family="'Segoe UI', system-ui, Arial, sans-serif" font-size="24" font-weight="700" fill="#CFE0FF">Pipelines you can see.</text>
+  <text x="58" y="212" font-family="'Segoe UI', system-ui, Arial, sans-serif" font-size="15.5" font-weight="400" fill="#8A97AE">Visual ETL plus statistics, ML, and deep learning. Read files,</text>
+  <text x="58" y="234" font-family="'Segoe UI', system-ui, Arial, sans-serif" font-size="15.5" font-weight="400" fill="#8A97AE">databases, and the cloud, reshape with 136 transforms, land data anywhere.</text>
   <text x="58" y="262" font-family="'Segoe UI', system-ui, Arial, sans-serif" font-size="13" font-weight="600" fill="#5E6B82">~65 MB desktop app · no servers · runs on DuckDB</text>
 
   <!-- flow on the right: Sources -> Quilt -> Sinks -->

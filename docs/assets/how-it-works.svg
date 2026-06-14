@@ -95,7 +95,7 @@
   <text x="828" y="148" font-size="15" font-weight="700" fill="#E7EEFC">DuckDB</text>
   <text x="828" y="166" font-size="11" fill="#9FB6DC">columnar engine</text>
   <text x="776" y="198" font-size="11" fill="#A9BCE0">vectorized · local</text>
-  <text x="776" y="217" font-size="11" fill="#A9BCE0">native speed · offline</text>
+  <text x="776" y="217" font-size="11" fill="#A9BCE0">native speed</text>
 
   <!-- duckdb -> targets -->
   <g stroke="#2A364C" stroke-width="1.5" fill="none"><line x1="946" y1="175" x2="1014" y2="175"/></g>
