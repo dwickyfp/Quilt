@@ -31,7 +31,6 @@
 **Get started**
 
 - [What is Quilt?](#what-is-quilt)
-- [Why this fork?](#why-this-fork)
 - [How it works](#how-it-works)
 - [Quickstart (60 s)](#quickstart-60-seconds)
 - [Download / Install](#download--install)
@@ -111,18 +110,6 @@ Three things make Quilt different from the heavyweights and the toy ETL tools:
 <div align="center">
 <img src="docs/assets/flow.svg" alt="Sources flow through 127 transforms into files, databases, object storage, vector stores, and AI" width="100%"/>
 </div>
-
----
-
-## Why this fork?
-
-Quilt began as a fork of **duckle** and has grown its own identity and roadmap. The work here focuses on three areas:
-
-- **Multi-workspace.** Open several workspace folders at once in one window, each as its own root in the Project tree — edit and run pipelines across all of them without one replacing another. Schedules fire per workspace, to their own folder.
-- **A distinct visual identity.** New "Aurora" palette (teal → indigo → violet) across the app and docs, while keeping the patchwork mark that gives Quilt its name.
-- **Honest engineering.** Pure, unit-tested cores for the tricky bits (workspace namespacing, save routing, per-workspace scheduling), verified end to end — lint, tests, and a real build — before anything ships.
-
-Everything below is the full capability surface, kept intact and current.
 
 ---
 
