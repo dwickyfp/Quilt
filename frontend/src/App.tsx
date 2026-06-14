@@ -25,7 +25,7 @@ import {
     compilePipelineSql,
     runPipeline,
     runPipelinePartial,
-    scheduleSetWorkspace,
+    scheduleSetWorkspaces,
     type PipelineEvent,
     type RunResult,
 } from './tauri-bridge';
@@ -49,6 +49,7 @@ import { validatePipeline } from './validation';
 import { expandComponentsForRun, resolveForRun } from './run-resolve';
 import type { SavedComponent } from './workflow-ui/component-expand';
 import { extractComponent } from './workflow-ui/component-def';
+import { layoutTree } from './workflow-ui/tree-layout';
 import WorkspacePickerModal from './workflow-ui/WorkspacePickerModal';
 import {
     deleteItemPayload,
@@ -230,6 +231,7 @@ export default function App() {
     );
     const [isRunning, setIsRunning] = useState<boolean>(false);
     const [renameRequest, setRenameRequest] = useState<number>(0);
+    const [layoutTick, setLayoutTick] = useState<number>(0);
     const [repo, setRepo] = useState<RepoItem[]>(() => loadPersisted('repo', INITIAL_REPO));
     // Saved reusable components (a collapsed subgraph turned into one cmp.* node).
     // Persisted in localStorage like the rest of the workspace UI state.
@@ -523,12 +525,16 @@ export default function App() {
         [addWorkspace],
     );
 
-    // Sync the active workspace path with the Rust scheduler so it loads any
-    // schedules persisted in that folder.
+    // Register every open workspace with the Rust scheduler so schedules in
+    // ANY open workspace fire to their own folder; the active path (owner of
+    // the focused pipeline) is the baseline process env for foreground runs.
     useEffect(() => {
         if (!isInTauri()) return;
-        void scheduleSetWorkspace(workspacePathState);
-    }, [workspacePathState]);
+        void scheduleSetWorkspaces(
+            openWorkspaces.map(w => w.path),
+            workspacePathState,
+        );
+    }, [openPathsKey, workspacePathState]);
 
     const [scheduleModalPipelineId, setScheduleModalPipelineId] = useState<string | null>(
         null,
@@ -1291,13 +1297,15 @@ export default function App() {
     }, [importFromText]);
 
     const handleAutoLayout = useCallback(() => {
-        setNodes(ns =>
-            ns.map((n, i) => ({
-                ...n,
-                position: { x: 60 + i * 280, y: 140 },
-            })),
-        );
-    }, [setNodes]);
+        setNodes(ns => {
+            const pos = layoutTree(ns, edges);
+            return ns.map(n =>
+                pos.has(n.id) ? { ...n, position: pos.get(n.id)! } : n,
+            );
+        });
+        markDirty();
+        setLayoutTick(t => t + 1);
+    }, [setNodes, edges, markDirty]);
 
     const handleDropComponent = useCallback(
         (component: ComponentDef, position: DropPosition) => {
@@ -2000,6 +2008,7 @@ export default function App() {
                         onEdgeDelete={handleEdgeDelete}
                         onEdgeEdit={handleEdgeEdit}
                         nodeAutodetectAvailable={nodeAutodetectAvailable}
+                        fitSignal={layoutTick}
                     />
                 </section>
                 <PropertiesPanel
@@ -2107,12 +2116,16 @@ export default function App() {
 
             {scheduleModalPipelineId ? (
                 <ScheduleEditorModal
-                    pipelineId={scheduleModalPipelineId}
+                    pipelineId={bareIdOf(scheduleModalPipelineId)}
                     pipelineName={
                         repo.find(r => r.id === scheduleModalPipelineId)?.name ??
-                        scheduleModalPipelineId
+                        bareIdOf(scheduleModalPipelineId)
                     }
-                    workspacePath={workspacePathState}
+                    workspacePath={
+                        openWorkspaces.find(
+                            w => w.token === tokenOf(scheduleModalPipelineId),
+                        )?.path ?? workspacePathState
+                    }
                     onClose={() => setScheduleModalPipelineId(null)}
                 />
             ) : null}

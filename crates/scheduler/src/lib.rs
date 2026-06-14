@@ -61,10 +61,24 @@ pub struct Schedule {
     pub last_run_error: Option<String>,
     #[serde(default)]
     pub next_run_at: Option<DateTime<Utc>>,
+    /// Which workspace folder this schedule lives in. Not persisted in a
+    /// meaningful way (overwritten from the on-disk location on load); it
+    /// rides the IPC boundary so the frontend can route schedules to the
+    /// right workspace when several are open at once.
+    #[serde(default)]
+    pub workspace_path: Option<String>,
 }
 
 fn default_true() -> bool {
     true
+}
+
+/// One open workspace's schedules. Each workspace persists its own
+/// `schedules.json`; the scheduler holds a group per open workspace so
+/// schedules in a non-focused workspace still fire to their own folder.
+struct WorkspaceGroup {
+    path: PathBuf,
+    schedules: Vec<Schedule>,
 }
 
 #[derive(Clone)]
@@ -75,13 +89,36 @@ pub struct Scheduler {
 }
 
 struct SchedulerInner {
-    schedules: Vec<Schedule>,
-    workspace_path: Option<PathBuf>,
-    /// Active file-watchers, keyed by schedule id. Holding the
-    /// `Debouncer` keeps the watch alive; dropping it stops watching.
+    /// One group per open workspace. Schedules across all groups are
+    /// evaluated every tick and fired against their OWN workspace.
+    groups: Vec<WorkspaceGroup>,
+    /// The focused workspace - used as the baseline process env so manual
+    /// (foreground) actions and child-pipeline resolution default here.
+    active_path: Option<PathBuf>,
+    /// Active file-watchers, keyed by schedule id (globally unique uuid).
+    /// Holding the `Debouncer` keeps the watch alive; dropping it stops.
     watchers: HashMap<String, Debouncer<RecommendedWatcher>>,
     /// Receiver for file-watch fires; taken by `spawn_ticker`.
     fire_rx: Option<UnboundedReceiver<String>>,
+}
+
+/// Point the process env at a workspace so the engine resolves child
+/// pipelines, the stage cache, and run logs under it. Centralized here so
+/// scheduled fires (which run headless, in this crate) and the desktop's
+/// active-workspace baseline use identical semantics.
+pub fn apply_workspace_env(path: Option<&Path>) {
+    match path {
+        Some(p) => {
+            std::env::set_var("QUILT_WORKSPACE", p);
+            std::env::set_var("QUILT_LOG_DIR", p.join("logs"));
+            std::env::set_var("QUILT_STAGE_CACHE_DIR", p.join("cache"));
+        }
+        None => {
+            std::env::remove_var("QUILT_WORKSPACE");
+            std::env::remove_var("QUILT_LOG_DIR");
+            std::env::remove_var("QUILT_STAGE_CACHE_DIR");
+        }
+    }
 }
 
 impl Scheduler {
@@ -89,8 +126,8 @@ impl Scheduler {
         let (fire_tx, fire_rx) = unbounded_channel();
         Self {
             inner: Arc::new(Mutex::new(SchedulerInner {
-                schedules: Vec::new(),
-                workspace_path: None,
+                groups: Vec::new(),
+                active_path: None,
                 watchers: HashMap::new(),
                 fire_rx: Some(fire_rx),
             })),
@@ -99,22 +136,48 @@ impl Scheduler {
         }
     }
 
-    /// Switch to a different workspace path. Loads schedules from the
-    /// new path; computes next-run times for each; rebuilds watchers.
-    pub fn set_workspace(&self, path: Option<PathBuf>) {
+    /// Register the full set of open workspaces. Each one's
+    /// `schedules.json` is loaded so schedules in ANY open workspace fire
+    /// to their own folder. `active` is the focused workspace, published
+    /// to the process env as the baseline for foreground actions.
+    ///
+    /// Groups already loaded for a still-open path are KEPT (preserving
+    /// in-memory next-run claims) rather than reloaded, so opening or
+    /// switching a workspace never resets another's firing cadence.
+    pub fn set_workspaces(&self, paths: Vec<PathBuf>, active: Option<PathBuf>) {
         let mut g = self.inner.lock().expect("scheduler poisoned");
-        g.workspace_path = path.clone();
-        g.schedules = match path {
-            Some(p) => load_schedules(&p).unwrap_or_else(|e| {
-                warn!("Failed to load schedules: {}", e);
+        let mut existing: HashMap<PathBuf, WorkspaceGroup> =
+            g.groups.drain(..).map(|grp| (grp.path.clone(), grp)).collect();
+        let mut groups = Vec::with_capacity(paths.len());
+        for p in paths {
+            if let Some(grp) = existing.remove(&p) {
+                groups.push(grp); // keep runtime state
+                continue;
+            }
+            let mut schedules = load_schedules(&p).unwrap_or_else(|e| {
+                warn!("Failed to load schedules for {}: {}", p.display(), e);
                 Vec::new()
-            }),
-            None => Vec::new(),
-        };
-        for s in g.schedules.iter_mut() {
-            compute_next_run(s);
+            });
+            let label = p.to_string_lossy().to_string();
+            for s in schedules.iter_mut() {
+                s.workspace_path = Some(label.clone());
+                compute_next_run(s);
+            }
+            groups.push(WorkspaceGroup { path: p, schedules });
         }
+        g.groups = groups;
+        g.active_path = active.clone();
+        apply_workspace_env(active.as_deref());
         self.rebuild_watchers(&mut g);
+    }
+
+    /// Back-compat single-workspace entry point: register exactly one
+    /// workspace (or none) as both the only group and the active one.
+    pub fn set_workspace(&self, path: Option<PathBuf>) {
+        match path {
+            Some(p) => self.set_workspaces(vec![p.clone()], Some(p)),
+            None => self.set_workspaces(Vec::new(), None),
+        }
     }
 
     /// Recreate file-watchers for the current schedule set. Drops all
@@ -123,8 +186,9 @@ impl Scheduler {
     fn rebuild_watchers(&self, inner: &mut SchedulerInner) {
         inner.watchers.clear();
         let specs: Vec<(String, String, bool)> = inner
-            .schedules
+            .groups
             .iter()
+            .flat_map(|grp| grp.schedules.iter())
             .filter(|s| s.enabled)
             .filter_map(|s| match &s.kind {
                 ScheduleKind::FileWatch { path, recursive } => {
@@ -167,12 +231,21 @@ impl Scheduler {
         Ok(debouncer)
     }
 
+    /// All schedules across every open workspace, each stamped with its
+    /// owning `workspace_path` so the frontend can group/route them.
     pub fn list(&self) -> Vec<Schedule> {
-        self.inner
-            .lock()
-            .expect("scheduler poisoned")
-            .schedules
-            .clone()
+        let g = self.inner.lock().expect("scheduler poisoned");
+        g.groups
+            .iter()
+            .flat_map(|grp| {
+                let label = grp.path.to_string_lossy().to_string();
+                grp.schedules.iter().map(move |s| {
+                    let mut s = s.clone();
+                    s.workspace_path = Some(label.clone());
+                    s
+                })
+            })
+            .collect()
     }
 
     pub fn upsert(&self, mut schedule: Schedule) -> Result<Schedule, String> {
@@ -197,13 +270,20 @@ impl Scheduler {
         }
         compute_next_run(&mut schedule);
         let mut g = self.inner.lock().expect("scheduler poisoned");
-        if let Some(idx) = g.schedules.iter().position(|s| s.id == schedule.id) {
-            g.schedules[idx] = schedule.clone();
-        } else {
-            g.schedules.push(schedule.clone());
-        }
-        if let Some(path) = g.workspace_path.clone() {
-            let _ = save_schedules(&path, &g.schedules);
+        // Pick the target workspace group: the one named on the schedule if
+        // open, else the active workspace, else the only open group.
+        let target = pick_group_index(&g, schedule.workspace_path.as_deref())
+            .ok_or_else(|| "No workspace open for this schedule".to_string())?;
+        let path = g.groups[target].path.clone();
+        schedule.workspace_path = Some(path.to_string_lossy().to_string());
+        {
+            let schedules = &mut g.groups[target].schedules;
+            if let Some(idx) = schedules.iter().position(|s| s.id == schedule.id) {
+                schedules[idx] = schedule.clone();
+            } else {
+                schedules.push(schedule.clone());
+            }
+            let _ = save_schedules(&path, schedules);
         }
         self.rebuild_watchers(&mut g);
         Ok(schedule)
@@ -211,60 +291,77 @@ impl Scheduler {
 
     pub fn delete(&self, id: &str) -> Result<(), String> {
         let mut g = self.inner.lock().expect("scheduler poisoned");
-        g.schedules.retain(|s| s.id != id);
-        g.watchers.remove(id);
-        if let Some(path) = g.workspace_path.clone() {
-            let _ = save_schedules(&path, &g.schedules);
+        // Find the owning group, remove there, persist that workspace only.
+        for grp in g.groups.iter_mut() {
+            if let Some(pos) = grp.schedules.iter().position(|s| s.id == id) {
+                grp.schedules.remove(pos);
+                let _ = save_schedules(&grp.path, &grp.schedules);
+                break;
+            }
         }
+        g.watchers.remove(id);
         Ok(())
     }
 
     /// Execute a schedule's pipeline right now, regardless of its
-    /// timing. Updates last-run bookkeeping on completion.
+    /// timing. Runs against the schedule's OWN workspace (sets the process
+    /// env to that folder for the duration), so a schedule in a
+    /// non-focused workspace still resolves its pipeline + child refs +
+    /// cache + logs under its own folder. Updates last-run bookkeeping.
     pub async fn run_now(&self, id: &str) -> Result<RunResult, String> {
         let (workspace, pipeline_id) = {
             let g = self.inner.lock().expect("scheduler poisoned");
-            let s = g
-                .schedules
+            let (grp, s) = g
+                .groups
                 .iter()
-                .find(|s| s.id == id)
+                .find_map(|grp| grp.schedules.iter().find(|s| s.id == id).map(|s| (grp, s)))
                 .ok_or_else(|| "Schedule not found".to_string())?;
-            (g.workspace_path.clone(), s.pipeline_id.clone())
+            (grp.path.clone(), s.pipeline_id.clone())
         };
-        let workspace =
-            workspace.ok_or_else(|| "No workspace set for the scheduler".to_string())?;
         let pipeline = load_pipeline(&workspace, &pipeline_id)?;
         let engine = self.engine.clone();
         let started = Utc::now();
         // Log scheduled runs under the pipeline id (the scheduler has no
         // friendly name handy) so they still land in the per-pipeline log.
         let log_name = pipeline_id.clone();
+        // Point the engine's env at THIS schedule's workspace just before
+        // the run so child-pipeline resolution / stage cache / run logs all
+        // land in the right folder, even for a non-focused workspace. Then
+        // restore the active workspace as the baseline.
+        let active = {
+            let g = self.inner.lock().expect("scheduler poisoned");
+            g.active_path.clone()
+        };
+        apply_workspace_env(Some(&workspace));
         let result =
             tokio::task::spawn_blocking(move || engine.execute_pipeline_named(&pipeline, &log_name))
                 .await
                 .map_err(|e| e.to_string())?;
+        apply_workspace_env(active.as_deref());
         self.record_run(id, started, &result);
         Ok(result)
     }
 
     fn record_run(&self, id: &str, started: DateTime<Utc>, result: &RunResult) {
         let mut g = self.inner.lock().expect("scheduler poisoned");
-        let mut pipeline_id = None;
-        if let Some(s) = g.schedules.iter_mut().find(|s| s.id == id) {
-            s.last_run_at = Some(started);
-            s.last_run_status = Some(result.status.clone());
-            s.last_run_duration_ms = Some(result.duration_ms);
-            s.last_run_error = result.error.clone();
-            pipeline_id = Some(s.pipeline_id.clone());
-            compute_next_run(s);
-        }
-        if let Some(path) = g.workspace_path.clone() {
-            let _ = save_schedules(&path, &g.schedules);
-            // Append to the pipeline's run history too.
-            if let Some(pid) = pipeline_id {
-                let record = RunRecord::from_result(result, "scheduled");
-                let _ = append_run_record(&path, &pid, record);
+        let mut found: Option<(PathBuf, String)> = None;
+        for grp in g.groups.iter_mut() {
+            if let Some(s) = grp.schedules.iter_mut().find(|s| s.id == id) {
+                s.last_run_at = Some(started);
+                s.last_run_status = Some(result.status.clone());
+                s.last_run_duration_ms = Some(result.duration_ms);
+                s.last_run_error = result.error.clone();
+                let pid = s.pipeline_id.clone();
+                compute_next_run(s);
+                let _ = save_schedules(&grp.path, &grp.schedules);
+                found = Some((grp.path.clone(), pid));
+                break;
             }
+        }
+        // Append to the pipeline's run history under its own workspace.
+        if let Some((path, pid)) = found {
+            let record = RunRecord::from_result(result, "scheduled");
+            let _ = append_run_record(&path, &pid, record);
         }
     }
 
@@ -307,7 +404,7 @@ impl Scheduler {
         let due: Vec<String> = {
             let mut g = self.inner.lock().expect("scheduler poisoned");
             let mut due = Vec::new();
-            for s in g.schedules.iter_mut() {
+            for s in g.groups.iter_mut().flat_map(|grp| grp.schedules.iter_mut()) {
                 if s.enabled && matches!(s.next_run_at, Some(t) if t <= now) {
                     due.push(s.id.clone());
                     // Claim the occurrence immediately, under the lock, by
@@ -332,6 +429,28 @@ impl Scheduler {
             });
         }
     }
+}
+
+/// Choose which open workspace group an upserted schedule belongs to.
+/// Preference order: the workspace named on the schedule (if still open),
+/// then the active workspace, then the sole open group. Returns None when
+/// no workspace is open at all.
+fn pick_group_index(inner: &SchedulerInner, named: Option<&str>) -> Option<usize> {
+    if inner.groups.is_empty() {
+        return None;
+    }
+    if let Some(name) = named.filter(|s| !s.is_empty()) {
+        let np = PathBuf::from(name);
+        if let Some(i) = inner.groups.iter().position(|g| g.path == np) {
+            return Some(i);
+        }
+    }
+    if let Some(active) = inner.active_path.as_ref() {
+        if let Some(i) = inner.groups.iter().position(|g| &g.path == active) {
+            return Some(i);
+        }
+    }
+    Some(0)
 }
 
 /// Advance next_run_at to the next occurrence strictly after `now`.
@@ -407,22 +526,31 @@ fn load_pipeline(workspace: &PathBuf, pipeline_id: &str) -> Result<PipelineDoc, 
 mod tests {
     use super::*;
 
-    #[test]
-    fn cron_parses_and_computes_next() {
-        let mut s = Schedule {
-            id: "t".into(),
-            pipeline_id: "p1".into(),
-            name: "every minute".into(),
+    fn sched(id: &str, pipeline_id: &str, kind: ScheduleKind) -> Schedule {
+        Schedule {
+            id: id.into(),
+            pipeline_id: pipeline_id.into(),
+            name: id.into(),
             enabled: true,
-            kind: ScheduleKind::Cron {
-                expr: "0 * * * * *".into(),
-            },
+            kind,
             last_run_at: None,
             last_run_status: None,
             last_run_duration_ms: None,
             last_run_error: None,
             next_run_at: None,
-        };
+            workspace_path: None,
+        }
+    }
+
+    fn engine() -> DuckdbEngine {
+        // The registry tests never execute a pipeline, so a CLI path that
+        // need not exist is fine - construction doesn't touch the binary.
+        DuckdbEngine::new(PathBuf::from("duckdb"))
+    }
+
+    #[test]
+    fn cron_parses_and_computes_next() {
+        let mut s = sched("t", "p1", ScheduleKind::Cron { expr: "0 * * * * *".into() });
         compute_next_run(&mut s);
         assert!(s.next_run_at.is_some());
         assert!(s.next_run_at.unwrap() > Utc::now());
@@ -430,18 +558,7 @@ mod tests {
 
     #[test]
     fn interval_computes_next() {
-        let mut s = Schedule {
-            id: "t".into(),
-            pipeline_id: "p1".into(),
-            name: "every 5".into(),
-            enabled: true,
-            kind: ScheduleKind::Interval { seconds: 300 },
-            last_run_at: None,
-            last_run_status: None,
-            last_run_duration_ms: None,
-            last_run_error: None,
-            next_run_at: None,
-        };
+        let mut s = sched("t", "p1", ScheduleKind::Interval { seconds: 300 });
         compute_next_run(&mut s);
         let next = s.next_run_at.expect("next_run_at set");
         let now = Utc::now();
@@ -451,19 +568,126 @@ mod tests {
 
     #[test]
     fn disabled_clears_next() {
-        let mut s = Schedule {
-            id: "t".into(),
-            pipeline_id: "p1".into(),
-            name: "off".into(),
-            enabled: false,
-            kind: ScheduleKind::Interval { seconds: 60 },
-            last_run_at: None,
-            last_run_status: None,
-            last_run_duration_ms: None,
-            last_run_error: None,
-            next_run_at: Some(Utc::now()),
-        };
+        let mut s = sched("t", "p1", ScheduleKind::Interval { seconds: 60 });
+        s.enabled = false;
+        s.next_run_at = Some(Utc::now());
         compute_next_run(&mut s);
         assert!(s.next_run_at.is_none());
+    }
+
+    // ---- Multi-workspace registry --------------------------------------
+
+    #[test]
+    fn set_workspaces_loads_every_open_workspace() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let pa = a.path().to_path_buf();
+        let pb = b.path().to_path_buf();
+        save_schedules(&pa, &[sched("a1", "pa", ScheduleKind::Interval { seconds: 60 })]).unwrap();
+        save_schedules(&pb, &[sched("b1", "pb", ScheduleKind::Interval { seconds: 60 })]).unwrap();
+
+        let s = Scheduler::new(engine());
+        s.set_workspaces(vec![pa.clone(), pb.clone()], Some(pa.clone()));
+
+        let all = s.list();
+        assert_eq!(all.len(), 2, "both workspaces' schedules are loaded");
+        let a1 = all.iter().find(|x| x.id == "a1").unwrap();
+        let b1 = all.iter().find(|x| x.id == "b1").unwrap();
+        // Each schedule is stamped with its OWN workspace path.
+        assert_eq!(a1.workspace_path.as_deref(), Some(pa.to_string_lossy().as_ref()));
+        assert_eq!(b1.workspace_path.as_deref(), Some(pb.to_string_lossy().as_ref()));
+    }
+
+    #[test]
+    fn upsert_routes_to_named_workspace_and_persists_there_only() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let pa = a.path().to_path_buf();
+        let pb = b.path().to_path_buf();
+        let s = Scheduler::new(engine());
+        // Active is A, but the new schedule names B -> must land in B.
+        s.set_workspaces(vec![pa.clone(), pb.clone()], Some(pa.clone()));
+
+        let mut draft = sched("", "pb_pipe", ScheduleKind::Interval { seconds: 120 });
+        draft.workspace_path = Some(pb.to_string_lossy().to_string());
+        let saved = s.upsert(draft).unwrap();
+        assert_eq!(saved.workspace_path.as_deref(), Some(pb.to_string_lossy().as_ref()));
+
+        // Persisted into B's schedules.json, NOT A's.
+        let in_b = load_schedules(&pb).unwrap();
+        let in_a = load_schedules(&pa).unwrap();
+        assert_eq!(in_b.len(), 1);
+        assert_eq!(in_b[0].pipeline_id, "pb_pipe");
+        assert!(in_a.is_empty(), "workspace A's schedules.json untouched");
+    }
+
+    #[test]
+    fn upsert_without_named_workspace_falls_back_to_active() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let pa = a.path().to_path_buf();
+        let pb = b.path().to_path_buf();
+        let s = Scheduler::new(engine());
+        s.set_workspaces(vec![pa.clone(), pb.clone()], Some(pb.clone()));
+
+        // No workspace_path on the draft -> active (B) wins.
+        let saved = s.upsert(sched("", "x", ScheduleKind::Interval { seconds: 60 })).unwrap();
+        assert_eq!(saved.workspace_path.as_deref(), Some(pb.to_string_lossy().as_ref()));
+        assert_eq!(load_schedules(&pb).unwrap().len(), 1);
+        assert!(load_schedules(&pa).unwrap().is_empty());
+    }
+
+    #[test]
+    fn delete_removes_from_owning_workspace_only() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let pa = a.path().to_path_buf();
+        let pb = b.path().to_path_buf();
+        save_schedules(&pa, &[sched("a1", "pa", ScheduleKind::Interval { seconds: 60 })]).unwrap();
+        save_schedules(&pb, &[sched("b1", "pb", ScheduleKind::Interval { seconds: 60 })]).unwrap();
+        let s = Scheduler::new(engine());
+        s.set_workspaces(vec![pa.clone(), pb.clone()], Some(pa.clone()));
+
+        s.delete("b1").unwrap();
+        assert!(load_schedules(&pb).unwrap().is_empty(), "B's schedule removed from disk");
+        assert_eq!(load_schedules(&pa).unwrap().len(), 1, "A's schedule untouched");
+        assert_eq!(s.list().len(), 1);
+    }
+
+    #[test]
+    fn set_workspaces_preserves_runtime_state_for_still_open_paths() {
+        let a = tempfile::tempdir().unwrap();
+        let pa = a.path().to_path_buf();
+        let s = Scheduler::new(engine());
+        s.set_workspaces(vec![pa.clone()], Some(pa.clone()));
+        s.upsert(sched("k", "p", ScheduleKind::Interval { seconds: 60 })).unwrap();
+        let before = s.list()[0].next_run_at;
+
+        // Re-register the same path alongside a new one: A's group is kept,
+        // so its claimed next_run_at is preserved (not recomputed).
+        let b = tempfile::tempdir().unwrap();
+        s.set_workspaces(vec![pa.clone(), b.path().to_path_buf()], Some(pa.clone()));
+        let after = s.list().iter().find(|x| x.id == "k").unwrap().next_run_at;
+        assert_eq!(before, after, "re-registering keeps the existing run cadence");
+    }
+
+    #[test]
+    fn closing_a_workspace_drops_its_schedules_from_the_active_set() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let pa = a.path().to_path_buf();
+        let pb = b.path().to_path_buf();
+        save_schedules(&pa, &[sched("a1", "pa", ScheduleKind::Interval { seconds: 60 })]).unwrap();
+        save_schedules(&pb, &[sched("b1", "pb", ScheduleKind::Interval { seconds: 60 })]).unwrap();
+        let s = Scheduler::new(engine());
+        s.set_workspaces(vec![pa.clone(), pb.clone()], Some(pa.clone()));
+        assert_eq!(s.list().len(), 2);
+
+        // Close B (re-register with only A): B's schedules no longer fire,
+        // but B's schedules.json on disk is left intact.
+        s.set_workspaces(vec![pa.clone()], Some(pa.clone()));
+        assert_eq!(s.list().len(), 1);
+        assert_eq!(s.list()[0].id, "a1");
+        assert_eq!(load_schedules(&pb).unwrap().len(), 1, "closed workspace's file preserved");
     }
 }

@@ -3,6 +3,37 @@
 All notable changes to Quilt are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.5] - 2026-06-14
+
+Multi-workspace scheduling: schedules now fire to their own workspace.
+
+### Fixed
+- **The scheduler tracks every open workspace, not just the focused one.**
+  Previously the scheduler held a single workspace path, so a schedule saved
+  in a non-focused workspace silently stopped firing (and a scheduled run
+  could resolve its pipeline/cache/logs against the wrong folder). The
+  scheduler now keeps one schedule group per open workspace, evaluates them
+  all every tick, and runs each against its OWN folder — setting the process
+  env (`QUILT_WORKSPACE`/`QUILT_LOG_DIR`/`QUILT_STAGE_CACHE_DIR`) to that
+  workspace just for the duration of the fire, then restoring the active one.
+- **Scheduled runs in multi-workspace mode resolve the right pipeline file.**
+  The schedule editor stored a namespaced pipeline id (`ws…__j1`) while
+  on-disk pipelines are bare (`j1.json`), so scheduled runs failed to load.
+  The editor now uses the bare id and routes by the pipeline's owning
+  workspace, and schedules are filtered/persisted per workspace (two
+  workspaces can share a bare id without colliding).
+- Foreground runs set their own workspace env per call, so a manual run in
+  one workspace isn't affected by a scheduled fire in another.
+
+### Internal
+- New `Scheduler::set_workspaces(paths, active)` (the single-workspace
+  `set_workspace` remains as a back-compat shim) + `apply_workspace_env`
+  helper shared by scheduled and foreground runs. New Tauri command
+  `schedule_set_workspaces`; the frontend registers all open workspaces.
+  +6 scheduler tests (10 total): load every workspace, route upsert/delete to
+  the owning folder, preserve run cadence on re-register, drop a closed
+  workspace's schedules while leaving its `schedules.json` intact.
+
 ## [0.4.4] - 2026-06-14
 
 More multi-workspace QA hardening. No behaviour change for single-workspace use.

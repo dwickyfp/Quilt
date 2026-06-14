@@ -517,6 +517,10 @@ export type Schedule = {
     last_run_duration_ms?: number;
     last_run_error?: string;
     next_run_at?: string;
+    /** Which open workspace folder this schedule belongs to. Set by the
+     *  backend on list; sent by the frontend on upsert so the schedule is
+     *  routed to the right workspace when several are open. */
+    workspace_path?: string | null;
 };
 
 export async function scheduleSetWorkspace(path: string | null): Promise<void> {
@@ -525,6 +529,20 @@ export async function scheduleSetWorkspace(path: string | null): Promise<void> {
         await invoke('schedule_set_workspace', { path: path ?? '' });
     } catch (err) {
         console.warn('scheduleSetWorkspace failed', err);
+    }
+}
+
+/** Register every open workspace so schedules in all of them fire to their
+ *  own folder; `active` is the focused workspace (baseline process env). */
+export async function scheduleSetWorkspaces(
+    paths: string[],
+    active: string | null,
+): Promise<void> {
+    if (!isTauri()) return;
+    try {
+        await invoke('schedule_set_workspaces', { paths, active: active ?? null });
+    } catch (err) {
+        console.warn('scheduleSetWorkspaces failed', err);
     }
 }
 

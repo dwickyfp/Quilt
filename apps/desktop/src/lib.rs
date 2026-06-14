@@ -10,7 +10,7 @@ use quilt_duckdb_engine::{
 };
 use quilt_metadata::Schema;
 use quilt_plugin_sdk::{InspectError, SchemaInspector};
-use quilt_scheduler::{Schedule, Scheduler};
+use quilt_scheduler::{apply_workspace_env, Schedule, Scheduler};
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use std::path::PathBuf;
@@ -138,6 +138,7 @@ pub fn run() {
             cancel_pipeline,
             compile_pipeline,
             schedule_set_workspace,
+            schedule_set_workspaces,
             schedule_list,
             schedule_upsert,
             schedule_delete,
@@ -275,6 +276,13 @@ async fn run_pipeline(
 ) -> Result<RunResult, String> {
     let engine = engine()?;
     let name = pipeline_name.clone();
+    // Point the engine env at THIS run's workspace just before executing so
+    // child-pipeline resolution, the stage cache, and run logs all land in
+    // its own folder - matters in multi-workspace mode where the focused
+    // pipeline may not belong to the last workspace the scheduler set.
+    if let Some(ws) = workspace_path.as_deref().filter(|s| !s.is_empty()) {
+        apply_workspace_env(Some(std::path::Path::new(ws)));
+    }
     let result = tokio::task::spawn_blocking(move || {
         engine.execute_pipeline_with_events(&pipeline, None, name.as_deref(), |evt| {
             let _ = on_event.send(evt);
@@ -430,40 +438,42 @@ fn scheduler() -> Result<&'static Scheduler, String> {
         .ok_or_else(|| "Scheduler not initialized".to_string())
 }
 
-/// Point the scheduler at a workspace folder; loads schedules from
-/// `<workspace>/schedules.json`. Called by the frontend whenever the
-/// workspace path changes.
+/// Point the scheduler at a SINGLE workspace folder (back-compat). Prefer
+/// `schedule_set_workspaces` in multi-workspace mode.
 #[tauri::command]
 fn schedule_set_workspace(path: String) -> Result<(), String> {
     let sched = scheduler()?;
-    // Publish the workspace to the engine so child-pipeline references
-    // (Run Job / Iterate / Foreach) stored as bare pipeline ids resolve to
-    // their `<workspace>/pipelines/<id>.json` file, including for headless
-    // scheduled runs that never pass through the frontend. Called whenever
-    // the workspace changes, so this stays in sync.
-    if path.is_empty() {
-        std::env::remove_var("QUILT_WORKSPACE");
-        std::env::remove_var("QUILT_LOG_DIR");
-        std::env::remove_var("QUILT_STAGE_CACHE_DIR");
-    } else {
-        std::env::set_var("QUILT_WORKSPACE", &path);
-        // Universal, component-level run logging lands in the user's chosen
-        // workspace under logs/ (NDJSON) for Splunk / Dynatrace ingestion.
-        std::env::set_var("QUILT_LOG_DIR", PathBuf::from(&path).join("logs"));
-        // Smart incremental re-run: content-addressed Parquet stage cache under
-        // the workspace's cache/ dir. Editing one node then re-running serves
-        // unchanged stages from cache instead of recomputing the whole graph.
-        // Scoped to the workspace so it's discoverable + clearable by the user,
-        // and torn down when the workspace is cleared. Cache writes are atomic
-        // and content-addressed, so this is safe to default on.
-        std::env::set_var("QUILT_STAGE_CACHE_DIR", PathBuf::from(&path).join("cache"));
-    }
     let p = if path.is_empty() {
         None
     } else {
         Some(PathBuf::from(path))
     };
+    // The scheduler publishes the active workspace to the process env
+    // (QUILT_WORKSPACE / QUILT_LOG_DIR / QUILT_STAGE_CACHE_DIR) so child
+    // pipeline resolution, stage cache, and run logs land under it -
+    // including for headless scheduled runs that never reach the frontend.
     sched.set_workspace(p);
+    Ok(())
+}
+
+/// Register the full set of open workspaces with the scheduler so schedules
+/// in EVERY open workspace fire to their own folder, and publish `active`
+/// as the baseline process env for foreground actions. `active` should be
+/// the workspace owning the focused pipeline (or any open one).
+#[tauri::command]
+fn schedule_set_workspaces(paths: Vec<String>, active: Option<String>) -> Result<(), String> {
+    let sched = scheduler()?;
+    let paths: Vec<PathBuf> = paths
+        .into_iter()
+        .filter(|p| !p.is_empty())
+        .map(PathBuf::from)
+        .collect();
+    let active = active
+        .filter(|p| !p.is_empty())
+        .map(PathBuf::from)
+        // Default the baseline env to the first open workspace.
+        .or_else(|| paths.first().cloned());
+    sched.set_workspaces(paths, active);
     Ok(())
 }
 

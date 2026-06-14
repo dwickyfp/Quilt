@@ -68,6 +68,7 @@ async fn run_now_executes_pipeline_from_disk_and_records_history() {
             last_run_duration_ms: None,
             last_run_error: None,
             next_run_at: None,
+            workspace_path: None,
         })
         .unwrap();
 

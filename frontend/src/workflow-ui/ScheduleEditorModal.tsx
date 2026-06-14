@@ -67,7 +67,16 @@ export default function ScheduleEditorModal({
     const refresh = useCallback(async () => {
         setLoading(true);
         const all = await scheduleList();
-        setSchedules(all.filter(s => s.pipeline_id === pipelineId));
+        // Match on BOTH the bare pipeline id and the owning workspace: in
+        // multi-workspace mode two workspaces can share a bare id (e.g. j1),
+        // so the workspace path disambiguates which schedules are ours.
+        setSchedules(
+            all.filter(
+                s =>
+                    s.pipeline_id === pipelineId &&
+                    (!workspacePath || !s.workspace_path || s.workspace_path === workspacePath),
+            ),
+        );
         if (workspacePath) {
             setHistory(await runHistory(workspacePath, pipelineId));
         }
@@ -139,6 +148,9 @@ export default function ScheduleEditorModal({
             name: editing.name.trim() || 'Schedule',
             enabled: editing.enabled,
             kind,
+            // Route this schedule to the pipeline's own workspace folder so it
+            // persists + fires there, even when several workspaces are open.
+            workspace_path: workspacePath,
         };
         try {
             await scheduleUpsert(draft);
