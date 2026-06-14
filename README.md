@@ -86,6 +86,7 @@
 - [Status](#status)
 - [Contributing](#contributing)
 - [Sponsor Quilt](SPONSORS.md)
+- [Acknowledgments](#-acknowledgments)
 - [License](#license)
 - [Releases](https://github.com/dwickyfp/Quilt/releases)
 - [Contributing doc](CONTRIBUTING.md)
@@ -1141,6 +1142,17 @@ gh release edit vX.Y.Z --draft=false --latest
 ## Contributing
 
 Contributions, issues, and ideas are welcome. Quilt is young and there is a lot of green field. Open an issue to discuss a change before a large PR, match the existing code style, and keep changes focused. Run `cargo test` and `npm --prefix frontend run build` before submitting. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## 🧩 Acknowledgments
+
+Quilt stands on the shoulders of excellent open-source work.
+
+- **[duckle](#)** — the upstream project Quilt was forked from. Quilt keeps its spirit (local-first visual ETL on DuckDB) and builds its own identity, multi-workspace support, and roadmap on top. _(replace `#` with the upstream URL)_
+- **[DuckDB](https://duckdb.org)** — the vectorized, columnar engine every pipeline runs on.
+- **[Tauri](https://tauri.app)**, **[React](https://react.dev)**, and **[Rust](https://www.rust-lang.org)** — the desktop shell, UI, and core.
+- **[llama.cpp](https://github.com/ggml-org/llama.cpp)** + **[Qwen 2.5 Coder](https://github.com/QwenLM/Qwen2.5-Coder)** — the on-device engine and model behind Qunnie.
 
 ---
 
