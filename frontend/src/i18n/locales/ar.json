@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "مساحة العمل: {{path}}\nانقر للتبديل",
     "activeContextHint": "السياق النشط - يمكن ربط الحقول بمتغيراتها",
     "noContext": "لا يوجد سياق",
     "git": "بوابة (مساحة عمل)",

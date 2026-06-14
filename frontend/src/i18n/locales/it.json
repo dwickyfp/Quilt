@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Spazio di lavoro: {{path}}\nClicca per cambiare",
     "activeContextHint": "Contesto attivo - i campi possono associarsi alle sue variabili",
     "noContext": "Nessun contesto",
     "git": "Git (spazio di lavoro)",

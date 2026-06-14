@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Radni prostor: {{path}}\nPritisnite za promjenu",
     "activeContextHint": "Aktivni kontekst - polja se mogu vezati na njegove varijable",
     "noContext": "Bez konteksta",
     "git": "Git (radni prostor)",

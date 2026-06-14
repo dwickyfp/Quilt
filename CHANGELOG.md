@@ -3,6 +3,30 @@
 All notable changes to Quilt are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] - 2026-06-14
+
+Multi-workspace quality-of-life pass for the Project sidebar, plus a
+disk-authoritative workspace loader.
+
+### Added
+- **Disk-authoritative workspace loading.** Opening a workspace now scans the
+  folder for pipeline files and shows them even when `repository.json` doesn't
+  reference them (hand-dropped files, git restores, files written by external
+  tools). Misplaced pipelines sitting at the workspace root are loaded and
+  relocated into `pipelines/` automatically. This fixes existing pipelines not
+  auto-loading when switching to a workspace.
+- **Workspace name as the project root.** The Project tree's root node now shows
+  the workspace folder name instead of a static "Quilt Project" label.
+- **Workspace actions menu.** A kebab (⋮) on the workspace root opens a menu with
+  New pipeline, New folder, and Close workspace.
+- **New Workspace button.** The sidebar toolbar now has a single "New Workspace"
+  button that opens another workspace folder from disk (same picker as before).
+
+### Changed
+- The Pipeline / Folder toolbar buttons moved into the workspace kebab menu.
+- Removed the workspace path button from the app header (redundant with the
+  named project root + New Workspace button).
+
 ## [0.4.0] - 2026-06-13
 
 The **Qunnie** release — a rebrand of the in-app AI assistant plus a major

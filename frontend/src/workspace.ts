@@ -22,6 +22,60 @@ const PAYLOAD_DIR_BY_TYPE: Record<string, string> = {
     doc: DOCS_DIR,
 };
 
+// Workspace-level JSON files that are NOT pipelines, so the root scan must
+// never mistake them for an orphan pipeline.
+const RESERVED_ROOT_FILES = new Set<string>([METADATA_FILE, REPOSITORY_FILE, V1_FILE]);
+
+export type DiscoveredPipeline = {
+    id: string;
+    name: string;
+};
+
+/**
+ * Reconcile the repository manifest against the pipeline files actually found
+ * on disk. Returns the RepoItems for any pipeline that exists as a file but is
+ * missing from `repository.json`, so the Project sidebar stays
+ * disk-authoritative: a pipeline is visible even if the manifest never
+ * recorded it (e.g. a file dropped into the folder by hand, restored from git,
+ * or written by an external tool). Pure / DOM-free for unit testing; the
+ * directory scan + file reads live in `loadV2`.
+ */
+export function reconcilePipelineItems(
+    repo: Array<Record<string, unknown>>,
+    discovered: DiscoveredPipeline[],
+): Array<Record<string, unknown>> {
+    const knownIds = new Set(
+        repo.filter(i => i.type === 'pipeline').map(i => i.id as string),
+    );
+    // Newly-registered orphans need a parent folder. Prefer the standard
+    // "pipelines" folder; fall back to the project root if the manifest is
+    // missing it, so the item is never dangling/invisible.
+    const parentId = repo.some(i => i.id === 'pipelines' && i.type === 'folder')
+        ? 'pipelines'
+        : 'root';
+    const added: Array<Record<string, unknown>> = [];
+    const seen = new Set<string>();
+    for (const d of discovered) {
+        if (knownIds.has(d.id) || seen.has(d.id)) continue;
+        seen.add(d.id);
+        added.push({ id: d.id, name: d.name, type: 'pipeline', parentId });
+    }
+    return added;
+}
+
+function pipelineDisplayName(content: Record<string, unknown>, id: string): string {
+    const n = content.name;
+    return typeof n === 'string' && n.trim() ? n.trim() : id;
+}
+
+function isPipelineShape(content: unknown): content is Record<string, unknown> {
+    return (
+        !!content &&
+        typeof content === 'object' &&
+        Array.isArray((content as Record<string, unknown>).nodes)
+    );
+}
+
 export type WorkspaceState = {
     version: number;
     pipelineData?: Record<string, unknown>;
@@ -56,6 +110,17 @@ export function clearWorkspacePath(): void {
     } catch {
         /* ignore */
     }
+}
+
+/**
+ * Derive the display name (last path segment) of a workspace folder from its
+ * absolute path. Handles both POSIX and Windows separators and trailing
+ * slashes. Returns null for an empty/nullish path. Pure for unit testing.
+ */
+export function folderNameFromPath(path: string | null | undefined): string | null {
+    if (!path) return null;
+    const parts = path.split(/[\\/]/).filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : path;
 }
 
 function joinPath(dir: string, ...parts: string[]): string {
@@ -198,12 +263,65 @@ async function loadV2(path: string): Promise<WorkspaceState | null> {
 
     // Load each pipeline file referenced in the repo.
     const pipelineData: Record<string, unknown> = {};
+    const loadedIds = new Set<string>();
     for (const item of repo) {
         if (item.type !== 'pipeline') continue;
-        const file = joinPath(path, PIPELINES_DIR, `${item.id}.json`);
+        const id = item.id as string;
+        const file = joinPath(path, PIPELINES_DIR, `${id}.json`);
         const pipeline = await readJsonIfExists(file);
-        if (pipeline) pipelineData[item.id as string] = pipeline;
+        if (pipeline) {
+            pipelineData[id] = pipeline;
+            loadedIds.add(id);
+        }
     }
+
+    // Disk-authoritative reconciliation: discover pipeline files that exist on
+    // disk but aren't referenced by the manifest, so the Project sidebar shows
+    // them instead of silently dropping them. This is what makes switching to
+    // an existing workspace auto-load its pipelines even if repository.json is
+    // stale, was hand-edited, or the file was restored from git / written by an
+    // external tool.
+    const discovered: DiscoveredPipeline[] = [];
+
+    // (1) Orphans inside the canonical pipelines/ dir.
+    for (const fileName of await readDirEntries(joinPath(path, PIPELINES_DIR))) {
+        const id = fileName.replace(/\.json$/i, '');
+        if (loadedIds.has(id)) continue;
+        const content = await readJsonIfExists(joinPath(path, PIPELINES_DIR, fileName));
+        if (!isPipelineShape(content)) continue;
+        pipelineData[id] = content;
+        loadedIds.add(id);
+        discovered.push({ id, name: pipelineDisplayName(content, id) });
+    }
+
+    // (2) Misplaced / legacy pipeline files sitting at the workspace root.
+    // Relocate them into pipelines/ (best-effort) so future saves stay in the
+    // canonical layout; the pipeline is loaded regardless of whether the move
+    // succeeds.
+    for (const fileName of await readDirEntries(path)) {
+        if (RESERVED_ROOT_FILES.has(fileName)) continue;
+        const id = fileName.replace(/\.json$/i, '');
+        if (loadedIds.has(id)) continue;
+        const content = await readJsonIfExists(joinPath(path, fileName));
+        if (!isPipelineShape(content)) continue;
+        pipelineData[id] = content;
+        loadedIds.add(id);
+        discovered.push({ id, name: pipelineDisplayName(content, id) });
+        try {
+            await savePipelineFile(path, id, content);
+            const { exists, remove } = await fs();
+            if (await exists(joinPath(path, PIPELINES_DIR, `${id}.json`))) {
+                await remove(joinPath(path, fileName));
+            }
+        } catch (err) {
+            console.warn('Could not relocate root pipeline file', fileName, err);
+        }
+    }
+
+    // Fold discovered orphans into the manifest so they render in the sidebar
+    // and the app's save effect heals repository.json on the next write.
+    const added = reconcilePipelineItems(repo, discovered);
+    if (added.length) repo.push(...added);
 
     return {
         version: meta.version ?? 2,

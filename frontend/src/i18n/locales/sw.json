@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Nafasi ya kazi: {{path}}\nBofya ili kubadili",
     "activeContextHint": "Muktadha amilifu - sehemu zinaweza kushikamana na anuwai zake",
     "noContext": "Hakuna muktadha",
     "git": "Git (nafasi ya kazi)",

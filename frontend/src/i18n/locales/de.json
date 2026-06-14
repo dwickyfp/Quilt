@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Arbeitsbereich: {{path}}\nZum Wechseln klicken",
     "activeContextHint": "Aktiver Kontext - Felder können an ihre Variablen gebunden werden",
     "noContext": "Nein {{context}}",
     "git": "Git (Arbeitsbereich)",

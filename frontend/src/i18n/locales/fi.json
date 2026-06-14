@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Työtila: {{polku}}\nNapsauta vaihtaaksesi",
     "activeContextHint": "Aktiivinen konteksti - kentät voivat sitoutua sen muuttujiin",
     "noContext": "Ei kontekstia",
     "git": "Git (työtila)",

@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Tööruum: {{path}}\nVahetamiseks klõpsake",
     "activeContextHint": "Aktiivne kontekst – väljad võivad seostuda selle muutujatega",
     "noContext": "Pole konteksti",
     "git": "Git (tööruum)",

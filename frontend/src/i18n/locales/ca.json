@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Espai de treball: {{camí}}\nFeu clic per canviar",
     "activeContextHint": "Context actiu: els camps es poden unir a les seves variables",
     "noContext": "Sense context",
     "git": "Git (espai de treball)",

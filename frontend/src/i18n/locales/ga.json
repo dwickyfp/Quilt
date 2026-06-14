@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Spás oibre: {{conair}}\nCliceáil chun athrú",
     "activeContextHint": "Comhthéacs gníomhach - is féidir le réimsí ceangal lena athróga",
     "noContext": "Gan comhthéacs",
     "git": "Git (spás oibre)",

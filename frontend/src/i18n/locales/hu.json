@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Munkaterület: {{path}}\nKattints a váltáshoz",
     "activeContextHint": "Aktív kontextus - a mezők kötődhetnek a változóikhoz",
     "noContext": "Nincs kontextus",
     "git": "Git (munkaterület)",

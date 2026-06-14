@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "İş sahəsi: {{path}}\nKeçirmək üçün klikləyin",
     "activeContextHint": "Aktiv kontekst - sahələr onun dəyişənlərinə bağlana bilər",
     "noContext": "Kontekst yoxdur",
     "git": "Git (iş sahəsi)",

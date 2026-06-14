@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Arbetsyta: {{path}}\nKlicka för att byta",
     "activeContextHint": "Aktivt sammanhang - fält kan bindas till sina variabler",
     "noContext": "Inget sammanhang",
     "git": "Git (arbetsyta)",

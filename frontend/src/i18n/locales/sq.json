@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Hapësira e punës: {{rruga}}\nKlikoni për të kaluar",
     "activeContextHint": "Konteksti aktiv - fushat mund të lidhen me variablat e tij",
     "noContext": "Asnjë kontekst",
     "git": "Git (hapësirë ​​pune)",

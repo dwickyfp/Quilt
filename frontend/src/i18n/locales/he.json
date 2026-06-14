@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "סביבת עבודה: {{path}}\nלחץ כדי להחליף",
     "activeContextHint": "הקשר פעיל - שדות יכולים להיקשר למשתנים שלו",
     "noContext": "ללא הקשר",
     "git": "GIT (פינת עבודה)",

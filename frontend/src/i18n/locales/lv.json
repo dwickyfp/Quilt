@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Darbvieta: {{path}}\nNoklikšķiniet, lai pārslēgtos",
     "activeContextHint": "Aktīvs konteksts — lauki var saistīties ar tā mainīgajiem",
     "noContext": "Nav konteksta",
     "git": "Git (darbvieta)",

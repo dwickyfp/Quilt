@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Werkruimte: {{path}}\nKlik om te schakelen",
     "activeContextHint": "Actieve context - velden kunnen zich binden aan de variabelen",
     "noContext": "Geen context",
     "git": "Git (werkruimte)",

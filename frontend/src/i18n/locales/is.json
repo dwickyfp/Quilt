@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Vinnusvæði: {{path}}\nSmelltu til að skipta",
     "activeContextHint": "Virkt samhengi - reitir geta bundist breytum sínum",
     "noContext": "Ekkert samhengi",
     "git": "Git (vinnusvæði)",

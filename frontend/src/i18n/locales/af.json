@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Werkspasie: {{pad}}\nKlik om oor te skakel",
     "activeContextHint": "Aktiewe konteks - velde kan aan sy veranderlikes bind",
     "noContext": "Geen konteks nie",
     "git": "Git (werkspasie)",

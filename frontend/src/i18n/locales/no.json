@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Arbeidsområde: {{bane}}\nKlikk for å bytte",
     "activeContextHint": "Aktiv kontekst - felt kan binde seg til variablene",
     "noContext": "Ingen kontekst",
     "git": "Git (arbeidsområde)",

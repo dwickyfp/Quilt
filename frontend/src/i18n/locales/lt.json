@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Darbo sritis: {{path}}\nSpustelėkite norėdami perjungti",
     "activeContextHint": "Aktyvus kontekstas – laukai gali susieti su jo kintamaisiais",
     "noContext": "Jokio konteksto",
     "git": "Git (darbo sritis)",

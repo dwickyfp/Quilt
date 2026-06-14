@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "ワークスペース: {{path}}\nクリックして切り替え",
     "activeContextHint": "アクティブなコンテキスト-フィールドはその変数にバインドできます",
     "noContext": "コンテキストがありません",
     "git": "Git （ワークスペース）",

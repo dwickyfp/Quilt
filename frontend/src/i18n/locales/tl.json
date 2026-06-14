@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Lugar ng trabaho: {{path}}\nI - click upang lumipat",
     "activeContextHint": "Aktibong konteksto - maaaring magbigkis ang mga patlang sa mga variable nito",
     "noContext": "Walang konteksto",
     "git": "Git",

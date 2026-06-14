@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Gweithle: {{path}}\nCliciwch i newid",
     "activeContextHint": "Cyd-destun gweithredol - gall meysydd rwymo i'w newidynnau",
     "noContext": "Dim cyd-destun",
     "git": "Git (lle gwaith)",

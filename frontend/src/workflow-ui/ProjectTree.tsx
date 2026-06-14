@@ -11,11 +11,13 @@ import {
     Folder,
     FolderOpen,
     FolderPlus,
+    FolderSearch,
     History,
+    LogOut,
+    MoreVertical,
     Package,
     Pencil,
     Plug,
-    Plus,
     Trash2,
     Variable,
     Workflow,
@@ -28,6 +30,7 @@ const ICON_SIZE = 14;
 
 type Props = {
     items: RepoItem[];
+    workspaceName: string | null;
     activeJobId: string;
     openJobIds: Set<string>;
     onOpenPipeline: (id: string) => void;
@@ -44,6 +47,8 @@ type Props = {
     onSchedulePipeline: (id: string) => void;
     onBackfillPipeline: (id: string) => void;
     onBuildPipeline: (id: string) => void;
+    onNewWorkspace: () => void;
+    onCloseWorkspace: () => void;
 };
 
 const TYPE_LABEL: Record<RepoItemType, string> = {
@@ -79,6 +84,7 @@ function TypeIcon({ type, isOpen }: { type: RepoItemType; isOpen: boolean }) {
 export default function ProjectTree(props: Props) {
     const {
         items,
+        workspaceName,
         activeJobId,
         openJobIds,
         onOpenPipeline,
@@ -95,6 +101,8 @@ export default function ProjectTree(props: Props) {
         onSchedulePipeline,
         onBackfillPipeline,
         onBuildPipeline,
+        onNewWorkspace,
+        onCloseWorkspace,
     } = props;
 
     // Walk up to find which root folder this item lives under.
@@ -150,6 +158,38 @@ export default function ProjectTree(props: Props) {
     };
 
     const cancelRename = () => setRenamingId(null);
+
+    // Menu for the workspace (project root) kebab + context menu: create items
+    // and close the workspace. Mirrors the actions previously in the toolbar.
+    const buildWorkspaceMenu = (item: RepoItem): MenuItem[] => [
+        { kind: 'header', key: 'h', label: workspaceName ?? item.name },
+        {
+            kind: 'item',
+            key: 'new-pipeline',
+            label: 'New pipeline…',
+            icon: <FileCog size={ICON_SIZE} />,
+            onClick: () => onNewPipeline('pipelines'),
+        },
+        {
+            kind: 'item',
+            key: 'new-folder',
+            label: 'New folder',
+            icon: <FolderPlus size={ICON_SIZE} />,
+            onClick: () => onNewFolder('root'),
+        },
+        { kind: 'separator', key: 's1' },
+        {
+            kind: 'item',
+            key: 'close-workspace',
+            label: 'Close workspace',
+            icon: <LogOut size={ICON_SIZE} />,
+            onClick: () => onCloseWorkspace(),
+        },
+    ];
+
+    const openWorkspaceMenu = (e: React.MouseEvent, item: RepoItem) => {
+        menu.open(e, buildWorkspaceMenu(item));
+    };
 
     const toggle = (id: string) => {
         setExpanded(s => {
@@ -319,9 +359,11 @@ export default function ProjectTree(props: Props) {
 
     const onItemContextMenu = (e: React.MouseEvent, item: RepoItem) => {
         const itemsArr =
-            item.type === 'folder' || item.type === 'project'
-                ? buildFolderMenu(item)
-                : finishItemMenu(buildItemMenu(item), item);
+            item.type === 'project'
+                ? buildWorkspaceMenu(item)
+                : item.type === 'folder'
+                  ? buildFolderMenu(item)
+                  : finishItemMenu(buildItemMenu(item), item);
         menu.open(e, itemsArr);
     };
 
@@ -392,8 +434,24 @@ export default function ProjectTree(props: Props) {
                             onCancel={cancelRename}
                         />
                     ) : (
-                        <span className="repo-label">{item.name}</span>
+                        <span className="repo-label">
+                            {item.type === 'project' ? workspaceName ?? item.name : item.name}
+                        </span>
                     )}
+                    {item.type === 'project' && !isRenaming ? (
+                        <button
+                            type="button"
+                            className="repo-node-kebab"
+                            title="Workspace actions"
+                            aria-label="Workspace actions"
+                            onClick={e => {
+                                e.stopPropagation();
+                                openWorkspaceMenu(e, item);
+                            }}
+                        >
+                            <MoreVertical size={14} />
+                        </button>
+                    ) : null}
                     {item.type === 'pipeline' && isOpen && !isRenaming ? (
                         <span className="repo-open-dot" aria-label="open in editor" />
                     ) : null}
@@ -415,19 +473,11 @@ export default function ProjectTree(props: Props) {
             <div className="repo-tree-actions">
                 <button
                     type="button"
-                    className="repo-action-button"
-                    onClick={() => onNewPipeline('pipelines')}
-                    title="New pipeline"
+                    className="repo-action-button repo-action-button-full"
+                    onClick={onNewWorkspace}
+                    title="Open another workspace folder"
                 >
-                    <Plus size={13} /> Pipeline
-                </button>
-                <button
-                    type="button"
-                    className="repo-action-button"
-                    onClick={() => onNewFolder('root')}
-                    title="New folder"
-                >
-                    <FolderPlus size={13} /> Folder
+                    <FolderSearch size={13} /> New Workspace
                 </button>
             </div>
             <div className="repo-tree-body" onContextMenu={e => e.preventDefault()}>

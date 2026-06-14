@@ -12,7 +12,7 @@ import {
     type OnSelectionChangeParams,
 } from '@xyflow/react';
 import type { ConnectionType } from './canvas/connection-types';
-import { Braces, FolderOpen, GitBranch, Moon, Settings, Sparkles, Sun } from 'lucide-react';
+import { Braces, GitBranch, Moon, Settings, Sparkles, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { UpdateBanner } from './UpdateBanner';
 import EditorTabs from './workflow-ui/EditorTabs';
@@ -51,8 +51,10 @@ import type { SavedComponent } from './workflow-ui/component-expand';
 import { extractComponent } from './workflow-ui/component-def';
 import WorkspacePickerModal from './workflow-ui/WorkspacePickerModal';
 import {
+    clearWorkspacePath,
     deleteItemPayload,
     deletePipelineFile,
+    folderNameFromPath,
     getWorkspacePath,
     isInTauri,
     loadWorkspace,
@@ -477,11 +479,24 @@ export default function App() {
         setWorkspacePathState(picked);
     }, [workspacePathState]);
 
-    const workspaceFolderName = useMemo(() => {
-        if (!workspacePathState) return null;
-        const parts = workspacePathState.split(/[\\/]/).filter(Boolean);
-        return parts[parts.length - 1] ?? workspacePathState;
-    }, [workspacePathState]);
+    const workspaceFolderName = useMemo(
+        () => folderNameFromPath(workspacePathState),
+        [workspacePathState],
+    );
+
+    // Close the current workspace: clear the persisted path + reset state so
+    // the workspace picker is shown again. The save effects bail while no path
+    // is set, so this won't write to the just-closed folder.
+    const handleCloseWorkspace = useCallback(() => {
+        if (!isInTauri()) return;
+        setWorkspaceReady(false);
+        setPipelineData(INITIAL_PIPELINE_DATA);
+        setRepo(INITIAL_REPO);
+        setJobs(INITIAL_JOBS);
+        setActiveJobId('j1');
+        clearWorkspacePath();
+        setWorkspacePathState(null);
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -1732,17 +1747,6 @@ export default function App() {
                     Quilt
                 </div>
                 <div className="topbar-spacer" data-tauri-drag-region />
-                {workspaceFolderName ? (
-                    <button
-                        type="button"
-                        className="topbar-workspace"
-                        onClick={handleSwitchWorkspace}
-                        title={t('topbar.workspaceTooltip', { path: workspacePathState })}
-                    >
-                        <FolderOpen size={12} />
-                        <span className="topbar-workspace-name">{workspaceFolderName}</span>
-                    </button>
-                ) : null}
                 {contexts.length > 0 ? (
                     <div
                         className="topbar-context"
@@ -1824,6 +1828,7 @@ export default function App() {
             <main className="workspace">
                 <LeftSidebar
                     repoItems={repo}
+                    workspaceName={workspaceFolderName}
                     savedComponents={savedComponents}
                     onDeleteComponent={id => setSavedComponents(cs => cs.filter(c => c.id !== id))}
                     activeJobId={activeJobId}
@@ -1842,6 +1847,8 @@ export default function App() {
                     onSchedulePipeline={handleSchedulePipeline}
                     onBackfillPipeline={handleBackfillPipeline}
                     onBuildPipeline={handleBuildPipeline}
+                    onNewWorkspace={handleSwitchWorkspace}
+                    onCloseWorkspace={handleCloseWorkspace}
                 />
                 <section className="canvas-shell">
                     <EditorHeader

@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Workspace: {{path}}\nClick to switch",
     "activeContextHint": "Active context - fields can bind to its variables",
     "noContext": "No context",
     "git": "Git (workspace)",

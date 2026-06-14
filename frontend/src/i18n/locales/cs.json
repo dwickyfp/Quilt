@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Pracovní prostor: {{path}}\nKliknutím přepnete",
     "activeContextHint": "Aktivní kontext - pole se mohou vázat na své proměnné",
     "noContext": "Bez kontextu",
     "git": "Git (pracovní plocha)",

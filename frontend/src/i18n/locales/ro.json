@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Spațiu de lucru: {{path}}\nFaceți clic pentru a comuta",
     "activeContextHint": "Context activ - câmpurile se pot lega de variabilele sale",
     "noContext": "Fără context",
     "git": "Git (spațiu de lucru)",

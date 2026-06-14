@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Ruang kerja: {{path}}\nKlik untuk beralih",
     "activeContextHint": "Konteks aktif - bidang dapat mengikat variabelnya",
     "noContext": "Tidak ada konteks",
     "git": "Git (ruang kerja)",

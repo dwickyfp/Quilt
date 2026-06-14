@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "작업 공간: {{path}}\n전환하려면 클릭하세요.",
     "activeContextHint": "활성 컨텍스트 - 필드는 해당 변수에 바인딩할 수 있습니다",
     "noContext": "맥락 없음",
     "git": "Git (작업 공간)",

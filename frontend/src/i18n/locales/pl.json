@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Obszar roboczy: {{path}}\nKliknij, aby przełączyć",
     "activeContextHint": "Aktywny kontekst - pola mogą być powiązane z jego zmiennymi",
     "noContext": "Brak kontekstu",
     "git": "Git (obszar roboczy)",

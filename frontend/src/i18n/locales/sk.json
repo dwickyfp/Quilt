@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "Pracovný priestor: {{cesta}}\nKliknutím prepnete",
     "activeContextHint": "Aktívny kontext – polia sa môžu viazať na jeho premenné",
     "noContext": "Bez kontextu",
     "git": "Git (pracovný priestor)",

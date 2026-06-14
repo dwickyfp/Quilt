@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "工作区： {{path}}\n点击切换",
     "activeContextHint": "活动上下文-字段可以绑定到其变量",
     "noContext": "没有场景",
     "git": "Git (工作区)",

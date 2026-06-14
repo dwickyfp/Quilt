@@ -9,6 +9,7 @@ type SideTab = 'project' | 'palette';
 
 type Props = {
     repoItems: RepoItem[];
+    workspaceName: string | null;
     savedComponents: PaletteSavedComponent[];
     onDeleteComponent: (id: string) => void;
     activeJobId: string;
@@ -27,10 +28,13 @@ type Props = {
     onSchedulePipeline: (id: string) => void;
     onBackfillPipeline: (id: string) => void;
     onBuildPipeline: (id: string) => void;
+    onNewWorkspace: () => void;
+    onCloseWorkspace: () => void;
 };
 
 export default function LeftSidebar({
     repoItems,
+    workspaceName,
     savedComponents,
     onDeleteComponent,
     activeJobId,
@@ -49,6 +53,8 @@ export default function LeftSidebar({
     onSchedulePipeline,
     onBackfillPipeline,
     onBuildPipeline,
+    onNewWorkspace,
+    onCloseWorkspace,
 }: Props) {
     const { t } = useTranslation();
     const [tab, setTab] = useState<SideTab>('palette');
@@ -83,6 +89,7 @@ export default function LeftSidebar({
                 ) : (
                     <ProjectTree
                         items={repoItems}
+                        workspaceName={workspaceName}
                         activeJobId={activeJobId}
                         openJobIds={openJobIds}
                         onOpenPipeline={onOpenPipeline}
@@ -99,6 +106,8 @@ export default function LeftSidebar({
                         onSchedulePipeline={onSchedulePipeline}
                         onBackfillPipeline={onBackfillPipeline}
                         onBuildPipeline={onBuildPipeline}
+                        onNewWorkspace={onNewWorkspace}
+                        onCloseWorkspace={onCloseWorkspace}
                     />
                 )}
             </div>

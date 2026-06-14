@@ -1,6 +1,5 @@
 {
   "topbar": {
-    "workspaceTooltip": "工作空間： {{path}}\n按一下以切換",
     "activeContextHint": "活動上下文-字段可以綁定到其變量",
     "noContext": "無上下文",
     "git": "Git （工作區）",
