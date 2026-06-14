@@ -10058,6 +10058,254 @@ fn ml_partition_splits_train_and_test_complementary() {
     assert_eq!(overlap, 0, "train and test must not overlap");
 }
 
+#[test]
+fn ml_crossval_kfold_reports_per_fold_and_mean_metrics() {
+    // A linearly separable 2-class set; 5-fold CV with a forest must score
+    // near-perfect accuracy, emit one row per fold plus a mean row, and every
+    // input row must be held out exactly once (test_rows sum to the input).
+    let tmp = tempfile::tempdir().unwrap();
+    let mut csv = String::from("x,y,label\n");
+    for i in 0..50 {
+        let (x, label) = if i % 2 == 0 { (i, "lo") } else { (i + 100, "hi") };
+        csv.push_str(&format!("{},{},{}\n", x, x * 2, label));
+    }
+    let path = write_file(tmp.path(), "cv.csv", &csv);
+    let out = out_path(tmp.path(), "cv.parquet");
+
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": path, "hasHeader": true })),
+            node("cv", "ml.crossval", json!({
+                "algorithm": "forest",
+                "targetColumn": "label",
+                "featureColumns": ["x", "y"],
+                "folds": 5,
+                "seed": 7,
+                "nTrees": 30,
+                "task": "classification"
+            })),
+            node("k1", "snk.parquet", json!({ "path": out })),
+        ]),
+        json!([
+            main_edge("e1", "s1", "cv"),
+            main_edge("e2", "cv", "k1"),
+        ]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "crossval run failed: {:?}", result.error);
+
+    // Mean accuracy row present and high on a separable set. The mean row is
+    // the only one carrying a `std` value; per-fold rows carry `test_rows`.
+    // (The `fold` column mixes ints and "mean", so DuckDB infers it numeric and
+    // nulls the label — discriminate on std/test_rows instead.)
+    let mean = duckdb_json(&format!(
+        "SELECT value FROM read_parquet('{}') WHERE std IS NOT NULL",
+        out
+    ));
+    let macc = mean
+        .first()
+        .and_then(|r| r.get("value"))
+        .and_then(|v| v.as_f64())
+        .expect("mean accuracy present");
+    assert!(macc > 0.9, "expected near-perfect CV accuracy, got {}", macc);
+
+    // Exactly 5 per-fold rows (those carry test_rows; the mean row does not).
+    let nfolds = count(&format!(
+        "(SELECT * FROM read_parquet('{}') WHERE test_rows IS NOT NULL)",
+        out
+    ));
+    assert_eq!(nfolds, 5, "expected 5 fold rows");
+
+    // Every input row is a test row exactly once (mean row has null test_rows).
+    // SUM over BIGINT yields HUGEINT (serialized as a string), so cast back.
+    let total = duckdb_json(&format!(
+        "SELECT CAST(SUM(test_rows) AS BIGINT) AS n FROM read_parquet('{}')",
+        out
+    ));
+    let t = total
+        .first()
+        .and_then(|r| r.get("n"))
+        .and_then(|v| v.as_i64())
+        .expect("test_rows sum present");
+    assert_eq!(t, 50, "test rows must cover the input exactly once");
+}
+
+#[test]
+fn ml_featureselect_picks_informative_features_over_noise() {
+    // Regression target depends only on good1, good2; noise1/noise2 are
+    // uninformative. Forward selection (linreg, RMSE) must add an informative
+    // feature first and end with both informative features selected.
+    let tmp = tempfile::tempdir().unwrap();
+    let mut csv = String::from("good1,good2,noise1,noise2,y\n");
+    for i in 0..60 {
+        let g1 = (i % 10) as f64;
+        let g2 = ((i * 7) % 13) as f64;
+        let n1 = ((i * 31) % 17) as f64;
+        let n2 = ((i * 19) % 11) as f64;
+        let y = 2.0 * g1 + 3.0 * g2; // pure signal, no noise
+        csv.push_str(&format!("{},{},{},{},{}\n", g1, g2, n1, n2, y));
+    }
+    let path = write_file(tmp.path(), "fs.csv", &csv);
+    let out = out_path(tmp.path(), "fs.parquet");
+
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": path, "hasHeader": true })),
+            node("fs", "ml.featureselect", json!({
+                "algorithm": "linreg",
+                "targetColumn": "y",
+                "featureColumns": ["good1", "good2", "noise1", "noise2"],
+                "folds": 4,
+                "seed": 42,
+                "task": "regression"
+            })),
+            node("k1", "snk.parquet", json!({ "path": out })),
+        ]),
+        json!([
+            main_edge("e1", "s1", "fs"),
+            main_edge("e2", "fs", "k1"),
+        ]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "featureselect run failed: {:?}", result.error);
+
+    // First selected feature must be informative, not noise.
+    let first = duckdb_json(&format!(
+        "SELECT added_feature FROM read_parquet('{}') ORDER BY step LIMIT 1",
+        out
+    ));
+    let f = first
+        .first()
+        .and_then(|r| r.get("added_feature"))
+        .and_then(|v| v.as_str())
+        .expect("first added feature present")
+        .to_string();
+    assert!(
+        f == "good1" || f == "good2",
+        "expected informative first pick, got {}",
+        f
+    );
+
+    // The final running feature set must include both informative features.
+    let last = duckdb_json(&format!(
+        "SELECT features FROM read_parquet('{}') ORDER BY step DESC LIMIT 1",
+        out
+    ));
+    let feats = last
+        .first()
+        .and_then(|r| r.get("features"))
+        .and_then(|v| v.as_str())
+        .expect("features present")
+        .to_string();
+    assert!(
+        feats.contains("good1") && feats.contains("good2"),
+        "expected both informative features selected, got {}",
+        feats
+    );
+}
+
+#[test]
+fn ml_pca_appends_components_with_dominant_first() {
+    // f1,f2 track a wide-range latent factor (high variance); f3 a small
+    // bounded factor. PCA(2) must append pc1/pc2, pc1 must carry more variance
+    // than pc2, and the row count must be preserved.
+    let tmp = tempfile::tempdir().unwrap();
+    let mut csv = String::from("f1,f2,f3\n");
+    for i in 0..50 {
+        let t = i as f64; // dominant factor 0..49
+        let u = (((i * 13) % 11) as f64) - 5.0; // small bounded -5..5
+        csv.push_str(&format!("{},{},{}\n", 2.0 * t, 3.0 * t, u));
+    }
+    let path = write_file(tmp.path(), "pca.csv", &csv);
+    let out = out_path(tmp.path(), "pca.parquet");
+
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": path, "hasHeader": true })),
+            node("pca", "ml.pca", json!({
+                "featureColumns": ["f1", "f2", "f3"],
+                "nComponents": 2,
+                "outputPrefix": "pc"
+            })),
+            node("k1", "snk.parquet", json!({ "path": out })),
+        ]),
+        json!([
+            main_edge("e1", "s1", "pca"),
+            main_edge("e2", "pca", "k1"),
+        ]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "pca run failed: {:?}", result.error);
+
+    // Row count preserved and pc1 carries more variance than pc2.
+    let n = count(&format!("read_parquet('{}')", out));
+    assert_eq!(n, 50, "pca must preserve row count");
+    let v = duckdb_json(&format!(
+        "SELECT var_pop(pc1) AS v1, var_pop(pc2) AS v2 FROM read_parquet('{}')",
+        out
+    ));
+    let r = v.first().expect("variance row");
+    let v1 = r.get("v1").and_then(|x| x.as_f64()).expect("v1 present");
+    let v2 = r.get("v2").and_then(|x| x.as_f64()).expect("v2 present");
+    assert!(
+        v1 > v2,
+        "pc1 must be the dominant component: v1={} v2={}",
+        v1,
+        v2
+    );
+}
+
+#[test]
+fn ml_onehot_appends_one_indicator_per_category() {
+    // color cycles red/green/blue (10 each over 30 rows). One-hot must add
+    // color_red/color_green/color_blue, exactly one hot per row, and each
+    // indicator's hot count must match the category frequency.
+    let tmp = tempfile::tempdir().unwrap();
+    let mut csv = String::from("id,color\n");
+    let colors = ["red", "green", "blue"];
+    for i in 0..30 {
+        csv.push_str(&format!("{},{}\n", i, colors[i % 3]));
+    }
+    let path = write_file(tmp.path(), "oh.csv", &csv);
+    let out = out_path(tmp.path(), "oh.parquet");
+
+    let engine = engine_or_skip!();
+    let d = doc(
+        json!([
+            node("s1", "src.csv", json!({ "path": path, "hasHeader": true })),
+            node("oh", "ml.onehot", json!({
+                "columns": ["color"],
+                "maxCategories": 0,
+                "dropOriginal": false
+            })),
+            node("k1", "snk.parquet", json!({ "path": out })),
+        ]),
+        json!([
+            main_edge("e1", "s1", "oh"),
+            main_edge("e2", "oh", "k1"),
+        ]),
+    );
+    let result = engine.execute_pipeline(&d);
+    assert_eq!(result.status, "ok", "onehot run failed: {:?}", result.error);
+
+    // Exactly one indicator is hot per row.
+    let bad = count(&format!(
+        "(SELECT * FROM read_parquet('{}') WHERE (color_red + color_green + color_blue) <> 1)",
+        out
+    ));
+    assert_eq!(bad, 0, "each row must have exactly one hot indicator");
+
+    // Each indicator's hot count matches the category frequency (10 each).
+    let red = count(&format!(
+        "(SELECT * FROM read_parquet('{}') WHERE color_red = 1)",
+        out
+    ));
+    assert_eq!(red, 10, "color_red hot count must match frequency");
+}
+
 // ===================================================================
 // Smart incremental re-run: content-addressed Parquet stage cache.
 //
