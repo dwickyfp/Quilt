@@ -101,6 +101,10 @@
 
 A visual data pipeline studio that runs on your laptop. Drag sources, transforms, validators, and sinks onto a canvas. Wire them together. Press **Run**. Quilt compiles the graph to SQL and executes it through a real columnar engine, with live previews, generated SQL on every node, and zero hidden state.
 
+<div align="center">
+<img src="docs/assets/screenshot.png" alt="The Quilt desktop app: a node-based RFM segmentation pipeline on the canvas, with the components palette on the left and a run-output panel showing 35 nodes and 6,692 rows written" width="100%"/>
+</div>
+
 Three things make Quilt different from the heavyweights and the toy ETL tools:
 
 1. **An AI assistant that ships in the box.** Describe the pipeline you want in English; Qunnie writes the JSON and drops it onto the canvas. The model runs locally - no API key, no telemetry, no cloud round-trip.
