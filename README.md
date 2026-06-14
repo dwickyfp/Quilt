@@ -1164,7 +1164,7 @@ Contributions, issues, and ideas are welcome. Quilt is young and there is a lot 
 
 Quilt stands on the shoulders of excellent open-source work.
 
-- **[duckle](#)** — the upstream project Quilt was forked from. Quilt keeps its spirit (local-first visual ETL on DuckDB) and builds its own identity, multi-workspace support, and roadmap on top. _(replace `#` with the upstream URL)_
+- **[duckle](https://github.com/SouravRoy-ETL/duckle)** — the upstream project Quilt was forked from. Quilt keeps its spirit (local-first visual ETL on DuckDB) and builds its own identity, multi-workspace support, and roadmap on top.
 - **[DuckDB](https://duckdb.org)** — the vectorized, columnar engine every pipeline runs on.
 - **[Tauri](https://tauri.app)**, **[React](https://react.dev)**, and **[Rust](https://www.rust-lang.org)** — the desktop shell, UI, and core.
 - **[llama.cpp](https://github.com/ggml-org/llama.cpp)** + **[Qwen 2.5 Coder](https://github.com/QwenLM/Qwen2.5-Coder)** — the on-device engine and model behind Qunnie.
