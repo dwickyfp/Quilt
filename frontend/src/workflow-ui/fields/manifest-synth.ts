@@ -592,6 +592,14 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // PCA - data in, same rows with pc1..pcN columns appended out.
+    if (id === 'ml.pca') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [MAIN_OUT],
+        };
+    }
+
     // Viz charts - terminal: one main input, no output (renders a chart).
     if (comp.kind === 'viz') {
         return {
@@ -5225,6 +5233,50 @@ function synthMl(comp: ComponentDef): ComponentManifest {
                         label: 'Learning rate (xgb)',
                         kind: 'number',
                         defaultValue: 0.1,
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
+
+    if (id === 'ml.pca') {
+        return base(comp, [
+            {
+                label: 'PCA',
+                fields: [
+                    {
+                        key: 'featureColumns',
+                        label: 'Feature columns',
+                        kind: 'columns',
+                        description: 'Numeric columns to decompose. Leave empty to use all numeric columns.',
+                    },
+                    {
+                        key: 'nComponents',
+                        label: 'Components (N)',
+                        kind: 'integer',
+                        defaultValue: 2,
+                        description: 'Number of principal components to keep (capped at the feature count).',
+                    },
+                    {
+                        key: 'useCorrelationMatrix',
+                        label: 'Standardize (correlation matrix)',
+                        kind: 'bool',
+                        defaultValue: false,
+                        description: 'Standardize variables to mean 0 / sd 1 before decomposition.',
+                    },
+                    {
+                        key: 'outputPrefix',
+                        label: 'Output prefix',
+                        kind: 'text',
+                        defaultValue: 'pc',
+                        description: 'Component columns are named <prefix>1..<prefix>N.',
+                    },
+                    {
+                        key: 'dropFeatures',
+                        label: 'Drop source features',
+                        kind: 'bool',
+                        defaultValue: false,
+                        description: 'Remove the original feature columns from the output.',
                     },
                 ],
             },

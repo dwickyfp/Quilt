@@ -22,6 +22,7 @@ use smartcore::cluster::dbscan::{DBSCAN, DBSCANParameters};
 use smartcore::ensemble::random_forest_classifier::{
     RandomForestClassifier, RandomForestClassifierParameters,
 };
+use smartcore::decomposition::pca::{PCA, PCAParameters};
 use smartcore::linalg::basic::matrix::DenseMatrix;
 use smartcore::linear::linear_regression::{LinearRegression, LinearRegressionParameters};
 use smartcore::linear::logistic_regression::{LogisticRegression, LogisticRegressionParameters};
@@ -1153,6 +1154,97 @@ impl DuckdbEngine {
             spec.task,
             selected.len(),
             selected.len() + candidates.len(),
+            spec.node_id
+        ))
+    }
+
+    /// ml.pca: principal component analysis. A single fit+transform node — fits
+    /// PCA on the chosen numeric feature columns and appends the reduced
+    /// components as new columns (pc1..pcN). Unlike the learners this needs no
+    /// model round-trip / predict contract: it fits and transforms the same
+    /// rows in one pass, so the runtime-dependent column count (N components)
+    /// is just N extra keys appended to each output JSON row.
+    pub(crate) fn run_ml_pca(
+        &self,
+        db: &Path,
+        spec: &plan::MlPcaSpec,
+    ) -> Result<String, EngineError> {
+        use smartcore::linalg::basic::arrays::Array;
+        self.check_cancelled()?;
+        let rows = self.run_rows(
+            Some(db),
+            &format!("SELECT * FROM {};", plan::quote_ident(&spec.from_view)),
+        )?;
+        if rows.is_empty() {
+            return Err(EngineError::Query(format!(
+                "ml.pca: no rows from {}",
+                spec.from_view
+            )));
+        }
+
+        // Feature pool: explicit list, or every numeric column in the first row.
+        let features: Vec<String> = if spec.feature_columns.is_empty() {
+            rows.first()
+                .and_then(|r| r.as_object())
+                .map(|o| {
+                    o.iter()
+                        .filter(|(_, v)| v.is_number())
+                        .map(|(k, _)| k.clone())
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            spec.feature_columns.clone()
+        };
+        if features.len() < 2 {
+            return Err(EngineError::Config(format!(
+                "ml.pca: need at least 2 numeric feature columns, got {}",
+                features.len()
+            )));
+        }
+        // smartcore requires n_components <= number of attributes.
+        let n_components = spec.n_components.min(features.len()).max(1);
+
+        let x = build_matrix(&rows, &features);
+        let pca = PCA::fit(
+            &x,
+            PCAParameters::default()
+                .with_n_components(n_components)
+                .with_use_correlation_matrix(spec.use_correlation_matrix),
+        )
+        .map_err(fit_failed)?;
+        let transformed = pca.transform(&x).map_err(fit_failed)?;
+        let (nrows, ncomp) = transformed.shape();
+
+        // Append pc1..pcN to each row, optionally dropping the source features.
+        let mut out: Vec<JsonValue> = Vec::with_capacity(rows.len());
+        for (r, row) in rows.iter().enumerate().take(nrows) {
+            let mut obj = match row.as_object() {
+                Some(o) => o.clone(),
+                None => serde_json::Map::new(),
+            };
+            if spec.drop_features {
+                for f in &features {
+                    obj.remove(f);
+                }
+            }
+            for c in 0..ncomp {
+                let key = format!("{}{}", spec.output_prefix, c + 1);
+                obj.insert(key, json!(*transformed.get((r, c))));
+            }
+            out.push(JsonValue::Object(obj));
+        }
+
+        let count = out.len();
+        materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &out)?;
+        Ok(format!(
+            "ml.pca: {} rows, {} features -> {} components ({}1..{}{}) -> {}",
+            count,
+            features.len(),
+            ncomp,
+            spec.output_prefix,
+            spec.output_prefix,
+            ncomp,
             spec.node_id
         ))
     }

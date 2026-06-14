@@ -1344,6 +1344,26 @@ pub struct MlFeatureSelectSpec {
     pub task: String,
 }
 
+/// ml.pca: principal component analysis. A single fit+transform node — fits PCA
+/// on the chosen feature columns and appends the reduced components as new
+/// columns (pc1..pcN). No model round-trip / predict contract; the output is
+/// just the input rows with N extra numeric columns.
+#[derive(Debug, Clone)]
+pub struct MlPcaSpec {
+    pub node_id: String,
+    pub from_view: String,
+    /// Columns to run PCA over; empty = every numeric column.
+    pub feature_columns: Vec<String>,
+    /// Number of principal components to keep.
+    pub n_components: usize,
+    /// Standardize variables (correlation matrix) before decomposition.
+    pub use_correlation_matrix: bool,
+    /// Prefix for the emitted component columns (default "pc").
+    pub output_prefix: String,
+    /// Drop the original feature columns from the output.
+    pub drop_features: bool,
+}
+
 /// xf.stat.test: run a statistical hypothesis test over the upstream rows and
 /// emit a small (metric, value) table. `test` selects ttest / anova / chi2.
 #[derive(Debug, Clone)]

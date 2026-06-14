@@ -164,6 +164,7 @@ pub enum RuntimeSpec {
     MlScore(MlScoreSpec),
     MlCrossval(MlCrossvalSpec),
     MlFeatureSelect(MlFeatureSelectSpec),
+    MlPca(MlPcaSpec),
     StatTest(StatTestSpec),
     ModelWriter(ModelWriterSpec),
     OnnxReader(OnnxReaderSpec),
@@ -584,6 +585,7 @@ fn build_stage(
     let mut ml_score: Option<MlScoreSpec> = None;
     let mut ml_crossval: Option<MlCrossvalSpec> = None;
     let mut ml_featureselect: Option<MlFeatureSelectSpec> = None;
+    let mut ml_pca: Option<MlPcaSpec> = None;
     let mut stat_test: Option<StatTestSpec> = None;
     let mut model_writer: Option<ModelWriterSpec> = None;
     let mut onnx_reader: Option<OnnxReaderSpec> = None;
@@ -3190,6 +3192,25 @@ fn build_stage(
                 .unwrap_or_else(|| "classification".into()),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "ml.pca" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        ml_pca = Some(MlPcaSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            feature_columns: columns_list(&props, "featureColumns"),
+            n_components: props.get("nComponents").and_then(|v| v.as_u64()).unwrap_or(2).max(1) as usize,
+            use_correlation_matrix: props
+                .get("useCorrelationMatrix")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            output_prefix: string_prop(&props, "outputPrefix")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "pc".into()),
+            drop_features: props.get("dropFeatures").and_then(|v| v.as_bool()).unwrap_or(false),
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "xf.stat.test" {
         let from_view = inputs
             .main()
@@ -3792,6 +3813,7 @@ fn build_stage(
         .or_else(|| ml_score.map(RuntimeSpec::MlScore))
         .or_else(|| ml_crossval.map(RuntimeSpec::MlCrossval))
         .or_else(|| ml_featureselect.map(RuntimeSpec::MlFeatureSelect))
+        .or_else(|| ml_pca.map(RuntimeSpec::MlPca))
         .or_else(|| stat_test.map(RuntimeSpec::StatTest))
         .or_else(|| model_writer.map(RuntimeSpec::ModelWriter))
         .or_else(|| onnx_reader.map(RuntimeSpec::OnnxReader))

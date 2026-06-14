@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 372,
+  "componentCount": 373,
   "components": [
     {
       "id": "src.csv",
@@ -44103,6 +44103,93 @@
                 "label": "Learning rate (xgb)",
                 "kind": "number",
                 "defaultValue": 0.1
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.pca",
+      "label": "PCA",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Principal component analysis — a single fit+transform node that reduces the chosen numeric feature columns to N principal components and appends them as new columns (pc1..pcN). Props: featureColumns (blank = all numeric columns), nComponents (default 2), useCorrelationMatrix (standardize variables, default false), outputPrefix (default `pc`), dropFeatures (drop the source columns, default false). Wire the data into main.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.pca",
+        "kind": "ml",
+        "label": "PCA",
+        "description": "Principal component analysis — a single fit+transform node that reduces the chosen numeric feature columns to N principal components and appends them as new columns (pc1..pcN). Props: featureColumns (blank = all numeric columns), nComponents (default 2), useCorrelationMatrix (standardize variables, default false), outputPrefix (default `pc`), dropFeatures (drop the source columns, default false). Wire the data into main.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "PCA",
+            "fields": [
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Numeric columns to decompose. Leave empty to use all numeric columns."
+              },
+              {
+                "key": "nComponents",
+                "label": "Components (N)",
+                "kind": "integer",
+                "defaultValue": 2,
+                "description": "Number of principal components to keep (capped at the feature count)."
+              },
+              {
+                "key": "useCorrelationMatrix",
+                "label": "Standardize (correlation matrix)",
+                "kind": "bool",
+                "defaultValue": false,
+                "description": "Standardize variables to mean 0 / sd 1 before decomposition."
+              },
+              {
+                "key": "outputPrefix",
+                "label": "Output prefix",
+                "kind": "text",
+                "defaultValue": "pc",
+                "description": "Component columns are named <prefix>1..<prefix>N."
+              },
+              {
+                "key": "dropFeatures",
+                "label": "Drop source features",
+                "kind": "bool",
+                "defaultValue": false,
+                "description": "Remove the original feature columns from the output."
               }
             ]
           }
