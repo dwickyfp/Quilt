@@ -71,6 +71,9 @@ import {
     bareIdOf,
     denamespaceRepo,
     mergeWorkspaces,
+    planMetadataSaves,
+    planRepoSaves,
+    planPipelineSaves,
 } from './workspace-ns';
 import LeftSidebar from './workflow-ui/LeftSidebar';
 import PropertiesPanel from './workflow-ui/PropertiesPanel';
@@ -371,14 +374,10 @@ export default function App() {
         if (!workspaceReady || !isInTauri() || openWorkspaces.length === 0) return;
         const t = setTimeout(() => {
             void (async () => {
-                for (const ws of openWorkspaces) {
-                    const wsJobs = jobs.filter(j => tokenOf(j.id) === ws.token);
-                    const tokActive = tokenOf(activeJobId);
-                    await saveMetadata(ws.path, {
-                        jobs: wsJobs.map(j => ({ ...j, id: bareIdOf(j.id) })),
-                        activeJobId:
-                            tokActive === ws.token ? bareIdOf(activeJobId) : undefined,
-                    });
+                for (const op of planMetadataSaves(openWorkspaces, jobs, activeJobId)) {
+                    if (op.op === 'saveMetadata') {
+                        await saveMetadata(op.path, { jobs: op.jobs, activeJobId: op.activeJobId });
+                    }
                 }
             })();
         }, 200);
@@ -389,45 +388,24 @@ export default function App() {
         if (!workspaceReady || !isInTauri() || openWorkspaces.length === 0) return;
         const t = setTimeout(() => {
             void (async () => {
-                const prev = prevRepoRef.current ?? [];
-                const prevById = new Map(prev.map(i => [i.id, i]));
-                const currById = new Map(repo.map(i => [i.id, i]));
-                for (const ws of openWorkspaces) {
-                    // Write each workspace's repository.json from its own slice,
-                    // stripped back to bare on-disk ids.
-                    const slice = denamespaceRepo(ws.token, repo);
-                    await saveRepository(
-                        ws.path,
-                        slice as unknown as Array<Record<string, unknown>>,
-                    );
-                }
-                // Payload writes/deletes (connections/contexts/...): route each
-                // item to its owning workspace, by bare id.
-                const wsByToken = new Map(openWorkspaces.map(w => [w.token, w]));
-                for (const item of repo) {
-                    if (
-                        item.type === 'folder' ||
-                        item.type === 'project' ||
-                        item.type === 'pipeline'
-                    )
-                        continue;
-                    const ws = wsByToken.get(tokenOf(item.id) ?? '');
-                    if (!ws) continue;
-                    const before = prevById.get(item.id);
-                    if (!before || before.payload !== item.payload) {
-                        if (item.payload !== undefined) {
-                            await saveItemPayload(ws.path, item.type, bareIdOf(item.id), item.payload);
-                        }
-                    }
-                }
-                for (const before of prev) {
-                    if (currById.has(before.id)) continue;
-                    const ws = wsByToken.get(tokenOf(before.id) ?? '');
-                    if (!ws) continue;
-                    if (before.type === 'pipeline') {
-                        await deletePipelineFile(ws.path, bareIdOf(before.id));
-                    } else if (before.type !== 'folder' && before.type !== 'project') {
-                        await deleteItemPayload(ws.path, before.type, bareIdOf(before.id));
+                const ops = planRepoSaves(openWorkspaces, repo, prevRepoRef.current ?? []);
+                for (const op of ops) {
+                    switch (op.op) {
+                        case 'saveRepository':
+                            await saveRepository(
+                                op.path,
+                                op.repo as unknown as Array<Record<string, unknown>>,
+                            );
+                            break;
+                        case 'savePayload':
+                            await saveItemPayload(op.path, op.itemType, op.bareId, op.payload);
+                            break;
+                        case 'deletePayload':
+                            await deleteItemPayload(op.path, op.itemType, op.bareId);
+                            break;
+                        case 'deletePipeline':
+                            await deletePipelineFile(op.path, op.bareId);
+                            break;
                     }
                 }
                 prevRepoRef.current = repo;
@@ -440,12 +418,10 @@ export default function App() {
         if (!workspaceReady || !isInTauri() || openWorkspaces.length === 0) return;
         const t = setTimeout(() => {
             void (async () => {
-                const prev = prevPipelineDataRef.current ?? {};
-                const wsByToken = new Map(openWorkspaces.map(w => [w.token, w]));
-                for (const [id, state] of Object.entries(pipelineData)) {
-                    if (prev[id] !== state) {
-                        const ws = wsByToken.get(tokenOf(id) ?? '');
-                        if (ws) await savePipelineFile(ws.path, bareIdOf(id), state);
+                const ops = planPipelineSaves(openWorkspaces, pipelineData, prevPipelineDataRef.current ?? {});
+                for (const op of ops) {
+                    if (op.op === 'savePipeline') {
+                        await savePipelineFile(op.path, op.bareId, op.state as PipelineState);
                     }
                 }
                 prevPipelineDataRef.current = pipelineData;

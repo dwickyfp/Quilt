@@ -3,6 +3,23 @@
 All notable changes to Quilt are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.4] - 2026-06-14
+
+More multi-workspace QA hardening. No behaviour change for single-workspace use.
+
+### Internal
+- Extracted the three debounced save effects' routing logic into pure,
+  unit-tested planners — `planMetadataSaves`, `planRepoSaves`,
+  `planPipelineSaves` — that return a flat list of file operations. The App.tsx
+  effects now just execute the plan. This locks in the "right folder, bare id,
+  no namespace leak" contract: each `quilt.json` / `repository.json` / pipeline
+  file is written to its own workspace folder with on-disk (bare) ids, items are
+  routed to their owning workspace by token, and a just-closed workspace is
+  never written to. +7 tests (25 total in `workspace-ns`).
+- Added `docs/multi-workspace-qa-checklist.md` and two on-disk fixtures
+  (`~/quilt-samples`, `~/quilt-samples-2`) that share identical bare ids, for
+  end-to-end desktop QA of open/edit/create/close/persist/run.
+
 ## [0.4.3] - 2026-06-14
 
 QA hardening for multi-workspace. No behaviour change for single-workspace use.

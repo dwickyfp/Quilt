@@ -167,3 +167,115 @@ export function mergeWorkspaces<P, J extends { id: string }>(
     }
     return { repo, pipelineData, jobs, firstActive };
 }
+
+// ----------------------------------------------------------------------------
+// Save planners (pure). The App.tsx debounced save effects delegate the routing
+// decision to these so the "which file in which folder, with which bare id"
+// logic is unit-testable without a filesystem or React. Each returns a flat
+// list of operations the effect then executes against the workspace API.
+// ----------------------------------------------------------------------------
+
+export type SaveOp =
+    | { op: 'saveMetadata'; path: string; jobs: Array<Record<string, unknown>>; activeJobId?: string }
+    | { op: 'saveRepository'; path: string; repo: RepoItem[] }
+    | { op: 'savePayload'; path: string; itemType: string; bareId: string; payload: unknown }
+    | { op: 'deletePayload'; path: string; itemType: string; bareId: string }
+    | { op: 'savePipeline'; path: string; bareId: string; state: unknown }
+    | { op: 'deletePipeline'; path: string; bareId: string };
+
+const STRUCTURAL = new Set(['folder', 'project', 'pipeline']);
+
+/**
+ * Per-workspace metadata (`quilt.json`): each workspace gets ITS OWN open tabs
+ * (bare ids) and only the workspace that owns the focused pipeline records the
+ * activeJobId (bare). Mirrors the metadata save effect.
+ */
+export function planMetadataSaves<J extends { id: string }>(
+    workspaces: WorkspaceRef[],
+    jobs: J[],
+    activeJobId: string,
+): SaveOp[] {
+    const activeTok = tokenOf(activeJobId);
+    return workspaces.map(ws => ({
+        op: 'saveMetadata' as const,
+        path: ws.path,
+        jobs: jobs
+            .filter(j => tokenOf(j.id) === ws.token)
+            .map(j => ({ ...j, id: bareIdOf(j.id) })),
+        activeJobId: activeTok === ws.token ? bareIdOf(activeJobId) : undefined,
+    }));
+}
+
+/**
+ * `repository.json` (one per workspace, de-namespaced) plus payload writes for
+ * non-structural items (connection/context/doc/routine) whose payload changed,
+ * and payload deletes / pipeline-file deletes for items that disappeared.
+ * Items are routed to their owning workspace by token; orphans (token not in
+ * the open set) are skipped so a just-closed workspace is never written to.
+ */
+export function planRepoSaves(
+    workspaces: WorkspaceRef[],
+    repo: RepoItem[],
+    prevRepo: RepoItem[],
+): SaveOp[] {
+    const ops: SaveOp[] = [];
+    const wsByToken = new Map(workspaces.map(w => [w.token, w]));
+    // 1. Each workspace's repository.json from its own de-namespaced slice.
+    for (const ws of workspaces) {
+        ops.push({ op: 'saveRepository', path: ws.path, repo: denamespaceRepo(ws.token, repo) });
+    }
+    const prevById = new Map(prevRepo.map(i => [i.id, i]));
+    const currById = new Map(repo.map(i => [i.id, i]));
+    // 2. Payload writes for changed non-structural items.
+    for (const item of repo) {
+        if (STRUCTURAL.has(item.type)) continue;
+        const ws = wsByToken.get(tokenOf(item.id) ?? '');
+        if (!ws) continue;
+        const before = prevById.get(item.id);
+        if ((!before || before.payload !== item.payload) && item.payload !== undefined) {
+            ops.push({
+                op: 'savePayload',
+                path: ws.path,
+                itemType: item.type,
+                bareId: bareIdOf(item.id),
+                payload: item.payload,
+            });
+        }
+    }
+    // 3. Deletes for items removed since the previous snapshot.
+    for (const before of prevRepo) {
+        if (currById.has(before.id)) continue;
+        const ws = wsByToken.get(tokenOf(before.id) ?? '');
+        if (!ws) continue;
+        if (before.type === 'pipeline') {
+            ops.push({ op: 'deletePipeline', path: ws.path, bareId: bareIdOf(before.id) });
+        } else if (before.type !== 'folder' && before.type !== 'project') {
+            ops.push({
+                op: 'deletePayload',
+                path: ws.path,
+                itemType: before.type,
+                bareId: bareIdOf(before.id),
+            });
+        }
+    }
+    return ops;
+}
+
+/**
+ * Pipeline files: write each pipeline whose state object changed (by reference)
+ * to its owning workspace, with the bare id. Routes by token; orphans skipped.
+ */
+export function planPipelineSaves<P>(
+    workspaces: WorkspaceRef[],
+    pipelineData: Record<string, P>,
+    prevData: Record<string, P>,
+): SaveOp[] {
+    const ops: SaveOp[] = [];
+    const wsByToken = new Map(workspaces.map(w => [w.token, w]));
+    for (const [id, state] of Object.entries(pipelineData)) {
+        if (prevData[id] === state) continue;
+        const ws = wsByToken.get(tokenOf(id) ?? '');
+        if (ws) ops.push({ op: 'savePipeline', path: ws.path, bareId: bareIdOf(id), state });
+    }
+    return ops;
+}

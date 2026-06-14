@@ -10,6 +10,11 @@ import {
     namespacePipelineData,
     denamespacePipelineData,
     mergeWorkspaces,
+    planMetadataSaves,
+    planRepoSaves,
+    planPipelineSaves,
+    type SaveOp,
+    type WorkspaceRef,
     NS_SEP,
 } from './workspace-ns';
 
@@ -231,5 +236,143 @@ describe('mergeWorkspaces', () => {
             jobs: [],
             firstActive: null,
         });
+    });
+});
+
+// Two workspaces with IDENTICAL bare ids but different paths — the exact
+// scenario that broke single-workspace assumptions.
+const ws = (path: string): WorkspaceRef => ({
+    token: workspaceToken(path),
+    path,
+    name: path.split('/').pop() ?? path,
+});
+const PATH_A = '/u/work/samples';
+const PATH_B = '/u/archive/samples';
+const wsA = ws(PATH_A);
+const wsB = ws(PATH_B);
+const open = [wsA, wsB];
+
+// Helper: assert no operation ever writes a namespaced id to disk.
+function expectNoNamespacedIds(ops: SaveOp[]) {
+    for (const op of ops) {
+        if ('bareId' in op) expect(op.bareId).not.toContain(NS_SEP);
+        if (op.op === 'saveRepository') {
+            for (const item of op.repo) {
+                expect(item.id).not.toContain(NS_SEP);
+                if (item.parentId) expect(item.parentId).not.toContain(NS_SEP);
+            }
+        }
+        if (op.op === 'saveMetadata') {
+            for (const j of op.jobs) expect(String(j.id)).not.toContain(NS_SEP);
+        }
+    }
+}
+
+describe('planMetadataSaves', () => {
+    it('routes each workspace its own tabs (bare) and only the owner records activeJobId', () => {
+        const jobs = [
+            { id: nsId(wsA.token, 'j1'), name: 'a1', dirty: false },
+            { id: nsId(wsA.token, 'j2'), name: 'a2', dirty: true },
+            { id: nsId(wsB.token, 'j1'), name: 'b1', dirty: false },
+        ];
+        const ops = planMetadataSaves(open, jobs, nsId(wsB.token, 'j1'));
+        expect(ops).toHaveLength(2);
+        const a = ops.find(o => o.op === 'saveMetadata' && o.path === PATH_A);
+        const b = ops.find(o => o.op === 'saveMetadata' && o.path === PATH_B);
+        // A keeps its two tabs, bare; B keeps its one tab.
+        expect(a && a.op === 'saveMetadata' && a.jobs.map(j => j.id)).toEqual(['j1', 'j2']);
+        expect(b && b.op === 'saveMetadata' && b.jobs.map(j => j.id)).toEqual(['j1']);
+        // Only the owning workspace (B) records the active tab.
+        expect(a && a.op === 'saveMetadata' && a.activeJobId).toBeUndefined();
+        expect(b && b.op === 'saveMetadata' && b.activeJobId).toBe('j1');
+        expectNoNamespacedIds(ops);
+    });
+});
+
+describe('planRepoSaves', () => {
+    const repoFor = (token: string): RepoItem[] => [
+        { id: nsId(token, 'root'), name: 'WS', type: 'project' },
+        { id: nsId(token, 'pipelines'), name: 'Pipelines', type: 'folder', parentId: nsId(token, 'root') },
+        { id: nsId(token, 'j1'), name: 'p1', type: 'pipeline', parentId: nsId(token, 'pipelines') },
+        { id: nsId(token, 'connections'), name: 'Connections', type: 'folder', parentId: nsId(token, 'root') },
+        { id: nsId(token, 'c1'), name: 'pg', type: 'connection', parentId: nsId(token, 'connections') },
+    ];
+    const merged = () => [...repoFor(wsA.token), ...repoFor(wsB.token)];
+
+    it('writes one de-namespaced repository.json per workspace to its own path', () => {
+        const ops = planRepoSaves(open, merged(), []);
+        const repoOps = ops.filter(o => o.op === 'saveRepository');
+        expect(repoOps.map(o => o.path).sort()).toEqual([PATH_B, PATH_A].sort());
+        // Each slice holds exactly that workspace's items, bare.
+        const a = repoOps.find(o => o.path === PATH_A)!;
+        expect(a.op === 'saveRepository' && a.repo.map(i => i.id).sort()).toEqual(
+            ['c1', 'connections', 'j1', 'pipelines', 'root'].sort(),
+        );
+        expectNoNamespacedIds(ops);
+    });
+
+    it('writes a changed connection payload to the right workspace only', () => {
+        const prev = merged();
+        const next = merged().map(i =>
+            i.id === nsId(wsB.token, 'c1')
+                ? { ...i, payload: { host: 'db.internal' } as never }
+                : i,
+        );
+        const ops = planRepoSaves(open, next, prev);
+        const payloadOps = ops.filter(o => o.op === 'savePayload');
+        expect(payloadOps).toHaveLength(1);
+        const p = payloadOps[0];
+        expect(p.op === 'savePayload' && [p.path, p.itemType, p.bareId]).toEqual([
+            PATH_B,
+            'connection',
+            'c1',
+        ]);
+        expectNoNamespacedIds(ops);
+    });
+
+    it('emits a pipeline delete to the owning workspace when an item is removed', () => {
+        const prev = merged();
+        const next = prev.filter(i => i.id !== nsId(wsA.token, 'j1'));
+        const ops = planRepoSaves(open, next, prev);
+        const del = ops.filter(o => o.op === 'deletePipeline');
+        expect(del).toHaveLength(1);
+        expect(del[0].op === 'deletePipeline' && [del[0].path, del[0].bareId]).toEqual([
+            PATH_A,
+            'j1',
+        ]);
+    });
+
+    it('skips items whose workspace is no longer open (just-closed safety)', () => {
+        // Only A is open, but the merged repo still carries B's items briefly.
+        const ops = planRepoSaves([wsA], merged(), []);
+        // No payload/pipeline op targets B's path.
+        expect(ops.some(o => 'path' in o && o.path === PATH_B && o.op !== 'saveRepository')).toBe(
+            false,
+        );
+        // And only A's repository.json is written.
+        expect(ops.filter(o => o.op === 'saveRepository').map(o => o.path)).toEqual([PATH_A]);
+    });
+});
+
+describe('planPipelineSaves', () => {
+    it('writes only changed pipelines, to the owning workspace, with bare ids', () => {
+        const s1 = { nodes: [], edges: [] };
+        const s2 = { nodes: [], edges: [] };
+        const prev = { [nsId(wsA.token, 'j1')]: s1, [nsId(wsB.token, 'j1')]: s2 };
+        const changed = { nodes: [{ id: 'n' }], edges: [] };
+        const next = { [nsId(wsA.token, 'j1')]: changed, [nsId(wsB.token, 'j1')]: s2 };
+        const ops = planPipelineSaves(open, next, prev);
+        expect(ops).toHaveLength(1);
+        const op = ops[0];
+        expect(op.op === 'savePipeline' && [op.path, op.bareId]).toEqual([PATH_A, 'j1']);
+        expect(op.op === 'savePipeline' && op.state).toBe(changed);
+        expectNoNamespacedIds(ops);
+    });
+
+    it('skips a pipeline whose workspace is closed', () => {
+        const s = { nodes: [], edges: [] };
+        const next = { [nsId(wsB.token, 'j1')]: { nodes: [{ id: 'x' }], edges: [] } };
+        const ops = planPipelineSaves([wsA], next, { [nsId(wsB.token, 'j1')]: s });
+        expect(ops).toEqual([]);
     });
 });
