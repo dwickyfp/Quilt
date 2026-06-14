@@ -15,7 +15,7 @@
 <img alt="react" src="https://img.shields.io/badge/React%2019-20232A?logo=react&logoColor=61DAFB"/>
 <img alt="typescript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white"/>
 <img alt="duckdb" src="https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black"/>
-<img alt="stars" src="https://img.shields.io/github/stars/dwickyfp/Quilt?style=social"/>
+<a href="https://github.com/dwickyfp/Quilt/stargazers"><img alt="stars" src="https://img.shields.io/github/stars/dwickyfp/Quilt?logo=github&logoColor=white&label=Stars&color=F5A21E"/></a>
 </p>
 
 </div>
