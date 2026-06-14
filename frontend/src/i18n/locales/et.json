@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI assistent",
-    "localTag": "kohalik",
-    "checking": "AI mootori kontrollimine...",
-    "installTitle": "Installige Qunnie AI Assistant",
-    "installBody": "Quilt laadib alla väikese kohaliku mudeli (~1,1 GB), nii et assistent töötab täielikult teie masinas – pole API võtmeid ega pilvekõnesid.",
-    "installCta": "Install (~1,1 GB)",
-    "installFailedTitle": "Install ebaõnnestus",
-    "retry": "Proovi uuesti",
     "emptyTitle": "Kirjeldage torujuhet",
     "emptyHint": "Assistent väljastab Quilt'i torujuhtme, millel saate klõpsata, et lõuendile sisestada.",
     "insertIntoCanvas": "Sisestage lõuendisse",

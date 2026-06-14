@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI palīgs",
-    "localTag": "vietējais",
-    "checking": "Notiek AI dzinēja pārbaude...",
-    "installTitle": "Instalējiet Qunnie AI palīgu",
-    "installBody": "Quilt lejupielādē nelielu vietējo modeli (~1,1 GB), lai palīgs pilnībā darbotos jūsu datorā — bez API atslēgām, bez mākoņa zvanu.",
-    "installCta": "Instalēt (~1,1 GB)",
-    "installFailedTitle": "Instalēšana neizdevās",
-    "retry": "Mēģiniet vēlreiz",
     "emptyTitle": "Aprakstiet cauruļvadu",
     "emptyHint": "Asistents izvada Quilt cauruļvadu, uz kura varat noklikšķināt, lai ievietotu audeklā.",
     "insertIntoCanvas": "Ievietojiet audeklā",

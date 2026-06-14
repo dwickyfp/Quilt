@@ -206,10 +206,7 @@ fn install_spec<F: FnMut(InstallProgress)>(
             std::env::consts::ARCH
         )
     })?;
-    // Tag naming convention varies per upstream: DuckDB uses
-    // v-prefixed semver tags (v1.5.3); llama.cpp uses raw build tags
-    // (b9305). Pre-prepending `v` to every version produces a 404
-    // against ggml-org/llama.cpp.
+    // DuckDB release tags are v-prefixed semver (e.g. v1.5.3).
     let tag = format!("v{}", s.version);
     let url = format!(
         "https://github.com/{}/releases/download/{}/{}",

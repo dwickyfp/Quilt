@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI助手",
-    "localTag": "本地",
-    "checking": "正在檢查AI引擎...",
-    "installTitle": "安裝Qunnie AI Assistant",
-    "installBody": "Quilt下載一個小型本地模型（約1.1 GB ） ，因此助手完全在您的機器上運行-沒有API密鑰，沒有雲端調用。",
-    "installCta": "安裝(~1.1 GB)",
-    "installFailedTitle": "安裝失敗",
-    "retry": "重試(&R)",
     "emptyTitle": "描述管道",
     "emptyHint": "助手輸出Quilt管線，您可以點擊以插入到畫布中。",
     "insertIntoCanvas": "插入畫布",

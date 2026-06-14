@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI aðstoðarmaður",
-    "localTag": "staðbundið",
-    "checking": "Athugar gervigreind vél...",
-    "installTitle": "Settu upp Qunnie AI aðstoðarmanninn",
-    "installBody": "Quilt halar niður lítilli staðbundinni gerð (~1,1 GB) þannig að aðstoðarmaðurinn keyrir algjörlega á vélinni þinni - engir API lyklar, engin skýjasímtöl.",
-    "installCta": "Setja upp (~1,1 GB)",
-    "installFailedTitle": "Uppsetning mistókst",
-    "retry": "Reyndu aftur",
     "emptyTitle": "Lýstu leiðslu",
     "emptyHint": "Aðstoðarmaðurinn gefur frá sér Quilt leiðslu sem þú getur smellt á til að setja inn í striga.",
     "insertIntoCanvas": "Settu inn í striga",

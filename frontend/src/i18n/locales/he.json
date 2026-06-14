@@ -74,13 +74,6 @@
   },
   "chat": {
     "title": "עוזרת בינה מלאכותית של Qunnie",
-    "localTag": "מקומי",
-    "checking": "בודק את מנוע הבינה המלאכותית...",
-    "installTitle": "התקן את עוזר ה - Qunnie AI",
-    "installBody": "Quilt מוריד דגם מקומי קטן (~1.1 GB) כך שהעוזר פועל כולו במחשב שלך - אין מפתחות API, אין שיחות ענן.",
-    "installCta": "התקן (~1.1 GB)",
-    "installFailedTitle": "ההתקנה נכשלה",
-    "retry": "נסה שוב",
     "emptyTitle": "תארו צנרת",
     "emptyHint": "העוזר פולט צינור של דאקל שאפשר ללחוץ עליו כדי להכניס אותו לתוך הבד.",
     "insertIntoCanvas": "הוסף לקנבס",

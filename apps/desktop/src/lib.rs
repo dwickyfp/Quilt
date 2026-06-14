@@ -507,8 +507,7 @@ fn engine_status(app: tauri::AppHandle) -> Result<Vec<EngineStatus>, String> {
     Ok(engine_manager::status(&dir))
 }
 
-/// Download + install an engine (duckdb / llamacpp) into
-/// app-data, streaming progress.
+/// Download + install the DuckDB engine into app-data, streaming progress.
 #[tauri::command]
 async fn engine_install(
     app: tauri::AppHandle,

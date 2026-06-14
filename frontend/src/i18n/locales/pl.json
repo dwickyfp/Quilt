@@ -74,13 +74,6 @@
   },
   "chat": {
     "title": "Asystent Qunnie AI",
-    "localTag": "lokalny",
-    "checking": "Sprawdzanie silnika AI...",
-    "installTitle": "Zainstaluj Qunnie AI Assistant",
-    "installBody": "Quilt pobiera mały model lokalny (~ 1,1 GB), więc asystent działa całkowicie na Twoim komputerze - bez kluczy API, bez wywołań w chmurze.",
-    "installCta": "Zainstaluj (~ 1,1 GB)",
-    "installFailedTitle": "Instalacja nie powiodła się",
-    "retry": "Jeszcze raz",
     "emptyTitle": "Opisz proces",
     "emptyHint": "Asystent wyprowadza rurociąg Quilt, który można kliknąć, aby wstawić do płótna.",
     "insertIntoCanvas": "Wstaw do kanwy",

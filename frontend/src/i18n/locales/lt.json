@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI padėjėjas",
-    "localTag": "vietinis",
-    "checking": "Tikrinamas AI variklis...",
-    "installTitle": "Įdiekite „Qunnie AI Assistant“.",
-    "installBody": "Quilt atsisiunčia nedidelį vietinį modelį (~1,1 GB), todėl asistentas veikia tik jūsų kompiuteryje – nėra API raktų, jokių debesies skambučių.",
-    "installCta": "Įdiegti (~1,1 GB)",
-    "installFailedTitle": "Diegimas nepavyko",
-    "retry": "Bandykite dar kartą",
     "emptyTitle": "Apibūdinkite vamzdyną",
     "emptyHint": "Asistentas išveda Quilt vamzdyną, kurį galite spustelėti ir įterpti į drobę.",
     "insertIntoCanvas": "Įdėkite į drobę",

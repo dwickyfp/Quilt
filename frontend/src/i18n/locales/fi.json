@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI Assistant",
-    "localTag": "paikallinen",
-    "checking": "Tarkistetaan tekoälymoottoria...",
-    "installTitle": "Asenna Qunnie AI Assistant",
-    "installBody": "Quilt lataa pienen paikallisen mallin (~1,1 Gt), joten avustaja toimii kokonaan koneellasi - ei API-avaimia, ei pilvipuheluita.",
-    "installCta": "Asenna (~1,1 Gt)",
-    "installFailedTitle": "Asennus epäonnistui",
-    "retry": "Yritä uudelleen",
     "emptyTitle": "Kuvaile putkistoa",
     "emptyHint": "Assistentti tulostaa Quilt-putkilinjan, jonka voit lisätä kankaalle napsauttamalla.",
     "insertIntoCanvas": "Aseta kankaalle",

@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI pomoćnik",
-    "localTag": "lokalni",
-    "checking": "Provjera AI motora...",
-    "installTitle": "Instalirajte Qunnie AI Assistant",
-    "installBody": "Quilt preuzima mali lokalni model (~1,1 GB) tako da pomoćnik u potpunosti radi na vašem računalu - bez API ključeva, bez poziva u oblaku.",
-    "installCta": "Instaliraj (~1,1 GB)",
-    "installFailedTitle": "Install failed",
-    "retry": "Pokušaj ponovo",
     "emptyTitle": "Opišite cjevovod",
     "emptyHint": "Pomoćnik ispisuje Quilt cjevovod koji možete kliknuti da biste ga umetnuli u platno.",
     "insertIntoCanvas": "Umetnite u platno",

@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI Assistant",
-    "localTag": "местен",
-    "checking": "Проверка на AI двигателя...",
-    "installTitle": "Инсталирайте Qunnie AI Assistant",
-    "installBody": "Quilt изтегля малък локален модел (~1,1 GB), така че асистентът да работи изцяло на вашата машина - без API ключове, без облачни повиквания.",
-    "installCta": "Инсталиране (~1,1 GB)",
-    "installFailedTitle": "Инсталирането е неуспешно",
-    "retry": "Опитайте отново",
     "emptyTitle": "Опишете тръбопровод",
     "emptyHint": "Асистентът извежда тръбопровод на Quilt, който можете да щракнете, за да вмъкнете в платното.",
     "insertIntoCanvas": "Insert into canvas",

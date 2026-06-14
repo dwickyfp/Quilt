@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Cúntóir AI Qunnie",
-    "localTag": "áitiúil",
-    "checking": "Inneall AI á sheiceáil...",
-    "installTitle": "Suiteáil an Cúntóir AI Qunnie",
-    "installBody": "Íoslódálann Quilt múnla beag áitiúil (~1.1 GB) agus mar sin ritheann an cúntóir go hiomlán ar do ríomhaire - gan eochracha API, gan néalghlao.",
-    "installCta": "Suiteáil (~ 1.1 GB)",
-    "installFailedTitle": "Theip ar an tsuiteáil",
-    "retry": "Bain triail eile as",
     "emptyTitle": "Déan cur síos ar phíblíne",
     "emptyHint": "Aschuir an cúntóir píblíne Quilt is féidir leat a chliceáil chun é a chur isteach sa chanbhás.",
     "insertIntoCanvas": "Cuir isteach sa chanbhás",

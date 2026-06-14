@@ -74,13 +74,6 @@
   },
   "chat": {
     "title": "ผู้ช่วย Qunnie AI",
-    "localTag": "สถานที่",
-    "checking": "กำลังตรวจสอบเครื่องมือ AI...",
-    "installTitle": "ติดตั้ง Qunnie AI Assistant",
-    "installBody": "Quilt ดาวน์โหลดโมเดลในเครื่องขนาดเล็ก (~1.1 GB) เพื่อให้ผู้ช่วยทำงานบนเครื่องของคุณทั้งหมด - ไม่มีคีย์ API ไม่มีการโทรผ่านคลาวด์",
-    "installCta": "ติดตั้ง (~1.1 GB)",
-    "installFailedTitle": "ติดตั้ง PSP ล้มเหลว",
-    "retry": "ลองใหม่",
     "emptyTitle": "อธิบายไปป์ไลน์",
     "emptyHint": "ผู้ช่วยส่งออกท่อ Quilt ที่คุณสามารถคลิกเพื่อแทรกลงในผืนผ้าใบ",
     "insertIntoCanvas": "ใส่ลงในผ้าใบ",

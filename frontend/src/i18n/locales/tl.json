@@ -74,13 +74,6 @@
   },
   "chat": {
     "title": "Qunnie AI Assistant",
-    "localTag": "Lokal",
-    "checking": "Sinusuri ang AI engine...",
-    "installTitle": "I - install ang Qunnie AI Assistant",
-    "installBody": "Ang pato ay nagda - download ng isang maliit na lokal na modelo (~ 1.1 GB) kaya ang katulong ay ganap na tumatakbo sa iyong makina - walang mga key ng API, walang mga tawag sa ulap.",
-    "installCta": "I - install (~ 1.1 GB)",
-    "installFailedTitle": "Nabigo ang pag - install",
-    "retry": "Subukang muli",
     "emptyTitle": "Ilarawan ang pipeline",
     "emptyHint": "Ang assistant outputs isang Quilt pipeline maaari mong i - click upang ipasok sa canvas.",
     "insertIntoCanvas": "Ipasok sa canvas",

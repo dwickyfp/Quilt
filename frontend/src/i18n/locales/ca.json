@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI Assistant",
-    "localTag": "locals",
-    "checking": "S'està comprovant el motor d'IA...",
-    "installTitle": "Instal·leu el Qunnie AI Assistant",
-    "installBody": "Quilt baixa un petit model local (~1,1 GB) perquè l'assistent s'executi completament a la vostra màquina: sense claus API, sense trucades al núvol.",
-    "installCta": "Instal·lació (~1,1 GB)",
-    "installFailedTitle": "La instal·lació ha fallat",
-    "retry": "Torna-ho a provar",
     "emptyTitle": "Descriu una canonada",
     "emptyHint": "L'assistent genera una canalització Quilt que podeu fer clic per inserir-la al llenç.",
     "insertIntoCanvas": "Insereix al llenç",

@@ -74,13 +74,6 @@
   },
   "chat": {
     "title": "Pembantu AI Qunnie",
-    "localTag": "setempat",
-    "checking": "Memeriksa enjin AI...",
-    "installTitle": "Pasang Pembantu AI Qunnie",
-    "installBody": "Quilt memuat turun model tempatan kecil (~ 1.1 GB) supaya pembantu berjalan sepenuhnya pada mesin anda - tiada kekunci api, tiada panggilan awan.",
-    "installCta": "Pasang (~1.1 GB)",
-    "installFailedTitle": "Pemasangan gagal",
-    "retry": "Cuba semula",
     "emptyTitle": "Terangkan saluran paip",
     "emptyHint": "Pembantu mengeluarkan saluran paip Quilt yang anda boleh klik untuk memasukkan ke dalam kanvas.",
     "insertIntoCanvas": "Masukkan ke dalam kanvas",

@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI köməkçisi",
-    "localTag": "yerli",
-    "checking": "AI mühərriki yoxlanılır...",
-    "installTitle": "Qunnie AI köməkçisini quraşdırın",
-    "installBody": "Quilt kiçik yerli modeli (~1,1 GB) endirir, beləliklə, köməkçi tamamilə sizin maşınınızda işləyir - API düymələri yoxdur, bulud zəngləri yoxdur.",
-    "installCta": "Quraşdırma (~1,1 GB)",
-    "installFailedTitle": "Quraşdırma uğursuz oldu",
-    "retry": "Yenidən cəhd edin",
     "emptyTitle": "Boru kəmərini təsvir edin",
     "emptyHint": "Köməkçi kətana daxil etmək üçün klikləyə biləcəyiniz Ördək boru kəmərini çıxarır.",
     "insertIntoCanvas": "Kətana daxil edin",

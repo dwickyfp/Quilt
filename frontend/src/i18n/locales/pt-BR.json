@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Assistente de IA Qunnie",
-    "localTag": "local",
-    "checking": "Verificando o mecanismo de IA...",
-    "installTitle": "Instale o Qunnie AI Assistant",
-    "installBody": "O Quilt baixa um pequeno modelo local (~ 1,1 GB) para que o assistente seja executado inteiramente em sua máquina - sem chaves de API, sem chamadas na nuvem.",
-    "installCta": "Instalação (~ 1,1 GB)",
-    "installFailedTitle": "Falha na instalação. ",
-    "retry": "Tentar novamente",
     "emptyTitle": "Descrever um pipeline",
     "emptyHint": "O assistente gera um pipeline Quilt que você pode clicar para inserir na tela.",
     "insertIntoCanvas": "Inserir na tela",

@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI Assistant",
-    "localTag": "lokale",
-    "checking": "Po kontrollon motorin e AI...",
-    "installTitle": "Instaloni Qunnie AI Assistant",
-    "installBody": "Quilt shkarkon një model të vogël lokal (~1,1 GB) në mënyrë që asistenti të funksionojë tërësisht në kompjuterin tuaj - pa çelësa API, pa thirrje në renë kompjuterike.",
-    "installCta": "Instalo (~1,1 GB)",
-    "installFailedTitle": "Instalimi dështoi",
-    "retry": "Provo sërish",
     "emptyTitle": "Përshkruani një tubacion",
     "emptyHint": "Asistenti nxjerr një tubacion Quilt që mund të klikoni për ta futur në kanavacë.",
     "insertIntoCanvas": "Futeni në kanavacë",

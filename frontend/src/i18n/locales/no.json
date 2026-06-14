@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI-assistent",
-    "localTag": "lokale",
-    "checking": "Sjekker AI-motor...",
-    "installTitle": "Installer Qunnie AI Assistant",
-    "installBody": "Quilt laster ned en liten lokal modell (~1,1 GB) slik at assistenten kjører helt på maskinen din - ingen API-nøkler, ingen skyanrop.",
-    "installCta": "Installer (~1,1 GB)",
-    "installFailedTitle": "Installasjonen mislyktes",
-    "retry": "Prøv på nytt",
     "emptyTitle": "Beskriv en rørledning",
     "emptyHint": "Assistenten sender ut en Quilt-rørledning som du kan klikke for å sette inn i lerretet.",
     "insertIntoCanvas": "Sett inn i lerretet",

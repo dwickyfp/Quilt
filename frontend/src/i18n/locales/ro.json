@@ -74,13 +74,6 @@
   },
   "chat": {
     "title": "Qunnie AI Assistant",
-    "localTag": "local",
-    "checking": "Se verifică motorul AI...",
-    "installTitle": "Instalați Qunnie AI Assistant",
-    "installBody": "Quilt descarcă un model local mic (~ 1,1 GB), astfel încât asistentul rulează în întregime pe mașina dvs. - fără chei API, fără apeluri în cloud.",
-    "installCta": "Instalare (~ 1,1 GB)",
-    "installFailedTitle": "Instalare eșuată",
-    "retry": "Reîncercați",
     "emptyTitle": "Descrieți o conductă",
     "emptyHint": "Asistentul emite o conductă Quilt pe care puteți face clic pentru a o insera în pânză.",
     "insertIntoCanvas": "Inserare în pânză",

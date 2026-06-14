@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Msaidizi wa Qunnie AI",
-    "localTag": "mtaa",
-    "checking": "Inakagua injini ya AI...",
-    "installTitle": "Sakinisha Msaidizi wa Qunnie AI",
-    "installBody": "Quilt hupakua muundo mdogo wa ndani (~GB 1.1) kwa hivyo programu ya mratibu hutumika kabisa kwenye mashine yako - hakuna vitufe vya API, hakuna simu za wingu.",
-    "installCta": "Sakinisha (~GB 1.1)",
-    "installFailedTitle": "Imeshindwa kusakinisha",
-    "retry": "Jaribu tena",
     "emptyTitle": "Eleza bomba",
     "emptyHint": "Mratibu anatoa bomba la Quilt unaweza kubofya ili kuingiza kwenye turubai.",
     "insertIntoCanvas": "Ingiza kwenye turubai",

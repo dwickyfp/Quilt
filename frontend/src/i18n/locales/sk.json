@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Asistent AI Qunnie",
-    "localTag": "miestne",
-    "checking": "Kontrola motora AI...",
-    "installTitle": "Nainštalujte Qunnie AI Assistant",
-    "installBody": "Quilt si stiahne malý lokálny model (~1,1 GB), takže asistent beží výhradne na vašom počítači – žiadne kľúče API, žiadne cloudové volania.",
-    "installCta": "Inštalovať (~1,1 GB)",
-    "installFailedTitle": "Inštalácia zlyhala",
-    "retry": "Skúste to znova",
     "emptyTitle": "Opíšte potrubie",
     "emptyHint": "Asistent vygeneruje quilt potrubie, ktoré môžete kliknutím vložiť na plátno.",
     "insertIntoCanvas": "Vložte do plátna",

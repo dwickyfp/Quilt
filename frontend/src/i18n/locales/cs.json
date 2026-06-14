@@ -74,13 +74,6 @@
   },
   "chat": {
     "title": "Asistent umělé inteligence Qunnie",
-    "localTag": "místní",
-    "checking": "Kontrola motoru AI...",
-    "installTitle": "Nainstalujte asistenta umělé inteligence Qunnie",
-    "installBody": "Quilt stáhne malý místní model (~ 1,1 GB), takže asistent běží výhradně na vašem počítači - žádné klíče API, žádná cloudová volání.",
-    "installCta": "Instalovat (~ 1,1 GB)",
-    "installFailedTitle": "Instalace se nezdařila",
-    "retry": "Zkusit znovu",
     "emptyTitle": "Popsat pipeline",
     "emptyHint": "Asistent vypisuje Quilt pipeline, kterou můžete kliknutím vložit do plátna.",
     "insertIntoCanvas": "Vložit do plátna",

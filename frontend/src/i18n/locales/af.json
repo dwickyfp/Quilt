@@ -109,13 +109,6 @@
   },
   "chat": {
     "title": "Qunnie AI assistent",
-    "localTag": "plaaslik",
-    "checking": "Gaan tans KI-enjin na...",
-    "installTitle": "Installeer die Qunnie AI Assistant",
-    "installBody": "Quilt laai 'n klein plaaslike model af (~1,1 GB) sodat die assistent heeltemal op jou masjien werk - geen API-sleutels, geen wolkoproepe nie.",
-    "installCta": "Installeer (~1,1 GB)",
-    "installFailedTitle": "Installering het misluk",
-    "retry": "Probeer weer",
     "emptyTitle": "Beskryf 'n pyplyn",
     "emptyHint": "Die assistent voer 'n Quilt-pyplyn uit wat jy kan klik om in die doek in te voeg.",
     "insertIntoCanvas": "Plaas in doek",
