@@ -3,6 +3,27 @@
 All notable changes to Quilt are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.2] - 2026-06-14
+
+Multiple workspaces open at once.
+
+### Added
+- **Multi-workspace.** Opening another workspace with "New Workspace" now ADDS
+  it to the Project sidebar instead of replacing the current one, so several
+  workspaces show as separate roots and you can edit pipelines from any of them
+  at the same time. Each workspace's items are namespaced in memory by a stable
+  per-path token so identical on-disk ids (`root`, `pipelines`, `j1`, …) from
+  different folders never collide; files on disk keep their original bare ids.
+- **Per-workspace close.** "Close workspace" on a root's kebab menu removes just
+  that workspace from the sidebar; the others stay open. The open set is
+  persisted, so reopening the app restores every workspace.
+
+### Changed
+- The active workspace (for run, Ctrl+S, scheduler) follows the focused
+  pipeline's workspace. Saves are routed per-workspace: each workspace's
+  `repository.json`, `quilt.json`, and pipeline files are written back to its
+  own folder with bare ids.
+
 ## [0.4.1] - 2026-06-14
 
 Multi-workspace quality-of-life pass for the Project sidebar, plus a

@@ -1,6 +1,8 @@
 import { isTauri } from './tauri-dialog';
 
 const WORKSPACE_PATH_KEY = 'quilt:workspace-path';
+// Multi-workspace (this commit): the list of open workspace folder paths.
+const WORKSPACE_LIST_KEY = 'quilt:workspace-paths';
 
 // Workspace v1 (single file, everything in one blob). Kept for the
 // migration path.
@@ -121,6 +123,49 @@ export function folderNameFromPath(path: string | null | undefined): string | nu
     if (!path) return null;
     const parts = path.split(/[\\/]/).filter(Boolean);
     return parts.length ? parts[parts.length - 1] : path;
+}
+
+/**
+ * The list of open workspace folder paths. Migrates a legacy single-workspace
+ * value (`quilt:workspace-path`) into the new list transparently on first read,
+ * so users coming from the single-workspace build keep their open folder.
+ * De-duplicates while preserving order.
+ */
+export function getWorkspacePaths(): string[] {
+    let list: string[] = [];
+    try {
+        const raw = localStorage.getItem(WORKSPACE_LIST_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) list = parsed.filter(p => typeof p === 'string');
+        }
+    } catch {
+        /* ignore */
+    }
+    if (list.length === 0) {
+        // Migrate the legacy single path if present.
+        const legacy = getWorkspacePath();
+        if (legacy) list = [legacy];
+    }
+    // De-dupe, preserve order.
+    return Array.from(new Set(list));
+}
+
+export function setWorkspacePaths(paths: string[]): void {
+    const unique = Array.from(new Set(paths));
+    try {
+        localStorage.setItem(WORKSPACE_LIST_KEY, JSON.stringify(unique));
+    } catch {
+        /* ignore */
+    }
+    // Keep the legacy single-path key roughly in sync (first open workspace)
+    // so any code still reading it sees a sensible value; cleared when empty.
+    try {
+        if (unique.length) localStorage.setItem(WORKSPACE_PATH_KEY, unique[0]);
+        else localStorage.removeItem(WORKSPACE_PATH_KEY);
+    } catch {
+        /* ignore */
+    }
 }
 
 function joinPath(dir: string, ...parts: string[]): string {

@@ -51,19 +51,28 @@ import type { SavedComponent } from './workflow-ui/component-expand';
 import { extractComponent } from './workflow-ui/component-def';
 import WorkspacePickerModal from './workflow-ui/WorkspacePickerModal';
 import {
-    clearWorkspacePath,
     deleteItemPayload,
     deletePipelineFile,
     folderNameFromPath,
-    getWorkspacePath,
+    getWorkspacePaths,
     isInTauri,
     loadWorkspace,
     saveItemPayload,
     saveMetadata,
     savePipelineFile,
     saveRepository,
-    setWorkspacePath,
+    setWorkspacePaths,
 } from './workspace';
+import {
+    type WorkspaceRef,
+    workspaceToken,
+    tokenOf,
+    nsId,
+    bareIdOf,
+    namespaceRepo,
+    denamespaceRepo,
+    namespacePipelineData,
+} from './workspace-ns';
 import LeftSidebar from './workflow-ui/LeftSidebar';
 import PropertiesPanel from './workflow-ui/PropertiesPanel';
 import BottomPanel from './workflow-ui/BottomPanel';
@@ -229,6 +238,21 @@ export default function App() {
         loadPersisted<string | null>('active-context', null),
     );
 
+    // Multi-workspace: the list of workspaces open at once. Each contributes
+    // its (namespaced) items to the single merged `repo` / `pipelineData` /
+    // `jobs` above, so several workspaces show in the Project tree and you can
+    // edit pipelines from any of them at the same time. Tauri-only; in the
+    // browser this stays empty and the legacy single localStorage repo is used.
+    const [openWorkspaces, setOpenWorkspaces] = useState<WorkspaceRef[]>(() =>
+        isInTauri()
+            ? getWorkspacePaths().map(p => ({
+                  token: workspaceToken(p),
+                  path: p,
+                  name: folderNameFromPath(p) ?? p,
+              }))
+            : [],
+    );
+
     // First-run boot gate: in Tauri we must confirm an execution engine
     // is installed before anything else. 'checking' until engine_status
     // returns; 'engine-setup' if DuckDB is missing; 'ready' once present
@@ -253,17 +277,25 @@ export default function App() {
         };
     }, []);
 
-    const [workspacePathState, setWorkspacePathState] = useState<string | null>(() =>
-        getWorkspacePath(),
-    );
+    // The "active" workspace path = the workspace owning the focused pipeline
+    // (falls back to the first open one). Derived so the scheduler, Ctrl+S,
+    // run path, and picker gate keep working per the focused pipeline.
+    const workspacePathState = useMemo<string | null>(() => {
+        const tok = tokenOf(activeJobId);
+        return (
+            openWorkspaces.find(w => w.token === tok)?.path ??
+            openWorkspaces[0]?.path ??
+            null
+        );
+    }, [openWorkspaces, activeJobId]);
     // In Tauri: needs workspace picked + hydrated before saves start.
     // In browser: workspaceReady is always true; localStorage persists.
     const [workspaceReady, setWorkspaceReady] = useState<boolean>(!isInTauri());
     // Engine setup comes first; only once engines are ready do we show
-    // the workspace picker.
+    // the workspace picker (shown when no workspace is open yet).
     const showEngineSetup = isInTauri() && engineGate === 'engine-setup';
     const showWorkspacePicker =
-        isInTauri() && engineGate === 'ready' && !workspacePathState;
+        isInTauri() && engineGate === 'ready' && openWorkspaces.length === 0;
     const [newPipelineModal, setNewPipelineModal] = useState<{
         open: boolean;
         defaultParent: string;
@@ -273,25 +305,72 @@ export default function App() {
     const nodes = activePipeline.nodes;
     const edges = activePipeline.edges;
 
-    // Hydrate from workspace file on Tauri once the path is known.
+    // Hydrate every open workspace on Tauri and MERGE them into one repo /
+    // pipelineData. Each workspace's items are namespaced by its token so the
+    // identical on-disk ids (root, pipelines, j1, …) never collide. Reloads
+    // whenever the set of open workspace paths changes (add / close / reorder).
+    const openPathsKey = openWorkspaces.map(w => w.path).join('\u0000');
     useEffect(() => {
-        if (!isInTauri() || !workspacePathState) return;
-        let cancelled = false;
-        loadWorkspace(workspacePathState).then(state => {
-            if (cancelled) return;
-            if (state) {
-                if (state.pipelineData)
-                    setPipelineData(state.pipelineData as Record<string, PipelineState>);
-                if (state.repo) setRepo(state.repo as RepoItem[]);
-                if (state.jobs) setJobs(state.jobs as Job[]);
-                if (state.activeJobId) setActiveJobId(state.activeJobId);
-            }
+        if (!isInTauri()) return;
+        // Gate saves off until the (re)merge from disk completes, so a save
+        // effect can't fire with the previous repo against the new workspace
+        // set and overwrite a just-opened workspace's files with stale data.
+        setWorkspaceReady(false);
+        if (openWorkspaces.length === 0) {
+            setRepo([]);
+            setPipelineData({});
+            setJobs([]);
             setWorkspaceReady(true);
-        });
+            return;
+        }
+        let cancelled = false;
+        void (async () => {
+            const mergedRepo: RepoItem[] = [];
+            const mergedData: Record<string, PipelineState> = {};
+            const mergedJobs: Job[] = [];
+            let firstActive: string | null = null;
+            for (const ws of openWorkspaces) {
+                const state = await loadWorkspace(ws.path);
+                if (cancelled) return;
+                const repoItems = (state?.repo as RepoItem[] | undefined) ?? [];
+                // Set the project-root node's display name to the workspace
+                // folder name so each root in the tree is identifiable.
+                const named = repoItems.map(it =>
+                    it.type === 'project' ? { ...it, name: ws.name } : it,
+                );
+                mergedRepo.push(...namespaceRepo(ws.token, named));
+                const data = (state?.pipelineData as Record<string, PipelineState> | undefined) ?? {};
+                Object.assign(mergedData, namespacePipelineData(ws.token, data));
+                // Restore this workspace's open editor tabs (its saved `jobs`),
+                // namespaced. Keep only tabs whose pipeline still exists.
+                const wsJobs = (state?.jobs as Job[] | undefined) ?? [];
+                for (const j of wsJobs) {
+                    const id = nsId(ws.token, j.id);
+                    if (mergedData[id]) mergedJobs.push({ ...j, id });
+                }
+                if (!firstActive && state?.activeJobId) {
+                    firstActive = nsId(ws.token, state.activeJobId);
+                }
+            }
+            if (cancelled) return;
+            setRepo(mergedRepo);
+            setPipelineData(mergedData);
+            setJobs(mergedJobs);
+            setActiveJobId(prev =>
+                mergedData[prev]
+                    ? prev
+                    : firstActive ?? mergedJobs[0]?.id ?? Object.keys(mergedData)[0] ?? '',
+            );
+            // Reset save-diff baselines so the merge isn't written straight back.
+            prevRepoRef.current = mergedRepo;
+            prevPipelineDataRef.current = mergedData;
+            setWorkspaceReady(true);
+        })();
         return () => {
             cancelled = true;
         };
-    }, [workspacePathState]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [openPathsKey]);
 
     // Granular Tauri saves - each slice goes to its own file so the
     // workspace folder is git-friendly. Browser still uses localStorage.
@@ -299,25 +378,42 @@ export default function App() {
     const prevRepoRef = useRef<RepoItem[] | null>(null);
 
     useEffect(() => {
-        if (!workspaceReady || !isInTauri() || !workspacePathState) return;
-        const ws = workspacePathState;
-        const t = setTimeout(() => {
-            void saveMetadata(ws, { jobs, activeJobId });
-        }, 200);
-        return () => clearTimeout(t);
-    }, [workspaceReady, workspacePathState, jobs, activeJobId]);
-
-    useEffect(() => {
-        if (!workspaceReady || !isInTauri() || !workspacePathState) return;
-        const ws = workspacePathState;
+        if (!workspaceReady || !isInTauri() || openWorkspaces.length === 0) return;
         const t = setTimeout(() => {
             void (async () => {
-                await saveRepository(ws, repo as unknown as Array<Record<string, unknown>>);
-                // Diff payload-bearing items against the previous snapshot
-                // so we only write the ones that actually changed.
+                for (const ws of openWorkspaces) {
+                    const wsJobs = jobs.filter(j => tokenOf(j.id) === ws.token);
+                    const tokActive = tokenOf(activeJobId);
+                    await saveMetadata(ws.path, {
+                        jobs: wsJobs.map(j => ({ ...j, id: bareIdOf(j.id) })),
+                        activeJobId:
+                            tokActive === ws.token ? bareIdOf(activeJobId) : undefined,
+                    });
+                }
+            })();
+        }, 200);
+        return () => clearTimeout(t);
+    }, [workspaceReady, openWorkspaces, jobs, activeJobId]);
+
+    useEffect(() => {
+        if (!workspaceReady || !isInTauri() || openWorkspaces.length === 0) return;
+        const t = setTimeout(() => {
+            void (async () => {
                 const prev = prevRepoRef.current ?? [];
                 const prevById = new Map(prev.map(i => [i.id, i]));
                 const currById = new Map(repo.map(i => [i.id, i]));
+                for (const ws of openWorkspaces) {
+                    // Write each workspace's repository.json from its own slice,
+                    // stripped back to bare on-disk ids.
+                    const slice = denamespaceRepo(ws.token, repo);
+                    await saveRepository(
+                        ws.path,
+                        slice as unknown as Array<Record<string, unknown>>,
+                    );
+                }
+                // Payload writes/deletes (connections/contexts/...): route each
+                // item to its owning workspace, by bare id.
+                const wsByToken = new Map(openWorkspaces.map(w => [w.token, w]));
                 for (const item of repo) {
                     if (
                         item.type === 'folder' ||
@@ -325,47 +421,48 @@ export default function App() {
                         item.type === 'pipeline'
                     )
                         continue;
+                    const ws = wsByToken.get(tokenOf(item.id) ?? '');
+                    if (!ws) continue;
                     const before = prevById.get(item.id);
                     if (!before || before.payload !== item.payload) {
                         if (item.payload !== undefined) {
-                            await saveItemPayload(ws, item.type, item.id, item.payload);
+                            await saveItemPayload(ws.path, item.type, bareIdOf(item.id), item.payload);
                         }
                     }
                 }
-                // Delete payloads for items that were removed.
                 for (const before of prev) {
                     if (currById.has(before.id)) continue;
+                    const ws = wsByToken.get(tokenOf(before.id) ?? '');
+                    if (!ws) continue;
                     if (before.type === 'pipeline') {
-                        await deletePipelineFile(ws, before.id);
-                    } else if (
-                        before.type !== 'folder' &&
-                        before.type !== 'project'
-                    ) {
-                        await deleteItemPayload(ws, before.type, before.id);
+                        await deletePipelineFile(ws.path, bareIdOf(before.id));
+                    } else if (before.type !== 'folder' && before.type !== 'project') {
+                        await deleteItemPayload(ws.path, before.type, bareIdOf(before.id));
                     }
                 }
                 prevRepoRef.current = repo;
             })();
         }, 300);
         return () => clearTimeout(t);
-    }, [workspaceReady, workspacePathState, repo]);
+    }, [workspaceReady, openWorkspaces, repo]);
 
     useEffect(() => {
-        if (!workspaceReady || !isInTauri() || !workspacePathState) return;
-        const ws = workspacePathState;
+        if (!workspaceReady || !isInTauri() || openWorkspaces.length === 0) return;
         const t = setTimeout(() => {
             void (async () => {
                 const prev = prevPipelineDataRef.current ?? {};
+                const wsByToken = new Map(openWorkspaces.map(w => [w.token, w]));
                 for (const [id, state] of Object.entries(pipelineData)) {
                     if (prev[id] !== state) {
-                        await savePipelineFile(ws, id, state);
+                        const ws = wsByToken.get(tokenOf(id) ?? '');
+                        if (ws) await savePipelineFile(ws.path, bareIdOf(id), state);
                     }
                 }
                 prevPipelineDataRef.current = pipelineData;
             })();
         }, 400);
         return () => clearTimeout(t);
-    }, [workspaceReady, workspacePathState, pipelineData]);
+    }, [workspaceReady, openWorkspaces, pipelineData]);
 
     // Browser fallback: localStorage (unchanged).
     useEffect(() => {
@@ -399,19 +496,28 @@ export default function App() {
         const onKey = (e: KeyboardEvent) => {
             if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 's') return;
             e.preventDefault();
-            if (!workspacePathState) return;
-            const ws = workspacePathState;
+            const tok = tokenOf(activeJobId);
+            const ws = openWorkspaces.find(w => w.token === tok);
+            if (!ws) return;
             void (async () => {
                 const active = pipelineData[activeJobId];
-                if (active) await savePipelineFile(ws, activeJobId, active);
-                await saveRepository(ws, repo as unknown as Array<Record<string, unknown>>);
-                await saveMetadata(ws, { jobs, activeJobId });
+                if (active) await savePipelineFile(ws.path, bareIdOf(activeJobId), active);
+                await saveRepository(
+                    ws.path,
+                    denamespaceRepo(ws.token, repo) as unknown as Array<Record<string, unknown>>,
+                );
+                await saveMetadata(ws.path, {
+                    jobs: jobs
+                        .filter(j => tokenOf(j.id) === ws.token)
+                        .map(j => ({ ...j, id: bareIdOf(j.id) })),
+                    activeJobId: bareIdOf(activeJobId),
+                });
                 setJobs(js => js.map(j => (j.id === activeJobId ? { ...j, dirty: false } : j)));
             })();
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [workspacePathState, pipelineData, activeJobId, repo, jobs]);
+    }, [openWorkspaces, pipelineData, activeJobId, repo, jobs]);
 
     // Suppress the native webview right-click menu (Back / Reload / Print ...)
     // in the desktop app - it looks out of place on the header, footer and
@@ -430,12 +536,28 @@ export default function App() {
         return () => window.removeEventListener('contextmenu', onCtx);
     }, []);
 
-    const handlePickedWorkspace = useCallback((path: string) => {
-        setWorkspacePath(path);
-        setWorkspacePathState(path);
+    // Add a workspace to the open set (or focus it if already open). Persists
+    // the new list; the hydration effect re-merges from disk.
+    const addWorkspace = useCallback((path: string) => {
+        setOpenWorkspaces(prev => {
+            if (prev.some(w => w.path === path)) return prev;
+            const next = [
+                ...prev,
+                { token: workspaceToken(path), path, name: folderNameFromPath(path) ?? path },
+            ];
+            setWorkspacePaths(next.map(w => w.path));
+            return next;
+        });
     }, []);
 
-    // Sync the workspace path with the Rust scheduler so it loads any
+    const handlePickedWorkspace = useCallback(
+        (path: string) => {
+            addWorkspace(path);
+        },
+        [addWorkspace],
+    );
+
+    // Sync the active workspace path with the Rust scheduler so it loads any
     // schedules persisted in that folder.
     useEffect(() => {
         if (!isInTauri()) return;
@@ -462,40 +584,38 @@ export default function App() {
         setBuildModalPipelineId(pipelineId);
     }, []);
 
+    // "New Workspace": pick a folder and ADD it to the open set (does not
+    // replace the others), so several workspaces can be worked on at once.
     const handleSwitchWorkspace = useCallback(async () => {
         if (!isInTauri()) return;
         const { pickWorkspaceDirectory } = await import('./workspace');
         const picked = await pickWorkspaceDirectory();
-        if (!picked || picked === workspacePathState) return;
-        // Reset state so loadWorkspace effect re-hydrates from the new
-        // folder. We don't clear the existing state until we know the
-        // new path is set, to avoid a flash of empty canvas.
-        setWorkspaceReady(false);
-        setPipelineData(INITIAL_PIPELINE_DATA);
-        setRepo(INITIAL_REPO);
-        setJobs(INITIAL_JOBS);
-        setActiveJobId('j1');
-        setWorkspacePath(picked);
-        setWorkspacePathState(picked);
-    }, [workspacePathState]);
+        if (!picked) return;
+        addWorkspace(picked);
+    }, [addWorkspace]);
 
-    const workspaceFolderName = useMemo(
-        () => folderNameFromPath(workspacePathState),
-        [workspacePathState],
-    );
-
-    // Close the current workspace: clear the persisted path + reset state so
-    // the workspace picker is shown again. The save effects bail while no path
-    // is set, so this won't write to the just-closed folder.
-    const handleCloseWorkspace = useCallback(() => {
-        if (!isInTauri()) return;
-        setWorkspaceReady(false);
-        setPipelineData(INITIAL_PIPELINE_DATA);
-        setRepo(INITIAL_REPO);
-        setJobs(INITIAL_JOBS);
-        setActiveJobId('j1');
-        clearWorkspacePath();
-        setWorkspacePathState(null);
+    // Close one workspace by its project-root node id (`<token>__root`): drop
+    // it from the open set + remove its items from the merged state. The
+    // hydration/save effects key off `openWorkspaces`, so the closed folder is
+    // no longer written to.
+    const handleCloseWorkspace = useCallback((projectId: string) => {
+        const token = tokenOf(projectId);
+        if (!token) return;
+        setOpenWorkspaces(prev => {
+            const next = prev.filter(w => w.token !== token);
+            setWorkspacePaths(next.map(w => w.path));
+            return next;
+        });
+        setRepo(r => r.filter(i => tokenOf(i.id) !== token));
+        setJobs(js => js.filter(j => tokenOf(j.id) !== token));
+        setPipelineData(d => {
+            const next: Record<string, PipelineState> = {};
+            for (const [id, v] of Object.entries(d)) {
+                if (tokenOf(id) !== token) next[id] = v;
+            }
+            return next;
+        });
+        setActiveJobId(prev => (tokenOf(prev) === token ? '' : prev));
     }, []);
 
     useEffect(() => {
@@ -923,9 +1043,11 @@ export default function App() {
         // first, then inline SQL routines + substitute ${context.var}; the
         // canvas keeps the editable, un-substituted, un-expanded values.
         const runGraph = expandComponentsForRun(nodes, edges, savedComponents);
-        const runNodes = resolveForRun(runGraph.nodes, repo, workspacePathState);
-        const pipelineName = repo.find(r => r.id === activeJobId)?.name ?? activeJobId;
-        void runPipeline(runNodes, runGraph.edges, handleEvent, activeJobId, workspacePathState, pipelineName)
+        const activeTok = tokenOf(activeJobId);
+        const wsRepo = activeTok ? denamespaceRepo(activeTok, repo) : repo;
+        const runNodes = resolveForRun(runGraph.nodes, wsRepo, workspacePathState);
+        const pipelineName = repo.find(r => r.id === activeJobId)?.name ?? bareIdOf(activeJobId);
+        void runPipeline(runNodes, runGraph.edges, handleEvent, bareIdOf(activeJobId), workspacePathState, pipelineName)
             .then(result => finishRun(start, result))
             .finally(() => setIsRunning(false));
     }, [nodes, edges, repo, savedComponents, handleEvent, finishRun, activeJobId, workspacePathState, validation.errorCount]);
@@ -940,8 +1062,10 @@ export default function App() {
             setRunResult(null);
             const start = performance.now();
             const runGraph = expandComponentsForRun(nodes, edges, savedComponents);
-            const runNodes = resolveForRun(runGraph.nodes, repo, workspacePathState);
-            const pipelineName = repo.find(r => r.id === activeJobId)?.name ?? activeJobId;
+            const activeTok = tokenOf(activeJobId);
+            const wsRepo = activeTok ? denamespaceRepo(activeTok, repo) : repo;
+            const runNodes = resolveForRun(runGraph.nodes, wsRepo, workspacePathState);
+            const pipelineName = repo.find(r => r.id === activeJobId)?.name ?? bareIdOf(activeJobId);
             // If "run from here" targets a collapsed component instance, the
             // instance id no longer exists after expansion - remap it to the
             // component's output port (its last inner node) so the partial run
@@ -958,7 +1082,7 @@ export default function App() {
                 runGraph.edges,
                 runTarget,
                 handleEvent,
-                activeJobId,
+                bareIdOf(activeJobId),
                 workspacePathState,
                 pipelineName,
             )
@@ -1130,15 +1254,19 @@ export default function App() {
                 nodeIds.has(e.target);
             const rawEdges = Array.isArray(parsed.edges) ? parsed.edges : [];
             const importedEdges = rawEdges.filter(isValidEdge);
-            const id = freshId('p');
+            const tok = tokenOf(activeJobId);
+            const id = tok ? nsId(tok, freshId('p')) : freshId('p');
             const baseName =
                 (typeof parsed.name === 'string' && parsed.name.trim()) ||
                 suggestedName.replace(/\.quilt\.json$|\.json$/, '') ||
                 'imported_pipeline';
             const name = uniquePipelineName(baseName);
-            const parent = repo.find(i => i.id === 'pipelines')
-                ? 'pipelines'
-                : repo.find(i => i.type === 'folder')?.id ?? 'root';
+            const pipelinesId = tok ? nsId(tok, 'pipelines') : 'pipelines';
+            const parent = repo.find(i => i.id === pipelinesId)
+                ? pipelinesId
+                : repo.find(i => i.type === 'folder' && tokenOf(i.id) === tok)?.id ??
+                  repo.find(i => i.type === 'folder')?.id ??
+                  (tok ? nsId(tok, 'root') : 'root');
             setRepo(r => [...r, { id, name, type: 'pipeline', parentId: parent }]);
             setPipelineData(d => ({
                 ...d,
@@ -1485,17 +1613,19 @@ export default function App() {
 
     const handleNewFolderInRepo = useCallback(
         (parentId: string) => {
-            const id = 'f_' + Date.now().toString(36);
+            const tok = tokenOf(parentId) ?? tokenOf(activeJobId);
+            const id = tok ? nsId(tok, 'f_' + Date.now().toString(36)) : 'f_' + Date.now().toString(36);
             const count = repo.filter(i => i.type === 'folder' && i.parentId === parentId).length;
             const name = 'new_folder' + (count > 0 ? '_' + (count + 1) : '');
+            const fallbackParent = tok ? nsId(tok, 'root') : 'root';
             const realParent = repo.find(
                 i => i.id === parentId && (i.type === 'folder' || i.type === 'project'),
             )
                 ? parentId
-                : 'root';
+                : fallbackParent;
             setRepo(r => [...r, { id, name, type: 'folder', parentId: realParent }]);
         },
-        [repo],
+        [repo, activeJobId],
     );
 
     const handleRenameRepoItem = useCallback((id: string, newName: string) => {
@@ -1507,7 +1637,9 @@ export default function App() {
         (id: string) => {
             const item = repo.find(i => i.id === id);
             if (!item) return;
-            const newId = item.type[0] + '_' + Date.now().toString(36);
+            const tok = tokenOf(id);
+            const bareNew = item.type[0] + '_' + Date.now().toString(36);
+            const newId = tok ? nsId(tok, bareNew) : bareNew;
             setRepo(r => [...r, { ...item, id: newId, name: item.name + '_copy' }]);
             if (item.type === 'pipeline') {
                 setPipelineData(d => ({ ...d, [newId]: d[id] ?? EMPTY_PIPELINE }));
@@ -1547,12 +1679,16 @@ export default function App() {
 
     const handleCreatePipeline = useCallback(
         (rawName: string, parentId: string, template: PipelineTemplate) => {
-            const id = freshId('p');
+            // Namespace the new id to the parent's workspace (or the active
+            // one) so it saves to the right folder. Bare in browser mode.
+            const tok = tokenOf(parentId) ?? tokenOf(activeJobId);
+            const id = tok ? nsId(tok, freshId('p')) : freshId('p');
+            const fallbackParent = tok ? nsId(tok, 'pipelines') : 'pipelines';
             const realParent = repo.find(
                 i => i.id === parentId && (i.type === 'folder' || i.type === 'project'),
             )
                 ? parentId
-                : 'pipelines';
+                : fallbackParent;
             const seed = seedTemplate(template);
             setRepo(r => [...r, { id, name: rawName, type: 'pipeline', parentId: realParent }]);
             setPipelineData(d => ({ ...d, [id]: seed }));
@@ -1687,12 +1823,14 @@ export default function App() {
                     ),
                 );
             } else {
-                const id =
+                const tok = tokenOf(repoEditor.parentId) ?? tokenOf(activeJobId);
+                const bareNew =
                     type[0] +
                     '_' +
                     Date.now().toString(36) +
                     '_' +
                     Math.random().toString(36).slice(2, 6);
+                const id = tok ? nsId(tok, bareNew) : bareNew;
                 setRepo(r => [
                     ...r,
                     {
@@ -1828,7 +1966,6 @@ export default function App() {
             <main className="workspace">
                 <LeftSidebar
                     repoItems={repo}
-                    workspaceName={workspaceFolderName}
                     savedComponents={savedComponents}
                     onDeleteComponent={id => setSavedComponents(cs => cs.filter(c => c.id !== id))}
                     activeJobId={activeJobId}

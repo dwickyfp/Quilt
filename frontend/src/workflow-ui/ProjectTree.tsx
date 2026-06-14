@@ -30,7 +30,6 @@ const ICON_SIZE = 14;
 
 type Props = {
     items: RepoItem[];
-    workspaceName: string | null;
     activeJobId: string;
     openJobIds: Set<string>;
     onOpenPipeline: (id: string) => void;
@@ -48,7 +47,7 @@ type Props = {
     onBackfillPipeline: (id: string) => void;
     onBuildPipeline: (id: string) => void;
     onNewWorkspace: () => void;
-    onCloseWorkspace: () => void;
+    onCloseWorkspace: (projectId: string) => void;
 };
 
 const TYPE_LABEL: Record<RepoItemType, string> = {
@@ -84,7 +83,6 @@ function TypeIcon({ type, isOpen }: { type: RepoItemType; isOpen: boolean }) {
 export default function ProjectTree(props: Props) {
     const {
         items,
-        workspaceName,
         activeJobId,
         openJobIds,
         onOpenPipeline,
@@ -162,7 +160,7 @@ export default function ProjectTree(props: Props) {
     // Menu for the workspace (project root) kebab + context menu: create items
     // and close the workspace. Mirrors the actions previously in the toolbar.
     const buildWorkspaceMenu = (item: RepoItem): MenuItem[] => [
-        { kind: 'header', key: 'h', label: workspaceName ?? item.name },
+        { kind: 'header', key: 'h', label: item.name },
         {
             kind: 'item',
             key: 'new-pipeline',
@@ -183,7 +181,7 @@ export default function ProjectTree(props: Props) {
             key: 'close-workspace',
             label: 'Close workspace',
             icon: <LogOut size={ICON_SIZE} />,
-            onClick: () => onCloseWorkspace(),
+            onClick: () => onCloseWorkspace(item.id),
         },
     ];
 
@@ -435,7 +433,7 @@ export default function ProjectTree(props: Props) {
                         />
                     ) : (
                         <span className="repo-label">
-                            {item.type === 'project' ? workspaceName ?? item.name : item.name}
+                            {item.name}
                         </span>
                     )}
                     {item.type === 'project' && !isRenaming ? (
