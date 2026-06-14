@@ -3060,8 +3060,9 @@ fn build_stage(
         let target_column = string_prop(&props, "targetColumn")
             .filter(|s| !s.is_empty())
             .unwrap_or_default();
-        // Supervised learners require a target; k-means is unsupervised.
-        if algorithm != "kmeans" && target_column.is_empty() {
+        // Supervised learners require a target; k-means and dbscan are unsupervised.
+        let unsupervised = algorithm == "kmeans" || algorithm == "dbscan";
+        if !unsupervised && target_column.is_empty() {
             return Err(EngineError::Config(format!(
                 "{}: targetColumn required",
                 component_id
@@ -3077,6 +3078,10 @@ fn build_stage(
             n_trees: props.get("nTrees").and_then(|v| v.as_u64()).unwrap_or(100) as usize,
             k: props.get("k").and_then(|v| v.as_u64()).unwrap_or(5) as usize,
             max_iter: props.get("maxIter").and_then(|v| v.as_u64()).unwrap_or(100) as usize,
+            alpha: props.get("alpha").and_then(|v| v.as_f64()).unwrap_or(1.0),
+            l1_ratio: props.get("l1Ratio").and_then(|v| v.as_f64()).unwrap_or(0.5),
+            eps: props.get("eps").and_then(|v| v.as_f64()).unwrap_or(0.5),
+            min_samples: props.get("minSamples").and_then(|v| v.as_u64()).unwrap_or(5) as usize,
         });
         (String::new(), StageKind::View, None)
     } else if component_id == "ml.predict" {

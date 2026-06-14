@@ -18,12 +18,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use smartcore::cluster::kmeans::{KMeans, KMeansParameters};
+use smartcore::cluster::dbscan::{DBSCAN, DBSCANParameters};
 use smartcore::ensemble::random_forest_classifier::{
     RandomForestClassifier, RandomForestClassifierParameters,
 };
 use smartcore::linalg::basic::matrix::DenseMatrix;
 use smartcore::linear::linear_regression::{LinearRegression, LinearRegressionParameters};
 use smartcore::linear::logistic_regression::{LogisticRegression, LogisticRegressionParameters};
+use smartcore::linear::ridge_regression::{RidgeRegression, RidgeRegressionParameters};
+use smartcore::linear::lasso::{Lasso, LassoParameters};
+use smartcore::linear::elastic_net::{ElasticNet, ElasticNetParameters};
+use smartcore::naive_bayes::gaussian::{GaussianNB, GaussianNBParameters};
 use smartcore::metrics::distance::euclidian::Euclidian;
 use smartcore::neighbors::knn_classifier::{KNNClassifier, KNNClassifierParameters};
 use smartcore::neighbors::knn_regressor::{KNNRegressor, KNNRegressorParameters};
@@ -87,6 +92,27 @@ enum Model {
         features: Vec<String>,
         model: KNNRegressor<f64, f64, Matrix, Vec<f64>, Euclidian<f64>>,
     },
+    Ridge {
+        features: Vec<String>,
+        model: RidgeRegression<f64, f64, Matrix, Vec<f64>>,
+    },
+    Lasso {
+        features: Vec<String>,
+        model: Lasso<f64, f64, Matrix, Vec<f64>>,
+    },
+    ElasticNet {
+        features: Vec<String>,
+        model: ElasticNet<f64, f64, Matrix, Vec<f64>>,
+    },
+    Dbscan {
+        features: Vec<String>,
+        model: DBSCAN<f64, i64, Matrix, Vec<i64>, Euclidian<f64>>,
+    },
+    GaussianNb {
+        features: Vec<String>,
+        labels: Vec<String>,
+        model: GaussianNB<f64, u64, Matrix, Vec<u64>>,
+    },
 }
 
 impl Model {
@@ -100,7 +126,12 @@ impl Model {
             | Model::KMeans { features, .. }
             | Model::TreeReg { features, .. }
             | Model::ForestReg { features, .. }
-            | Model::KnnReg { features, .. } => features,
+            | Model::KnnReg { features, .. }
+            | Model::Ridge { features, .. }
+            | Model::Lasso { features, .. }
+            | Model::ElasticNet { features, .. }
+            | Model::Dbscan { features, .. }
+            | Model::GaussianNb { features, .. } => features,
         }
     }
 
@@ -115,6 +146,11 @@ impl Model {
             Model::TreeReg { .. } => "tree.reg",
             Model::ForestReg { .. } => "forest.reg",
             Model::KnnReg { .. } => "knn.reg",
+            Model::Ridge { .. } => "ridge",
+            Model::Lasso { .. } => "lasso",
+            Model::ElasticNet { .. } => "elasticnet",
+            Model::Dbscan { .. } => "dbscan",
+            Model::GaussianNb { .. } => "nb.gaussian",
         }
     }
 
@@ -360,6 +396,53 @@ impl DuckdbEngine {
                 let m = KNNRegressor::fit(&x, &y, params).map_err(fit_failed)?;
                 Model::KnnReg { features, model: m }
             }
+            "ridge" => {
+                let y: Vec<f64> = rows
+                    .iter()
+                    .map(|r| cell_to_f64(r.get(&spec.target_column)))
+                    .collect();
+                let params = RidgeRegressionParameters::default().with_alpha(spec.alpha);
+                let m = RidgeRegression::fit(&x, &y, params).map_err(fit_failed)?;
+                Model::Ridge { features, model: m }
+            }
+            "lasso" => {
+                let y: Vec<f64> = rows
+                    .iter()
+                    .map(|r| cell_to_f64(r.get(&spec.target_column)))
+                    .collect();
+                let params = LassoParameters::default().with_alpha(spec.alpha);
+                let m = Lasso::fit(&x, &y, params).map_err(fit_failed)?;
+                Model::Lasso { features, model: m }
+            }
+            "elasticnet" => {
+                let y: Vec<f64> = rows
+                    .iter()
+                    .map(|r| cell_to_f64(r.get(&spec.target_column)))
+                    .collect();
+                let params = ElasticNetParameters::default()
+                    .with_alpha(spec.alpha)
+                    .with_l1_ratio(spec.l1_ratio);
+                let m = ElasticNet::fit(&x, &y, params).map_err(fit_failed)?;
+                Model::ElasticNet { features, model: m }
+            }
+            "dbscan" => {
+                let params = DBSCANParameters::default()
+                    .with_eps(spec.eps)
+                    .with_min_samples(spec.min_samples.max(1));
+                let m = DBSCAN::fit(&x, params).map_err(fit_failed)?;
+                Model::Dbscan { features, model: m }
+            }
+            "nb.gaussian" => {
+                let (y_i64, labels) = encode_labels(&rows, &spec.target_column);
+                let y: Vec<u64> = y_i64.iter().map(|&v| v as u64).collect();
+                let m =
+                    GaussianNB::fit(&x, &y, GaussianNBParameters::default()).map_err(fit_failed)?;
+                Model::GaussianNb {
+                    features,
+                    labels,
+                    model: m,
+                }
+            }
             other => {
                 return Err(EngineError::Config(format!(
                     "ml.learner: unknown algorithm '{}'",
@@ -449,6 +532,35 @@ impl DuckdbEngine {
                 .into_iter()
                 .map(|v| json!(v))
                 .collect(),
+            Model::Ridge { model, .. } => model
+                .predict(&x)
+                .map_err(fit_failed)?
+                .into_iter()
+                .map(|v| json!(v))
+                .collect(),
+            Model::Lasso { model, .. } => model
+                .predict(&x)
+                .map_err(fit_failed)?
+                .into_iter()
+                .map(|v| json!(v))
+                .collect(),
+            Model::ElasticNet { model, .. } => model
+                .predict(&x)
+                .map_err(fit_failed)?
+                .into_iter()
+                .map(|v| json!(v))
+                .collect(),
+            Model::Dbscan { model, .. } => model
+                .predict(&x)
+                .map_err(fit_failed)?
+                .into_iter()
+                .map(|c| json!(c))
+                .collect(),
+            Model::GaussianNb { model, labels, .. } => {
+                let preds_u64 = model.predict(&x).map_err(fit_failed)?;
+                let preds_i64: Vec<i64> = preds_u64.iter().map(|&v| v as i64).collect();
+                decode_class_preds(preds_i64, labels)
+            }
         };
 
         for (row, pred) in rows.iter_mut().zip(preds.into_iter()) {

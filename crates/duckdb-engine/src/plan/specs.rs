@@ -1242,6 +1242,14 @@ pub struct MlLearnerSpec {
     pub n_trees: usize,
     pub k: usize,
     pub max_iter: usize,
+    /// Regularization strength (ridge / lasso / elasticnet).
+    pub alpha: f64,
+    /// ElasticNet mix between L1 and L2 (0..1).
+    pub l1_ratio: f64,
+    /// DBSCAN neighborhood radius.
+    pub eps: f64,
+    /// DBSCAN minimum points to form a dense region.
+    pub min_samples: usize,
 }
 
 /// ml.predict: apply a model trained by an upstream Learner (located via

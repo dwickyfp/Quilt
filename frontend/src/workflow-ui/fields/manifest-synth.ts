@@ -4769,8 +4769,8 @@ function synthMl(comp: ComponentDef): ComponentManifest {
 
     if (id.startsWith('ml.learner.')) {
         const fields: Field[] = [];
-        // k-means is unsupervised - no target column.
-        if (id !== 'ml.learner.kmeans') {
+        // k-means and dbscan are unsupervised - no target column.
+        if (id !== 'ml.learner.kmeans' && id !== 'ml.learner.dbscan') {
             fields.push({
                 key: 'targetColumn',
                 label: 'Target column',
@@ -4808,6 +4808,38 @@ function synthMl(comp: ComponentDef): ComponentManifest {
                 kind: 'integer',
                 defaultValue: 5,
             });
+        }
+        if (id === 'ml.learner.ridge' || id === 'ml.learner.lasso' || id === 'ml.learner.elasticnet') {
+            fields.push({
+                key: 'alpha',
+                label: 'Alpha (regularization)',
+                kind: 'number',
+                defaultValue: 1.0,
+            });
+        }
+        if (id === 'ml.learner.elasticnet') {
+            fields.push({
+                key: 'l1Ratio',
+                label: 'L1 ratio (0=ridge .. 1=lasso)',
+                kind: 'number',
+                defaultValue: 0.5,
+            });
+        }
+        if (id === 'ml.learner.dbscan') {
+            fields.push(
+                {
+                    key: 'eps',
+                    label: 'Eps (neighborhood radius)',
+                    kind: 'number',
+                    defaultValue: 0.5,
+                },
+                {
+                    key: 'minSamples',
+                    label: 'Min samples',
+                    kind: 'integer',
+                    defaultValue: 5,
+                },
+            );
         }
         if (id === 'ml.learner.kmeans') {
             fields.push(

@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 350,
+  "componentCount": 355,
   "components": [
     {
       "id": "src.csv",
@@ -42023,6 +42023,365 @@
                 "label": "Neighbors (k)",
                 "kind": "integer",
                 "defaultValue": 5
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.ridge",
+      "label": "Ridge Regression Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train an L2-regularized linear regression (numeric target). Props: targetColumn (numeric), featureColumns, alpha (regularization strength, default 1.0). Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.ridge",
+        "kind": "ml",
+        "label": "Ridge Regression Learner",
+        "description": "Train an L2-regularized linear regression (numeric target). Props: targetColumn (numeric), featureColumns, alpha (regularization strength, default 1.0). Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "alpha",
+                "label": "Alpha (regularization)",
+                "kind": "number",
+                "defaultValue": 1
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.lasso",
+      "label": "Lasso Regression Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train an L1-regularized linear regression that drives weak coefficients to zero (feature selection). Props: targetColumn (numeric), featureColumns, alpha (default 1.0). Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.lasso",
+        "kind": "ml",
+        "label": "Lasso Regression Learner",
+        "description": "Train an L1-regularized linear regression that drives weak coefficients to zero (feature selection). Props: targetColumn (numeric), featureColumns, alpha (default 1.0). Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "alpha",
+                "label": "Alpha (regularization)",
+                "kind": "number",
+                "defaultValue": 1
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.elasticnet",
+      "label": "ElasticNet Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train an ElasticNet regression blending L1 and L2 penalties. Props: targetColumn (numeric), featureColumns, alpha (default 1.0), l1Ratio (0=ridge .. 1=lasso, default 0.5). Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.elasticnet",
+        "kind": "ml",
+        "label": "ElasticNet Learner",
+        "description": "Train an ElasticNet regression blending L1 and L2 penalties. Props: targetColumn (numeric), featureColumns, alpha (default 1.0), l1Ratio (0=ridge .. 1=lasso, default 0.5). Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "alpha",
+                "label": "Alpha (regularization)",
+                "kind": "number",
+                "defaultValue": 1
+              },
+              {
+                "key": "l1Ratio",
+                "label": "L1 ratio (0=ridge .. 1=lasso)",
+                "kind": "number",
+                "defaultValue": 0.5
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.dbscan",
+      "label": "DBSCAN Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Fit a DBSCAN density clustering model (unsupervised). Finds arbitrarily shaped clusters and marks outliers as noise; no k needed. Props: featureColumns, eps (neighborhood radius, default 0.5), minSamples (default 5). Outputs a model on the model port; predict appends a cluster id (noise = its own group).",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.dbscan",
+        "kind": "ml",
+        "label": "DBSCAN Learner",
+        "description": "Fit a DBSCAN density clustering model (unsupervised). Finds arbitrarily shaped clusters and marks outliers as noise; no k needed. Props: featureColumns, eps (neighborhood radius, default 0.5), minSamples (default 5). Outputs a model on the model port; predict appends a cluster id (noise = its own group).",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "eps",
+                "label": "Eps (neighborhood radius)",
+                "kind": "number",
+                "defaultValue": 0.5
+              },
+              {
+                "key": "minSamples",
+                "label": "Min samples",
+                "kind": "integer",
+                "defaultValue": 5
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.nb.gaussian",
+      "label": "Gaussian Naive Bayes Learner",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a Gaussian Naive Bayes classifier (assumes per-class normal features). Props: targetColumn (categorical), featureColumns. Fast probabilistic baseline. Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.nb.gaussian",
+        "kind": "ml",
+        "label": "Gaussian Naive Bayes Learner",
+        "description": "Train a Gaussian Naive Bayes classifier (assumes per-class normal features). Props: targetColumn (categorical), featureColumns. Fast probabilistic baseline. Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
               }
             ]
           }
