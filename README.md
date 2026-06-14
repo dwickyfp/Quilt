@@ -32,6 +32,7 @@
 
 - [What is Quilt?](#what-is-quilt)
 - [Why this fork?](#why-this-fork)
+- [How it works](#how-it-works)
 - [Quickstart (60 s)](#quickstart-60-seconds)
 - [Download / Install](#download--install)
 - [Build from source](#build-from-source)
@@ -122,6 +123,26 @@ Quilt began as a fork of **duckle** and has grown its own identity and roadmap. 
 - **Honest engineering.** Pure, unit-tested cores for the tricky bits (workspace namespacing, save routing, per-workspace scheduling), verified end to end — lint, tests, and a real build — before anything ships.
 
 Everything below is the full capability surface, kept intact and current.
+
+---
+
+## How it works
+
+From an empty folder to clean data on disk in five steps. The graph you draw compiles to plain SQL and runs on a real columnar engine — locally, with a live preview on every node.
+
+<div align="center">
+<img src="docs/assets/how-it-works.svg" alt="How Quilt works: open a workspace, design on the canvas or via Qunnie, compile to SQL, run on DuckDB, then land and ship" width="100%"/>
+</div>
+
+| Step | What happens | Why it matters |
+|---|---|---|
+| **1 · Open workspace** | Pick a folder. Pipelines, connections, context variables, and routines persist as plain JSON / Markdown files. | Diff them, branch them, review them — your data work is version-controllable from day one. |
+| **2 · Design** | Drag sources → transforms → validators → sinks onto the canvas and wire them, **or** describe the pipeline in plain English and let Qunnie build it. | Two ways in: visual for control, AI for speed. Both produce the same auditable graph. |
+| **3 · Compile** | Quilt compiles the graph to readable SQL, surfaced on every node's **Plan** tab. | No black box. You can read exactly what will run before it runs. |
+| **4 · Run** | DuckDB executes locally — vectorized, columnar, native speed — lighting up nodes stage by stage with live row counts and real mid-query cancel. | A job that crawls in a spreadsheet finishes in milliseconds, fully offline. |
+| **5 · Land & ship** | Write to files, databases, object storage, or vector stores. Save the pipeline, attach a schedule, or build it into one self-contained binary for a server. | The same pipeline goes from laptop to production with no rewrite. |
+
+Throughout steps 3–4, the **Preview** tab shows a live row sample and the generated SQL for whatever node you select — zero hidden state.
 
 ---
 
