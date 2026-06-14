@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import Tooltip from './Tooltip';
 import {
     CircleCheck,
     Clipboard,
@@ -139,83 +140,92 @@ export default function EditorHeader({
 
             <div className="toolbar">
                 {isRunning ? (
-                    <button
-                        type="button"
-                        className="toolbar-button toolbar-stop"
-                        onClick={onStop}
-                        title={t('header.stopTooltip')}
-                    >
-                        <Square size={11} fill="currentColor" />
-                        <span>{t('header.stop')}</span>
-                    </button>
+                    <Tooltip label={t('header.stopTooltip')}>
+                        <button
+                            type="button"
+                            className="toolbar-button toolbar-stop"
+                            onClick={onStop}
+                            aria-label={t('header.stop')}
+                        >
+                            <Square size={11} fill="currentColor" />
+                            <span>{t('header.stop')}</span>
+                        </button>
+                    </Tooltip>
                 ) : (
-                    <button
-                        type="button"
-                        className="toolbar-button toolbar-run"
-                        onClick={onRun}
-                        title={t('header.runTooltip')}
-                    >
-                        <Play size={11} fill="currentColor" />
-                        <span>{t('header.run')}</span>
-                    </button>
+                    <Tooltip label={t('header.runTooltip')}>
+                        <button
+                            type="button"
+                            className="toolbar-button toolbar-run"
+                            onClick={onRun}
+                            aria-label={t('header.run')}
+                        >
+                            <Play size={11} fill="currentColor" />
+                            <span>{t('header.run')}</span>
+                        </button>
+                    </Tooltip>
                 )}
 
                 <div className="toolbar-sep" />
 
-                <button
-                    type="button"
-                    className="toolbar-icon-button"
-                    onClick={onSave}
-                    title={t('header.saveTooltip')}
-                    aria-label={t('header.save')}
-                >
-                    <Save size={14} />
-                </button>
-
-                <button
-                    type="button"
-                    className="toolbar-icon-button"
-                    onClick={onValidate}
-                    title={t('header.validateTooltip')}
-                    aria-label={t('header.validate')}
-                >
-                    <CircleCheck size={14} />
-                </button>
-
-                <button
-                    type="button"
-                    className="toolbar-icon-button"
-                    onClick={onAutoLayout}
-                    title={t('header.autoLayout')}
-                    aria-label={t('header.autoLayout')}
-                >
-                    <LayoutGrid size={14} />
-                </button>
-
-                <button
-                    type="button"
-                    className={'toolbar-icon-button' + (profileMode ? ' is-active' : '')}
-                    onClick={onToggleProfile}
-                    title={t('header.profileTooltip')}
-                    aria-label={t('header.profile')}
-                    aria-pressed={profileMode}
-                >
-                    <Gauge size={14} />
-                </button>
-
-                <div className="toolbar-more" ref={moreRef}>
+                <Tooltip label={t('header.saveTooltip')}>
                     <button
                         type="button"
-                        className={
-                            'toolbar-icon-button' + (moreOpen ? ' is-active' : '')
-                        }
-                        onClick={() => setMoreOpen(o => !o)}
-                        title={t('header.moreTooltip')}
-                        aria-label={t('header.more')}
-                        aria-expanded={moreOpen}
+                        className="toolbar-icon-button"
+                        onClick={onSave}
+                        aria-label={t('header.save')}
                     >
-                        <MoreHorizontal size={14} />
+                        <Save size={14} />
                     </button>
+                </Tooltip>
+
+                <Tooltip label={t('header.validateTooltip')}>
+                    <button
+                        type="button"
+                        className="toolbar-icon-button"
+                        onClick={onValidate}
+                        aria-label={t('header.validate')}
+                    >
+                        <CircleCheck size={14} />
+                    </button>
+                </Tooltip>
+
+                <Tooltip label={t('header.autoLayout')}>
+                    <button
+                        type="button"
+                        className="toolbar-icon-button"
+                        onClick={onAutoLayout}
+                        aria-label={t('header.autoLayout')}
+                    >
+                        <LayoutGrid size={14} />
+                    </button>
+                </Tooltip>
+
+                <Tooltip label={t('header.profileTooltip')}>
+                    <button
+                        type="button"
+                        className={'toolbar-icon-button' + (profileMode ? ' is-active' : '')}
+                        onClick={onToggleProfile}
+                        aria-label={t('header.profile')}
+                        aria-pressed={profileMode}
+                    >
+                        <Gauge size={14} />
+                    </button>
+                </Tooltip>
+
+                <div className="toolbar-more" ref={moreRef}>
+                    <Tooltip label={t('header.moreTooltip')}>
+                        <button
+                            type="button"
+                            className={
+                                'toolbar-icon-button' + (moreOpen ? ' is-active' : '')
+                            }
+                            onClick={() => setMoreOpen(o => !o)}
+                            aria-label={t('header.more')}
+                            aria-expanded={moreOpen}
+                        >
+                            <MoreHorizontal size={14} />
+                        </button>
+                    </Tooltip>
                     {moreOpen ? (
                         <div className="toolbar-more-menu" role="menu">
                             <button

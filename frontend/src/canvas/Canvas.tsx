@@ -105,6 +105,8 @@ type Props = {
     nodeAutodetectAvailable: (nodeId: string) => boolean;
     /** Active pipeline id - used to remember pan/zoom per pipeline. */
     pipelineId?: string | null;
+    /** Bumped by the parent after an auto-layout to trigger a fit-to-view. */
+    fitSignal?: number;
 };
 
 function CanvasInner({
@@ -123,6 +125,7 @@ function CanvasInner({
     onEdgeEdit,
     nodeAutodetectAvailable,
     pipelineId,
+    fitSignal,
 }: Props) {
     const { screenToFlowPosition, setViewport, fitView, getNodes } = useReactFlow();
     const { theme } = useTheme();
@@ -162,6 +165,20 @@ function CanvasInner({
         });
         return () => cancelAnimationFrame(raf);
     }, [pipelineId, setViewport, fitView]);
+
+    // Fit the viewport after an auto-layout. The parent bumps fitSignal; skip
+    // the initial mount so this only reacts to explicit layout requests.
+    const fitSignalMounted = useRef(false);
+    useEffect(() => {
+        if (!fitSignalMounted.current) {
+            fitSignalMounted.current = true;
+            return;
+        }
+        const raf = requestAnimationFrame(() => {
+            fitView({ padding: 0.2, duration: 300 });
+        });
+        return () => cancelAnimationFrame(raf);
+    }, [fitSignal, fitView]);
 
     const handleMoveEnd = useCallback(
         (_: unknown, vp: { x: number; y: number; zoom: number }) => {
