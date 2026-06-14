@@ -3302,6 +3302,18 @@ function synthNumericTransform(comp: ComponentDef): ComponentManifest {
             },
         ], 'upstream');
     }
+    if (comp.id === 'xf.kfold') {
+        return base(comp, [
+            {
+                label: 'K-Fold Assign',
+                fields: [
+                    { key: 'folds', label: 'Folds', kind: 'integer', defaultValue: 5 },
+                    { key: 'seed', label: 'Seed', kind: 'integer', defaultValue: 42 },
+                    { key: 'outputColumn', label: 'Output column', kind: 'text', placeholder: 'fold' },
+                ],
+            },
+        ], 'upstream');
+    }
     if (comp.id === 'xf.num.bucketize') {
         return base(comp, [
             {

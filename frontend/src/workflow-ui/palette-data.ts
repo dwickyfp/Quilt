@@ -387,6 +387,7 @@ export const PALETTE: Category[] = [
                     xf('impute', 'Impute Missing', 'available', 'Fill NULLs in a numeric column with mean (default) or median over the whole input. Distribution-based fill for ML preprocessing. Props: column, strategy (mean|median).'),
                     xf('stat.summary', 'Descriptive Summary', 'available', 'One row per selected numeric column with count / mean / stddev / min / median / max. Props: columns (array).'),
                     xf('stat.correlate', 'Pairwise Correlation', 'available', 'Pearson r for every unique pair of selected numeric columns (col_x / col_y / correlation). Props: columns (array, >=2).'),
+                    xf('kfold', 'K-Fold Assign', 'available', 'Stamp each row with a stable fold id 0..folds-1 (seeded hash, reproducible). The CV primitive: pair with Filter (fold != i = train, fold = i = test). Props: folds (>=2, default 5), seed, outputColumn.'),
                 ],
             },
             {

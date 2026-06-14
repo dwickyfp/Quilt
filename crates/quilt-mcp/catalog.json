@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 360,
+  "componentCount": 361,
   "components": [
     {
       "id": "src.csv",
@@ -20193,6 +20193,89 @@
                 "label": "Columns",
                 "kind": "columns",
                 "required": true
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "xf.kfold",
+      "label": "K-Fold Assign",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "Stamp each row with a stable fold id 0..folds-1 (seeded hash, reproducible). The CV primitive: pair with Filter (fold != i = train, fold = i = test). Props: folds (>=2, default 5), seed, outputColumn.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "xf.kfold",
+        "kind": "transform",
+        "label": "K-Fold Assign",
+        "description": "Stamp each row with a stable fold id 0..folds-1 (seeded hash, reproducible). The CV primitive: pair with Filter (fold != i = train, fold = i = test). Props: folds (>=2, default 5), seed, outputColumn.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "K-Fold Assign",
+            "fields": [
+              {
+                "key": "folds",
+                "label": "Folds",
+                "kind": "integer",
+                "defaultValue": 5
+              },
+              {
+                "key": "seed",
+                "label": "Seed",
+                "kind": "integer",
+                "defaultValue": 42
+              },
+              {
+                "key": "outputColumn",
+                "label": "Output column",
+                "kind": "text",
+                "placeholder": "fold"
               }
             ]
           }

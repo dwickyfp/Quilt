@@ -160,6 +160,7 @@ pub(crate) fn build_view_sql(
         "xf.impute" => build_impute(inputs, props),
         "xf.stat.summary" => build_stat_summary(inputs, props),
         "xf.stat.correlate" => build_stat_correlate(inputs, props),
+        "xf.kfold" => build_kfold(inputs, props),
         "xf.num.clamp" => build_clamp(inputs, props),
         "xf.num.sign" => build_sign(inputs, props),
         "xf.rank.filter" => build_rank_filter(inputs, props),
@@ -3976,7 +3977,31 @@ pub(crate) fn build_stat_correlate(inputs: &NodeInputs, props: &JsonValue) -> Re
     Ok(selects.join("\nUNION ALL\n"))
 }
 
-/// Literal Replace: DuckDB replace(string, search, replacement).
+/// K-Fold Assign: stamp each row with a stable fold id in 0..folds-1 via
+/// a seeded hash of its row position (same deterministic idiom as
+/// ml.partition, so it's reproducible without relying on DuckDB RNG
+/// state). This is the fold-assignment PRIMITIVE, not an automated CV
+/// loop: pair it with xf.filter (fold != i = train, fold = i = test) to
+/// build reproducible cross-validation folds by hand.
+pub(crate) fn build_kfold(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("xf.kfold"))?;
+    let folds = props
+        .get("folds")
+        .and_then(|v| v.as_u64())
+        .filter(|k| *k >= 2)
+        .unwrap_or(5);
+    let seed = props.get("seed").and_then(|v| v.as_i64()).unwrap_or(42);
+    let output = string_prop(props, "outputColumn")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "fold".to_string());
+    Ok(format!(
+        "SELECT *, CAST(hash(CAST(row_number() OVER () AS VARCHAR) || '#{seed}') % {folds} AS INTEGER) AS {out} FROM {up}",
+        seed = seed,
+        folds = folds,
+        out = quote_ident(&output),
+        up = quote_ident(upstream)
+    ))
+}
 /// Different from xf.regex - this is a literal substring swap, no
 /// regex metacharacters.
 pub(crate) fn build_text_replace(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
