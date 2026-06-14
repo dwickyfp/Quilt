@@ -163,6 +163,7 @@ pub enum RuntimeSpec {
     MlPredict(MlPredictSpec),
     MlScore(MlScoreSpec),
     MlCrossval(MlCrossvalSpec),
+    MlFeatureSelect(MlFeatureSelectSpec),
     StatTest(StatTestSpec),
     ModelWriter(ModelWriterSpec),
     OnnxReader(OnnxReaderSpec),
@@ -582,6 +583,7 @@ fn build_stage(
     let mut ml_predict: Option<MlPredictSpec> = None;
     let mut ml_score: Option<MlScoreSpec> = None;
     let mut ml_crossval: Option<MlCrossvalSpec> = None;
+    let mut ml_featureselect: Option<MlFeatureSelectSpec> = None;
     let mut stat_test: Option<StatTestSpec> = None;
     let mut model_writer: Option<ModelWriterSpec> = None;
     let mut onnx_reader: Option<OnnxReaderSpec> = None;
@@ -3157,6 +3159,37 @@ fn build_stage(
                 .unwrap_or_else(|| "classification".into()),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "ml.featureselect" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let target_column = string_prop(&props, "targetColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: targetColumn required", component_id)))?;
+        let algorithm = string_prop(&props, "algorithm")
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "forest".into());
+        ml_featureselect = Some(MlFeatureSelectSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            algorithm,
+            target_column,
+            feature_columns: columns_list(&props, "featureColumns"),
+            max_depth: props.get("maxDepth").and_then(|v| v.as_u64()).unwrap_or(10) as usize,
+            n_trees: props.get("nTrees").and_then(|v| v.as_u64()).unwrap_or(100) as usize,
+            k: props.get("k").and_then(|v| v.as_u64()).unwrap_or(5) as usize,
+            max_iter: props.get("maxIter").and_then(|v| v.as_u64()).unwrap_or(100) as usize,
+            alpha: props.get("alpha").and_then(|v| v.as_f64()).unwrap_or(1.0),
+            l1_ratio: props.get("l1Ratio").and_then(|v| v.as_f64()).unwrap_or(0.5),
+            learning_rate: props.get("learningRate").and_then(|v| v.as_f64()).unwrap_or(0.1),
+            folds: props.get("folds").and_then(|v| v.as_u64()).unwrap_or(5).max(2) as usize,
+            seed: props.get("seed").and_then(|v| v.as_u64()).unwrap_or(42),
+            max_features: props.get("maxFeatures").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
+            task: string_prop(&props, "task")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "classification".into()),
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "xf.stat.test" {
         let from_view = inputs
             .main()
@@ -3758,6 +3791,7 @@ fn build_stage(
         .or_else(|| ml_predict.map(RuntimeSpec::MlPredict))
         .or_else(|| ml_score.map(RuntimeSpec::MlScore))
         .or_else(|| ml_crossval.map(RuntimeSpec::MlCrossval))
+        .or_else(|| ml_featureselect.map(RuntimeSpec::MlFeatureSelect))
         .or_else(|| stat_test.map(RuntimeSpec::StatTest))
         .or_else(|| model_writer.map(RuntimeSpec::ModelWriter))
         .or_else(|| onnx_reader.map(RuntimeSpec::OnnxReader))

@@ -1012,6 +1012,9 @@ impl DuckdbEngine {
                     Some(RuntimeSpec::MlPredict(spec)) => self.run_ml_predict(&db_path, spec),
                     Some(RuntimeSpec::MlScore(spec)) => self.run_ml_score(&db_path, spec),
                     Some(RuntimeSpec::MlCrossval(spec)) => self.run_ml_crossval(&db_path, spec),
+                    Some(RuntimeSpec::MlFeatureSelect(spec)) => {
+                        self.run_ml_featureselect(&db_path, spec)
+                    }
                     Some(RuntimeSpec::StatTest(spec)) => self.run_stat_test(&db_path, spec),
                     Some(RuntimeSpec::ModelWriter(spec)) => self.run_model_writer(&db_path, spec),
                     Some(RuntimeSpec::OnnxReader(spec)) => self.run_onnx_reader(&db_path, spec),

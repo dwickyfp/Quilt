@@ -781,59 +781,50 @@ impl DuckdbEngine {
         ))
     }
 
-    /// ml.crossval: automated k-fold cross-validation. Trains the chosen
-    /// learner `folds` times — each time holding out one fold for testing — by
-    /// reusing the existing run_ml_learner / run_ml_predict code paths on
-    /// per-fold temp tables. Emits a metrics table: one score row per fold plus
-    /// a mean row (with std). No new model logic — the 12 learners are exercised
-    /// through their already-verified paths.
-    pub(crate) fn run_ml_crossval(
+    /// Run k-fold CV for one feature subset and return the per-fold
+    /// (score, test_row_count). Shared by ml.crossval and ml.featureselect so
+    /// both exercise the identical, already-verified learner/predictor paths.
+    /// `node_id` only names the transient per-fold temp tables.
+    #[allow(clippy::too_many_arguments)]
+    fn cv_fold_scores(
         &self,
         db: &Path,
-        spec: &plan::MlCrossvalSpec,
-    ) -> Result<String, EngineError> {
+        node_id: &str,
+        rows: &[JsonValue],
+        algorithm: &str,
+        target_column: &str,
+        feature_columns: &[String],
+        max_depth: usize,
+        n_trees: usize,
+        k: usize,
+        max_iter: usize,
+        alpha: f64,
+        l1_ratio: f64,
+        learning_rate: f64,
+        folds: usize,
+        seed: u64,
+        regression: bool,
+    ) -> Result<Vec<(f64, usize)>, EngineError> {
         use std::hash::{Hash, Hasher};
-        self.check_cancelled()?;
-        let rows = self.run_rows(
-            Some(db),
-            &format!("SELECT * FROM {};", plan::quote_ident(&spec.from_view)),
-        )?;
-        if rows.is_empty() {
-            return Err(EngineError::Query(format!(
-                "ml.crossval: no rows from {}",
-                spec.from_view
-            )));
-        }
-        let folds = spec.folds.max(2);
-        if rows.len() < folds {
-            return Err(EngineError::Config(format!(
-                "ml.crossval: need at least {} rows for {} folds, got {}",
-                folds,
-                folds,
-                rows.len()
-            )));
-        }
+        let folds = folds.max(2);
 
         // Deterministic fold assignment: hash(seed, row index) % folds. Stable
         // for a given (seed, row order) so runs are reproducible.
         let assign: Vec<usize> = (0..rows.len())
             .map(|i| {
                 let mut h = std::collections::hash_map::DefaultHasher::new();
-                spec.seed.hash(&mut h);
+                seed.hash(&mut h);
                 (i as u64).hash(&mut h);
                 (h.finish() % folds as u64) as usize
             })
             .collect();
 
-        let regression = spec.task == "regression";
-        let train_tbl = format!("{}__cv_train", spec.node_id);
-        let test_tbl = format!("{}__cv_test", spec.node_id);
-        let model_tbl = format!("{}__cv_model", spec.node_id);
-        let pred_tbl = format!("{}__cv_pred", spec.node_id);
-        let metric_name = if regression { "rmse" } else { "accuracy" };
+        let train_tbl = format!("{}__cv_train", node_id);
+        let test_tbl = format!("{}__cv_test", node_id);
+        let model_tbl = format!("{}__cv_model", node_id);
+        let pred_tbl = format!("{}__cv_pred", node_id);
 
-        let mut fold_scores: Vec<f64> = Vec::with_capacity(folds);
-        let mut metrics: Vec<JsonValue> = Vec::new();
+        let mut out: Vec<(f64, usize)> = Vec::with_capacity(folds);
 
         for fold in 0..folds {
             self.check_cancelled()?;
@@ -862,18 +853,18 @@ impl DuckdbEngine {
             let learner_spec = plan::MlLearnerSpec {
                 node_id: model_tbl.clone(),
                 from_view: train_tbl.clone(),
-                algorithm: spec.algorithm.clone(),
-                target_column: spec.target_column.clone(),
-                feature_columns: spec.feature_columns.clone(),
-                max_depth: spec.max_depth,
-                n_trees: spec.n_trees,
-                k: spec.k,
-                max_iter: spec.max_iter,
-                alpha: spec.alpha,
-                l1_ratio: spec.l1_ratio,
+                algorithm: algorithm.to_string(),
+                target_column: target_column.to_string(),
+                feature_columns: feature_columns.to_vec(),
+                max_depth,
+                n_trees,
+                k,
+                max_iter,
+                alpha,
+                l1_ratio,
                 eps: 0.5,
                 min_samples: 5,
-                learning_rate: spec.learning_rate,
+                learning_rate,
             };
             self.run_ml_learner(db, &learner_spec)?;
 
@@ -894,7 +885,7 @@ impl DuckdbEngine {
             let score = if regression {
                 let actual: Vec<f64> = scored
                     .iter()
-                    .map(|r| cell_to_f64(r.get(&spec.target_column)))
+                    .map(|r| cell_to_f64(r.get(target_column)))
                     .collect();
                 let predicted: Vec<f64> = scored
                     .iter()
@@ -915,7 +906,7 @@ impl DuckdbEngine {
                 };
                 let actual: Vec<i64> = scored
                     .iter()
-                    .map(|r| enc(label_of(r.get(&spec.target_column)), &mut labels))
+                    .map(|r| enc(label_of(r.get(target_column)), &mut labels))
                     .collect();
                 let predicted: Vec<i64> = scored
                     .iter()
@@ -923,13 +914,7 @@ impl DuckdbEngine {
                     .collect();
                 smartcore::metrics::accuracy(&actual, &predicted)
             };
-            fold_scores.push(score);
-            metrics.push(json!({
-                "fold": fold,
-                "metric": metric_name,
-                "value": score,
-                "test_rows": test.len(),
-            }));
+            out.push((score, test.len()));
         }
 
         // Best-effort cleanup of the per-fold temp tables.
@@ -940,12 +925,78 @@ impl DuckdbEngine {
                 false,
             );
         }
+        Ok(out)
+    }
 
-        if fold_scores.is_empty() {
+    /// ml.crossval: automated k-fold cross-validation. Trains the chosen
+    /// learner `folds` times — each time holding out one fold for testing — by
+    /// reusing the existing run_ml_learner / run_ml_predict code paths on
+    /// per-fold temp tables. Emits a metrics table: one score row per fold plus
+    /// a mean row (with std). No new model logic — the 12 learners are exercised
+    /// through their already-verified paths.
+    pub(crate) fn run_ml_crossval(
+        &self,
+        db: &Path,
+        spec: &plan::MlCrossvalSpec,
+    ) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+        let rows = self.run_rows(
+            Some(db),
+            &format!("SELECT * FROM {};", plan::quote_ident(&spec.from_view)),
+        )?;
+        if rows.is_empty() {
+            return Err(EngineError::Query(format!(
+                "ml.crossval: no rows from {}",
+                spec.from_view
+            )));
+        }
+        let folds = spec.folds.max(2);
+        if rows.len() < folds {
+            return Err(EngineError::Config(format!(
+                "ml.crossval: need at least {} rows for {} folds, got {}",
+                folds,
+                folds,
+                rows.len()
+            )));
+        }
+
+        let regression = spec.task == "regression";
+        let metric_name = if regression { "rmse" } else { "accuracy" };
+
+        let fold_results = self.cv_fold_scores(
+            db,
+            &spec.node_id,
+            &rows,
+            &spec.algorithm,
+            &spec.target_column,
+            &spec.feature_columns,
+            spec.max_depth,
+            spec.n_trees,
+            spec.k,
+            spec.max_iter,
+            spec.alpha,
+            spec.l1_ratio,
+            spec.learning_rate,
+            folds,
+            spec.seed,
+            regression,
+        )?;
+
+        if fold_results.is_empty() {
             return Err(EngineError::Query(
                 "ml.crossval: no fold produced a score".into(),
             ));
         }
+        let mut metrics: Vec<JsonValue> = Vec::new();
+        for (fold, (score, test_rows)) in fold_results.iter().enumerate() {
+            metrics.push(json!({
+                "fold": fold,
+                "metric": metric_name,
+                "value": score,
+                "test_rows": test_rows,
+            }));
+        }
+        let fold_scores: Vec<f64> = fold_results.iter().map(|(s, _)| *s).collect();
         let nfolds = fold_scores.len();
         let mean = fold_scores.iter().sum::<f64>() / nfolds as f64;
         let var = fold_scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / nfolds as f64;
@@ -960,6 +1011,149 @@ impl DuckdbEngine {
         Ok(format!(
             "ml.crossval ({}, {}): {} folds, mean {}={:.4} -> {}",
             spec.algorithm, spec.task, nfolds, metric_name, mean, spec.node_id
+        ))
+    }
+
+    /// ml.featureselect: greedy forward feature selection driven by k-fold CV.
+    /// Starting from no features, repeatedly adds the candidate that most
+    /// improves the mean CV score (accuracy up / RMSE down), stopping when no
+    /// candidate improves it or the optional cap is reached. Emits a table of
+    /// the selection path: step, added feature, running feature set, cv score.
+    /// Reuses cv_fold_scores so the 12 learners run through verified paths.
+    pub(crate) fn run_ml_featureselect(
+        &self,
+        db: &Path,
+        spec: &plan::MlFeatureSelectSpec,
+    ) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+        let rows = self.run_rows(
+            Some(db),
+            &format!("SELECT * FROM {};", plan::quote_ident(&spec.from_view)),
+        )?;
+        if rows.is_empty() {
+            return Err(EngineError::Query(format!(
+                "ml.featureselect: no rows from {}",
+                spec.from_view
+            )));
+        }
+        let folds = spec.folds.max(2);
+        if rows.len() < folds {
+            return Err(EngineError::Config(format!(
+                "ml.featureselect: need at least {} rows for {} folds, got {}",
+                folds,
+                folds,
+                rows.len()
+            )));
+        }
+
+        // Candidate pool: explicit list, or every column except the target.
+        let mut candidates: Vec<String> = if spec.feature_columns.is_empty() {
+            rows.first()
+                .and_then(|r| r.as_object())
+                .map(|o| {
+                    o.keys()
+                        .filter(|c| *c != &spec.target_column)
+                        .cloned()
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            spec.feature_columns.clone()
+        };
+        if candidates.is_empty() {
+            return Err(EngineError::Config(
+                "ml.featureselect: no candidate feature columns".into(),
+            ));
+        }
+        let regression = spec.task == "regression";
+        let metric_name = if regression { "rmse" } else { "accuracy" };
+        // Lower is better for RMSE; higher is better for accuracy.
+        let better = |a: f64, b: f64| if regression { a < b } else { a > b };
+
+        let max_features = if spec.max_features == 0 {
+            candidates.len()
+        } else {
+            spec.max_features.min(candidates.len())
+        };
+
+        let mean_cv = |me: &Self, feats: &[String]| -> Result<f64, EngineError> {
+            let r = me.cv_fold_scores(
+                db,
+                &spec.node_id,
+                &rows,
+                &spec.algorithm,
+                &spec.target_column,
+                feats,
+                spec.max_depth,
+                spec.n_trees,
+                spec.k,
+                spec.max_iter,
+                spec.alpha,
+                spec.l1_ratio,
+                spec.learning_rate,
+                folds,
+                spec.seed,
+                regression,
+            )?;
+            if r.is_empty() {
+                return Ok(if regression { f64::INFINITY } else { 0.0 });
+            }
+            Ok(r.iter().map(|(s, _)| *s).sum::<f64>() / r.len() as f64)
+        };
+
+        let mut selected: Vec<String> = Vec::new();
+        let mut steps: Vec<JsonValue> = Vec::new();
+        let mut best_so_far = if regression { f64::INFINITY } else { f64::NEG_INFINITY };
+
+        while selected.len() < max_features && !candidates.is_empty() {
+            self.check_cancelled()?;
+            let mut best_cand: Option<(usize, f64)> = None;
+            for (i, cand) in candidates.iter().enumerate() {
+                let mut trial = selected.clone();
+                trial.push(cand.clone());
+                let score = mean_cv(self, &trial)?;
+                let take = match best_cand {
+                    None => true,
+                    Some((_, bs)) => better(score, bs),
+                };
+                if take {
+                    best_cand = Some((i, score));
+                }
+            }
+            let (idx, score) = match best_cand {
+                Some(v) => v,
+                None => break,
+            };
+            // Stop if the best candidate doesn't improve the running score.
+            if !better(score, best_so_far) {
+                break;
+            }
+            best_so_far = score;
+            let added = candidates.remove(idx);
+            selected.push(added.clone());
+            steps.push(json!({
+                "step": selected.len(),
+                "added_feature": added,
+                "features": selected.join(","),
+                "n_features": selected.len(),
+                "metric": metric_name,
+                "cv_score": score,
+            }));
+        }
+
+        if steps.is_empty() {
+            return Err(EngineError::Query(
+                "ml.featureselect: no feature improved the score".into(),
+            ));
+        }
+        materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &steps)?;
+        Ok(format!(
+            "ml.featureselect ({}, {}): selected {} of {} features -> {}",
+            spec.algorithm,
+            spec.task,
+            selected.len(),
+            selected.len() + candidates.len(),
+            spec.node_id
         ))
     }
 

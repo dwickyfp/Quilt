@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 371,
+  "componentCount": 372,
   "components": [
     {
       "id": "src.csv",
@@ -43851,6 +43851,208 @@
                     "value": "regression"
                   }
                 ]
+              },
+              {
+                "key": "folds",
+                "label": "Folds (k)",
+                "kind": "integer",
+                "defaultValue": 5,
+                "description": "Number of cross-validation folds (min 2)."
+              },
+              {
+                "key": "seed",
+                "label": "Seed",
+                "kind": "integer",
+                "defaultValue": 42,
+                "description": "Deterministic fold-assignment seed."
+              },
+              {
+                "key": "maxDepth",
+                "label": "Max depth (tree/forest/xgb)",
+                "kind": "integer",
+                "defaultValue": 10
+              },
+              {
+                "key": "nTrees",
+                "label": "Trees / boosting iterations (forest/xgb)",
+                "kind": "integer",
+                "defaultValue": 100
+              },
+              {
+                "key": "k",
+                "label": "Neighbors k (knn)",
+                "kind": "integer",
+                "defaultValue": 5
+              },
+              {
+                "key": "alpha",
+                "label": "Alpha (ridge/lasso/elasticnet)",
+                "kind": "number",
+                "defaultValue": 1
+              },
+              {
+                "key": "l1Ratio",
+                "label": "L1 ratio (elasticnet)",
+                "kind": "number",
+                "defaultValue": 0.5
+              },
+              {
+                "key": "learningRate",
+                "label": "Learning rate (xgb)",
+                "kind": "number",
+                "defaultValue": 0.1
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.featureselect",
+      "label": "Feature Selector",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Greedy forward feature selection driven by k-fold CV. Starting from no features, repeatedly adds the candidate that most improves the mean CV score (accuracy up / RMSE down), stopping when none improves it or maxFeatures is reached. Emits the selection path: step, added feature, running feature set, cv score. Props: algorithm, targetColumn, featureColumns (candidate pool; blank = all other columns), folds, seed, maxFeatures (0 = no cap), task, plus learner hyperparams. Wire the data into main.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.featureselect",
+        "kind": "ml",
+        "label": "Feature Selector",
+        "description": "Greedy forward feature selection driven by k-fold CV. Starting from no features, repeatedly adds the candidate that most improves the mean CV score (accuracy up / RMSE down), stopping when none improves it or maxFeatures is reached. Emits the selection path: step, added feature, running feature set, cv score. Props: algorithm, targetColumn, featureColumns (candidate pool; blank = all other columns), folds, seed, maxFeatures (0 = no cap), task, plus learner hyperparams. Wire the data into main.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Feature Selection",
+            "fields": [
+              {
+                "key": "algorithm",
+                "label": "Algorithm",
+                "kind": "select",
+                "defaultValue": "forest",
+                "options": [
+                  {
+                    "label": "Linear Regression",
+                    "value": "linreg"
+                  },
+                  {
+                    "label": "Logistic Regression",
+                    "value": "logreg"
+                  },
+                  {
+                    "label": "Decision Tree",
+                    "value": "tree"
+                  },
+                  {
+                    "label": "Random Forest",
+                    "value": "forest"
+                  },
+                  {
+                    "label": "KNN",
+                    "value": "knn"
+                  },
+                  {
+                    "label": "Decision Tree (reg)",
+                    "value": "tree.reg"
+                  },
+                  {
+                    "label": "Random Forest (reg)",
+                    "value": "forest.reg"
+                  },
+                  {
+                    "label": "KNN (reg)",
+                    "value": "knn.reg"
+                  },
+                  {
+                    "label": "Ridge",
+                    "value": "ridge"
+                  },
+                  {
+                    "label": "Lasso",
+                    "value": "lasso"
+                  },
+                  {
+                    "label": "ElasticNet",
+                    "value": "elasticnet"
+                  },
+                  {
+                    "label": "Naive Bayes",
+                    "value": "nb.gaussian"
+                  },
+                  {
+                    "label": "XGBoost (classifier)",
+                    "value": "xgb"
+                  },
+                  {
+                    "label": "XGBoost (regressor)",
+                    "value": "xgb.reg"
+                  }
+                ]
+              },
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "featureColumns",
+                "label": "Candidate features",
+                "kind": "columns",
+                "description": "Candidate pool to select from. Leave empty to consider all other columns."
+              },
+              {
+                "key": "task",
+                "label": "Task",
+                "kind": "select",
+                "defaultValue": "classification",
+                "options": [
+                  {
+                    "label": "Classification (accuracy)",
+                    "value": "classification"
+                  },
+                  {
+                    "label": "Regression (RMSE)",
+                    "value": "regression"
+                  }
+                ]
+              },
+              {
+                "key": "maxFeatures",
+                "label": "Max features (0 = no cap)",
+                "kind": "integer",
+                "defaultValue": 0,
+                "description": "Stop after selecting this many features. 0 selects until no candidate improves the score."
               },
               {
                 "key": "folds",

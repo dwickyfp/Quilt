@@ -1317,6 +1317,33 @@ pub struct MlCrossvalSpec {
     pub task: String,
 }
 
+/// ml.featureselect: greedy forward feature selection driven by k-fold CV.
+/// Adds the candidate that most improves the mean CV score until none helps or
+/// `max_features` is reached. Emits the selection path as a table. Reuses the
+/// same learner/CV plumbing as ml.crossval.
+#[derive(Debug, Clone)]
+pub struct MlFeatureSelectSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub algorithm: String,
+    pub target_column: String,
+    /// Candidate columns; empty = every column except the target.
+    pub feature_columns: Vec<String>,
+    pub max_depth: usize,
+    pub n_trees: usize,
+    pub k: usize,
+    pub max_iter: usize,
+    pub alpha: f64,
+    pub l1_ratio: f64,
+    pub learning_rate: f64,
+    pub folds: usize,
+    pub seed: u64,
+    /// Stop after this many selected features; 0 = no cap.
+    pub max_features: usize,
+    /// "classification" or "regression".
+    pub task: String,
+}
+
 /// xf.stat.test: run a statistical hypothesis test over the upstream rows and
 /// emit a small (metric, value) table. `test` selects ttest / anova / chi2.
 #[derive(Debug, Clone)]
