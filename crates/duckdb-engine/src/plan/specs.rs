@@ -16,7 +16,8 @@ use serde::Deserialize;
 pub struct VizSpec {
     /// "bar" | "line" | "scatter" | "histogram".
     pub chart: String,
-    /// Dimension column (x axis).
+    /// Dimension column (x axis). Empty/absent for splom (uses `columns`).
+    #[serde(default)]
     pub x: String,
     /// Measure column. None for histogram (-> COUNT(*)).
     #[serde(default)]
@@ -27,6 +28,10 @@ pub struct VizSpec {
     /// Optional group-by series column (a second breakdown dimension).
     #[serde(default)]
     pub series: Option<String>,
+    /// Numeric columns for a scatter-plot matrix (splom). Each pair of columns
+    /// becomes one cell of the N x N grid. Ignored by other chart kinds.
+    #[serde(default)]
+    pub columns: Option<Vec<String>>,
     /// Row cap on the aggregated result. Clamped to a sane max in the planner.
     #[serde(default = "default_viz_limit")]
     pub limit: usize,

@@ -4678,6 +4678,7 @@ function synthViz(comp: ComponentDef): ComponentManifest {
     const isHeatmap = comp.id === 'viz.heatmap';
     const isPie = comp.id === 'viz.pie' || comp.id === 'viz.donut';
     const isCurve = comp.id === 'viz.roc' || comp.id === 'viz.pr';
+    const isSplom = comp.id === 'viz.splom';
 
     const aggField: Field = {
         key: 'agg',
@@ -4718,6 +4719,12 @@ function synthViz(comp: ComponentDef): ComponentManifest {
             { key: 'x', label: 'Score (continuous)', kind: 'column', required: true },
             { key: 'y', label: 'Label', kind: 'column', required: true },
             { key: 'series', label: 'Positive class value', kind: 'text', placeholder: '1', description: 'The label value treated as the positive class (default "1").' },
+        ];
+    } else if (isSplom) {
+        // Scatter matrix: 2+ numeric columns + optional series for coloring.
+        fields = [
+            { key: 'columns', label: 'Columns (2+)', kind: 'columns', required: true, description: 'Numeric columns; each pair becomes one scatter cell in the N x N grid.' },
+            { key: 'series', label: 'Series (optional color)', kind: 'column' },
         ];
     } else {
         // bar / line / scatter: dimension + measure + agg + optional series.

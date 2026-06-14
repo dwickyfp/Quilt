@@ -142,3 +142,42 @@ describe('buildVizOption — ROC / PR', () => {
         expect(s[0].data).toEqual([[0.5, 0.9], [1, 0.6]]);
     });
 });
+
+describe('buildVizOption — scatter matrix (splom)', () => {
+    it('builds an N x N grid from the column keys', () => {
+        const rows = [
+            { a: 1, b: 2, c: 3 },
+            { a: 4, b: 5, c: 6 },
+        ];
+        const o = buildVizOption(rows, 'splom');
+        // 3 columns -> 9 grid cells, 9 axes each, 9 scatter series (no group).
+        expect((o.grid as unknown[]).length).toBe(9);
+        expect((o.xAxis as unknown[]).length).toBe(9);
+        expect((o.series as unknown[]).length).toBe(9);
+    });
+
+    it('first cell maps col0-on-x, col0-on-y point pairs', () => {
+        const rows = [{ a: 1, b: 10 }, { a: 2, b: 20 }];
+        const o = buildVizOption(rows, 'splom');
+        const s = o.series as Record<string, unknown>[];
+        // 2 cols -> 4 cells. Cell 0 = (a,a): both axes are column a.
+        expect(s[0].data).toEqual([[1, 1], [2, 2]]);
+        // Cell 1 = (b on x, a on y).
+        expect(s[1].data).toEqual([[10, 1], [20, 2]]);
+    });
+
+    it('splits into one series per group per cell when series present', () => {
+        const rows = [
+            { a: 1, b: 2, series: 'x' },
+            { a: 3, b: 4, series: 'y' },
+        ];
+        const o = buildVizOption(rows, 'splom');
+        // 2 data cols (a,b) -> 4 cells x 2 groups = 8 series.
+        expect((o.series as unknown[]).length).toBe(8);
+    });
+
+    it('returns empty structure when fewer than 2 columns', () => {
+        const o = buildVizOption([{ a: 1 }], 'splom');
+        expect((o.series as unknown[]).length).toBe(0);
+    });
+});

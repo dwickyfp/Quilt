@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 367,
+  "componentCount": 368,
   "components": [
     {
       "id": "src.csv",
@@ -34955,6 +34955,66 @@
                 "kind": "text",
                 "placeholder": "1",
                 "description": "The label value treated as the positive class (default \"1\")."
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.splom",
+      "label": "Scatter Matrix",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Pairwise scatter plots of 2+ numeric columns in an N x N grid (SPLOM); optional series column colors the points",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.splom",
+        "kind": "viz",
+        "label": "Scatter Matrix",
+        "description": "Pairwise scatter plots of 2+ numeric columns in an N x N grid (SPLOM); optional series column colors the points",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "columns",
+                "label": "Columns (2+)",
+                "kind": "columns",
+                "required": true,
+                "description": "Numeric columns; each pair becomes one scatter cell in the N x N grid."
+              },
+              {
+                "key": "series",
+                "label": "Series (optional color)",
+                "kind": "column"
               },
               {
                 "key": "limit",

@@ -3207,7 +3207,7 @@ fn build_stage(
         let suffix = component_id.strip_prefix("viz.").unwrap_or("");
         let chart = if suffix.is_empty() { spec.chart.trim() } else { suffix };
         let x = spec.x.trim();
-        if x.is_empty() {
+        if x.is_empty() && chart != "splom" {
             return Err(EngineError::Config(format!(
                 "{}: x (dimension column) required",
                 component_id
@@ -3371,6 +3371,44 @@ fn build_stage(
                 pos = pos,
                 from = qfrom,
                 rates = rates,
+                n = limit
+            )
+        } else if chart == "splom" {
+            // Scatter-plot matrix: emit the raw selected numeric columns (plus
+            // an optional series label). The frontend builds the N x N grid of
+            // pairwise scatter cells. We just project + cap rows here.
+            let cols = spec
+                .columns
+                .as_ref()
+                .map(|c| c.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).collect::<Vec<_>>())
+                .unwrap_or_default();
+            if cols.len() < 2 {
+                return Err(EngineError::Config(format!(
+                    "{}: splom needs at least 2 columns",
+                    component_id
+                )));
+            }
+            let series = spec
+                .series
+                .as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty());
+            // Project each chosen column under its own name (quoted), plus the
+            // optional series column as "series".
+            let mut select_cols: Vec<String> = cols
+                .iter()
+                .map(|c| {
+                    let q = quote_ident(c);
+                    format!("{q} AS {q}")
+                })
+                .collect();
+            if let Some(s) = series {
+                select_cols.push(format!("{s} AS \"series\"", s = quote_ident(s)));
+            }
+            format!(
+                "SELECT {cols} FROM {from} LIMIT {n}",
+                cols = select_cols.join(", "),
+                from = qfrom,
                 n = limit
             )
         } else {

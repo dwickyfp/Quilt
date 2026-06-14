@@ -295,6 +295,96 @@ function buildRoc(rows: VizRow[], chart: string): VizOption {
 }
 
 /**
+ * Scatter-plot matrix (SPLOM). The engine emits the raw selected columns (plus
+ * an optional `series` label). We build an N x N grid of ECharts grids, one
+ * scatter series per (col_i on x, col_j on y) cell. Diagonal cells (i === j)
+ * are left as axis references showing the variable name.
+ */
+function buildSplom(rows: VizRow[]): VizOption {
+    // Column keys = every key in the first row except the reserved series label.
+    const first = rows[0] ?? {};
+    const cols = Object.keys(first).filter(k => k !== 'series');
+    const n = cols.length;
+    if (n < 2) {
+        return { series: [], grid: [], xAxis: [], yAxis: [] };
+    }
+    const hasSeries = rows.some(r => r.series !== undefined && r.series !== null);
+    const seriesNames = hasSeries
+        ? [...new Set(rows.map(r => toLabel(r.series)))]
+        : [''];
+
+    const grids: Record<string, unknown>[] = [];
+    const xAxes: Record<string, unknown>[] = [];
+    const yAxes: Record<string, unknown>[] = [];
+    const series: Record<string, unknown>[] = [];
+
+    // Layout: equal cells with small gaps, leaving a margin for axis labels.
+    const margin = 6; // percent
+    const cell = (100 - margin * 2) / n;
+
+    let gridIdx = 0;
+    for (let row = 0; row < n; row++) {
+        for (let col = 0; col < n; col++) {
+            const left = margin + col * cell;
+            const top = margin + row * cell;
+            grids.push({
+                left: `${left + 1}%`,
+                top: `${top + 1}%`,
+                width: `${cell - 2}%`,
+                height: `${cell - 2}%`,
+            });
+            // Bottom row shows x label; left column shows y label.
+            xAxes.push({
+                gridIndex: gridIdx,
+                type: 'value',
+                scale: true,
+                name: row === n - 1 ? cols[col] : '',
+                nameLocation: 'middle',
+                nameGap: 18,
+                axisLabel: { show: row === n - 1, fontSize: 9 },
+                splitLine: { show: false },
+            });
+            yAxes.push({
+                gridIndex: gridIdx,
+                type: 'value',
+                scale: true,
+                name: col === 0 ? cols[row] : '',
+                nameLocation: 'middle',
+                nameGap: 28,
+                axisLabel: { show: col === 0, fontSize: 9 },
+                splitLine: { show: false },
+            });
+
+            const xKey = cols[col];
+            const yKey = cols[row];
+            // One scatter series per group (or a single series when no group).
+            seriesNames.forEach((sName, si) => {
+                const data = rows
+                    .filter(r => !hasSeries || toLabel(r.series) === sName)
+                    .map(r => [toNumber(r[xKey]), toNumber(r[yKey])]);
+                series.push({
+                    type: 'scatter',
+                    xAxisIndex: gridIdx,
+                    yAxisIndex: gridIdx,
+                    symbolSize: 4,
+                    data,
+                    itemStyle: { color: PALETTE[si % PALETTE.length], opacity: 0.6 },
+                });
+            });
+            gridIdx++;
+        }
+    }
+    return {
+        tooltip: { trigger: 'item' },
+        legend: hasSeries ? { show: true, top: 0, data: seriesNames, textStyle: { color: '#8b949e' } } : { show: false },
+        grid: grids,
+        xAxis: xAxes,
+        yAxis: yAxes,
+        series,
+    };
+}
+
+/**
  * Dispatch by chart type. Returns a plain ECharts option object.
  */
 export function buildVizOption(rows: VizRow[], chart: string): VizOption {
@@ -311,6 +401,8 @@ export function buildVizOption(rows: VizRow[], chart: string): VizOption {
         case 'roc':
         case 'pr':
             return buildRoc(rows, chart);
+        case 'splom':
+            return buildSplom(rows);
         default:
             // bar / line / histogram
             return buildCategorical(rows, chart);
