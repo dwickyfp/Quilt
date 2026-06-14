@@ -4910,7 +4910,7 @@ function synthMl(comp: ComponentDef): ComponentManifest {
             kind: 'columns',
             description: 'Predictor columns. Leave empty to use all other numeric columns.',
         });
-        if (id === 'ml.learner.tree' || id === 'ml.learner.forest' || id === 'ml.learner.tree.reg' || id === 'ml.learner.forest.reg') {
+        if (id === 'ml.learner.tree' || id === 'ml.learner.forest' || id === 'ml.learner.tree.reg' || id === 'ml.learner.forest.reg' || id === 'ml.learner.xgb' || id === 'ml.learner.xgb.reg') {
             fields.push({
                 key: 'maxDepth',
                 label: 'Max depth',
@@ -4924,6 +4924,20 @@ function synthMl(comp: ComponentDef): ComponentManifest {
                 label: 'Number of trees',
                 kind: 'integer',
                 defaultValue: 100,
+            });
+        }
+        if (id === 'ml.learner.xgb' || id === 'ml.learner.xgb.reg') {
+            fields.push({
+                key: 'nTrees',
+                label: 'Boosting iterations',
+                kind: 'integer',
+                defaultValue: 100,
+            });
+            fields.push({
+                key: 'learningRate',
+                label: 'Learning rate (shrinkage)',
+                kind: 'number',
+                defaultValue: 0.1,
             });
         }
         if (id === 'ml.learner.knn' || id === 'ml.learner.knn.reg') {

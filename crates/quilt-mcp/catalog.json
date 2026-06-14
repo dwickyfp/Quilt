@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 368,
+  "componentCount": 370,
   "components": [
     {
       "id": "src.csv",
@@ -43384,6 +43384,174 @@
                 "label": "Feature columns",
                 "kind": "columns",
                 "description": "Predictor columns. Leave empty to use all other numeric columns."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.xgb",
+      "label": "Gradient Boosting Classifier",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a gradient-boosted decision tree classifier (binary, gbdt). Props: targetColumn (exactly 2 classes), featureColumns, nTrees (boosting iterations, default 100), maxDepth, learningRate (shrinkage, default 0.1). Outputs a model on the model port; predict appends the predicted class.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.xgb",
+        "kind": "ml",
+        "label": "Gradient Boosting Classifier",
+        "description": "Train a gradient-boosted decision tree classifier (binary, gbdt). Props: targetColumn (exactly 2 classes), featureColumns, nTrees (boosting iterations, default 100), maxDepth, learningRate (shrinkage, default 0.1). Outputs a model on the model port; predict appends the predicted class.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "maxDepth",
+                "label": "Max depth",
+                "kind": "integer",
+                "defaultValue": 10
+              },
+              {
+                "key": "nTrees",
+                "label": "Boosting iterations",
+                "kind": "integer",
+                "defaultValue": 100
+              },
+              {
+                "key": "learningRate",
+                "label": "Learning rate (shrinkage)",
+                "kind": "number",
+                "defaultValue": 0.1
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.xgb.reg",
+      "label": "Gradient Boosting Regressor",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a gradient-boosted decision tree regressor (numeric target, gbdt). Props: targetColumn (numeric), featureColumns, nTrees (boosting iterations, default 100), maxDepth, learningRate (shrinkage, default 0.1). Outputs a model on the model port; predict appends a numeric prediction.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.xgb.reg",
+        "kind": "ml",
+        "label": "Gradient Boosting Regressor",
+        "description": "Train a gradient-boosted decision tree regressor (numeric target, gbdt). Props: targetColumn (numeric), featureColumns, nTrees (boosting iterations, default 100), maxDepth, learningRate (shrinkage, default 0.1). Outputs a model on the model port; predict appends a numeric prediction.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "maxDepth",
+                "label": "Max depth",
+                "kind": "integer",
+                "defaultValue": 10
+              },
+              {
+                "key": "nTrees",
+                "label": "Boosting iterations",
+                "kind": "integer",
+                "defaultValue": 100
+              },
+              {
+                "key": "learningRate",
+                "label": "Learning rate (shrinkage)",
+                "kind": "number",
+                "defaultValue": 0.1
               }
             ]
           }

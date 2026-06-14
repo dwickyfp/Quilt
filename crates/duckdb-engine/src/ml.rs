@@ -39,8 +39,12 @@ use smartcore::ensemble::random_forest_regressor::{
     RandomForestRegressor, RandomForestRegressorParameters,
 };
 use smartcore::tree::decision_tree_regressor::{
-    DecisionTreeRegressor, DecisionTreeRegressorParameters,
-};
+    DecisionTreeRegressor, DecisionTreeRegressorParameters,};
+
+// Gradient-boosted decision trees (pure-Rust, no FFI). gbdt::ValueType is f32.
+use gbdt::config::Config as GbdtConfig;
+use gbdt::decision_tree::{Data as GbdtData, DataVec as GbdtDataVec};
+use gbdt::gradient_boost::GBDT;
 
 /// Column where a learner stashes the serialized model bundle.
 const MODEL_COLUMN: &str = "__quilt_model";
@@ -113,6 +117,18 @@ enum Model {
         labels: Vec<String>,
         model: GaussianNB<f64, u64, Matrix, Vec<u64>>,
     },
+    /// Gradient-boosted trees, binary classification. labels[0] = negative
+    /// class (-1), labels[1] = positive class (+1). predict returns P(+1).
+    Xgb {
+        features: Vec<String>,
+        labels: Vec<String>,
+        model: GBDT,
+    },
+    /// Gradient-boosted trees, regression.
+    XgbReg {
+        features: Vec<String>,
+        model: GBDT,
+    },
 }
 
 impl Model {
@@ -131,7 +147,9 @@ impl Model {
             | Model::Lasso { features, .. }
             | Model::ElasticNet { features, .. }
             | Model::Dbscan { features, .. }
-            | Model::GaussianNb { features, .. } => features,
+            | Model::GaussianNb { features, .. }
+            | Model::Xgb { features, .. }
+            | Model::XgbReg { features, .. } => features,
         }
     }
 
@@ -151,6 +169,8 @@ impl Model {
             Model::ElasticNet { .. } => "elasticnet",
             Model::Dbscan { .. } => "dbscan",
             Model::GaussianNb { .. } => "nb.gaussian",
+            Model::Xgb { .. } => "xgb",
+            Model::XgbReg { .. } => "xgb.reg",
         }
     }
 
@@ -227,6 +247,38 @@ fn build_matrix(rows: &[JsonValue], features: &[String]) -> Matrix {
         .map(|row| features.iter().map(|c| cell_to_f64(row.get(c))).collect())
         .collect();
     DenseMatrix::from_2d_vec(&data)
+}
+
+/// Build a gbdt training DataVec: feature vec (f32) + label. gbdt's ValueType
+/// is f32, so all values are cast down. `label_fn` maps a row to its target
+/// (e.g. -1.0/+1.0 for binary classification, or the raw numeric for
+/// regression).
+fn build_gbdt_data<F>(rows: &[JsonValue], features: &[String], mut label_fn: F) -> GbdtDataVec
+where
+    F: FnMut(&JsonValue) -> f32,
+{
+    rows.iter()
+        .map(|row| {
+            let feat: Vec<f32> = features
+                .iter()
+                .map(|c| cell_to_f64(row.get(c)) as f32)
+                .collect();
+            GbdtData::new_training_data(feat, 1.0, label_fn(row), None)
+        })
+        .collect()
+}
+
+/// Build a gbdt test DataVec (no labels) for prediction.
+fn build_gbdt_test(rows: &[JsonValue], features: &[String]) -> GbdtDataVec {
+    rows.iter()
+        .map(|row| {
+            let feat: Vec<f32> = features
+                .iter()
+                .map(|c| cell_to_f64(row.get(c)) as f32)
+                .collect();
+            GbdtData::new_test_data(feat, None)
+        })
+        .collect()
 }
 
 /// Encode a target column to integer class labels. Returns (encoded, label
@@ -443,6 +495,55 @@ impl DuckdbEngine {
                     model: m,
                 }
             }
+            "xgb" => {
+                // Binary classification. gbdt LogLikelyhood wants labels -1/+1
+                // and predict returns P(+1). Encode the target to two classes;
+                // labels[0] -> -1 (negative), labels[1] -> +1 (positive).
+                let (encoded, labels) = encode_labels(&rows, &spec.target_column);
+                if labels.len() != 2 {
+                    return Err(EngineError::Config(format!(
+                        "ml.learner.xgb: binary classification needs exactly 2 classes, found {}",
+                        labels.len()
+                    )));
+                }
+                let mut cfg = GbdtConfig::new();
+                cfg.set_feature_size(features.len());
+                cfg.set_max_depth(spec.max_depth.max(1) as u32);
+                cfg.set_iterations(spec.n_trees.max(1));
+                cfg.set_shrinkage(spec.learning_rate as f32);
+                cfg.set_loss("LogLikelyhood");
+                cfg.set_training_optimization_level(0);
+                // class index 1 -> +1.0, class index 0 -> -1.0
+                let idx_by_row: Vec<i64> = encoded;
+                let mut i = 0usize;
+                let mut train = build_gbdt_data(&rows, &features, |_| {
+                    let lbl = if idx_by_row[i] == 1 { 1.0f32 } else { -1.0f32 };
+                    i += 1;
+                    lbl
+                });
+                let mut m = GBDT::new(&cfg);
+                m.fit(&mut train);
+                Model::Xgb {
+                    features,
+                    labels,
+                    model: m,
+                }
+            }
+            "xgb.reg" => {
+                let mut cfg = GbdtConfig::new();
+                cfg.set_feature_size(features.len());
+                cfg.set_max_depth(spec.max_depth.max(1) as u32);
+                cfg.set_iterations(spec.n_trees.max(1));
+                cfg.set_shrinkage(spec.learning_rate as f32);
+                cfg.set_loss("SquaredError");
+                cfg.set_training_optimization_level(0);
+                let mut train = build_gbdt_data(&rows, &features, |row| {
+                    cell_to_f64(row.get(&spec.target_column)) as f32
+                });
+                let mut m = GBDT::new(&cfg);
+                m.fit(&mut train);
+                Model::XgbReg { features, model: m }
+            }
             other => {
                 return Err(EngineError::Config(format!(
                     "ml.learner: unknown algorithm '{}'",
@@ -560,6 +661,25 @@ impl DuckdbEngine {
                 let preds_u64 = model.predict(&x).map_err(fit_failed)?;
                 let preds_i64: Vec<i64> = preds_u64.iter().map(|&v| v as i64).collect();
                 decode_class_preds(preds_i64, labels)
+            }
+            Model::Xgb { model, labels, .. } => {
+                // gbdt predict returns P(+1); threshold at 0.5 -> class index,
+                // then decode to the original label string.
+                let test = build_gbdt_test(&rows, &features);
+                let probs = model.predict(&test);
+                let preds_i64: Vec<i64> = probs
+                    .iter()
+                    .map(|&p| if p > 0.5 { 1 } else { 0 })
+                    .collect();
+                decode_class_preds(preds_i64, labels)
+            }
+            Model::XgbReg { model, .. } => {
+                let test = build_gbdt_test(&rows, &features);
+                model
+                    .predict(&test)
+                    .into_iter()
+                    .map(|v| json!(v))
+                    .collect()
             }
         };
 

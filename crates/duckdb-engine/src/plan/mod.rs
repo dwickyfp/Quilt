@@ -3084,6 +3084,7 @@ fn build_stage(
             l1_ratio: props.get("l1Ratio").and_then(|v| v.as_f64()).unwrap_or(0.5),
             eps: props.get("eps").and_then(|v| v.as_f64()).unwrap_or(0.5),
             min_samples: props.get("minSamples").and_then(|v| v.as_u64()).unwrap_or(5) as usize,
+            learning_rate: props.get("learningRate").and_then(|v| v.as_f64()).unwrap_or(0.1),
         });
         (String::new(), StageKind::View, None)
     } else if component_id == "ml.predict" {

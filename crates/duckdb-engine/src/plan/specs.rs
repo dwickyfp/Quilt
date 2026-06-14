@@ -1255,6 +1255,8 @@ pub struct MlLearnerSpec {
     pub eps: f64,
     /// DBSCAN minimum points to form a dense region.
     pub min_samples: usize,
+    /// Boosting learning rate / shrinkage (gbdt xgb / xgb.reg).
+    pub learning_rate: f64,
 }
 
 /// ml.predict: apply a model trained by an upstream Learner (located via

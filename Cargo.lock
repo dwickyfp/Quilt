@@ -2652,6 +2652,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "gbdt"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbf6f986e660d06328c6febc0c35d620ef7155765cdf95a228ec8929d27532a7"
+dependencies = [
+ "cfg-if",
+ "rand 0.8.6",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "gdk"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6066,6 +6080,7 @@ dependencies = [
  "chrono",
  "flate2",
  "futures-util",
+ "gbdt",
  "hmac",
  "imap",
  "jsonwebtoken",

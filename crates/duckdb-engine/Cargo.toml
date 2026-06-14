@@ -161,6 +161,10 @@ parquet = { workspace = true }
 # persist a trained model to disk (bincode) for a downstream Predictor to
 # load. No native deps, fits the single-binary promise.
 smartcore = { version = "0.3", features = ["serde"] }
+# Gradient-boosted decision trees (ml.learner.xgb / xgb.reg). Pure-Rust,
+# no C++/FFI, Apache-2.0, serde-serializable so the trained model round-trips
+# through the same bincode model-storage path as the smartcore learners.
+gbdt = "0.1.3"
 bincode = "1.3"
 rand = "0.8"
 # Deep-learning inference (dl.onnx.*) via the ONNX Runtime. Gated behind
