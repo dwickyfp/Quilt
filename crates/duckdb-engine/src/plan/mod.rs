@@ -3241,6 +3241,80 @@ fn build_stage(
                 from = qfrom,
                 n = limit
             )
+        } else if chart == "box" {
+            // Box plot: a five-number summary (min / Q1 / median / Q3 / max)
+            // per category. DuckDB's quantile_cont gives interpolated quartiles.
+            let y = spec
+                .y
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| {
+                    EngineError::Config(format!(
+                        "{}: y (measure column) required for box chart",
+                        component_id
+                    ))
+                })?;
+            let qy = quote_ident(y);
+            format!(
+                "SELECT {x} AS \"x\", min({y}) AS \"min\", quantile_cont({y}, 0.25) AS \"q1\", \
+                 median({y}) AS \"median\", quantile_cont({y}, 0.75) AS \"q3\", max({y}) AS \"max\" \
+                 FROM {from} GROUP BY {x} ORDER BY {x} LIMIT {n}",
+                x = qx,
+                y = qy,
+                from = qfrom,
+                n = limit
+            )
+        } else if chart == "heatmap" {
+            // Heatmap: x (column dimension) x series (row dimension) -> an
+            // aggregated measure. Emits tidy (x, y, value) triples the frontend
+            // pivots into a colored grid.
+            let y = spec
+                .y
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| {
+                    EngineError::Config(format!(
+                        "{}: y (value column) required for heatmap",
+                        component_id
+                    ))
+                })?;
+            let s = spec
+                .series
+                .as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .ok_or_else(|| {
+                    EngineError::Config(format!(
+                        "{}: series (second/row dimension) required for heatmap",
+                        component_id
+                    ))
+                })?;
+            let qy = quote_ident(y);
+            let qs = quote_ident(s);
+            let raw_agg = spec
+                .agg
+                .as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty())
+                .unwrap_or("sum");
+            let agg = resolve_agg(raw_agg).ok_or_else(|| {
+                EngineError::Config(format!(
+                    "{}: unsupported aggregation '{}' (allowed: sum, avg, count, min, max)",
+                    component_id, raw_agg
+                ))
+            })?;
+            format!(
+                "SELECT {x} AS \"x\", {s} AS \"y\", {agg}({y}) AS \"value\" \
+                 FROM {from} GROUP BY {x}, {s} ORDER BY {x}, {s} LIMIT {n}",
+                x = qx,
+                s = qs,
+                agg = agg,
+                y = qy,
+                from = qfrom,
+                n = limit
+            )
         } else {
             // bar / line / scatter need a measure column.
             let y = spec

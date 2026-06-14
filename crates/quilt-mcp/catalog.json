@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 362,
+  "componentCount": 365,
   "components": [
     {
       "id": "src.csv",
@@ -20047,8 +20047,14 @@
                 "label": "Strategy",
                 "kind": "select",
                 "options": [
-                  "mean",
-                  "median"
+                  {
+                    "label": "Mean",
+                    "value": "mean"
+                  },
+                  {
+                    "label": "Median",
+                    "value": "median"
+                  }
                 ],
                 "defaultValue": "mean"
               }
@@ -20347,9 +20353,18 @@
                 "label": "Test",
                 "kind": "select",
                 "options": [
-                  "ttest",
-                  "anova",
-                  "chi2"
+                  {
+                    "label": "t-test",
+                    "value": "ttest"
+                  },
+                  {
+                    "label": "ANOVA",
+                    "value": "anova"
+                  },
+                  {
+                    "label": "Chi-squared",
+                    "value": "chi2"
+                  }
                 ],
                 "defaultValue": "ttest"
               },
@@ -34564,6 +34579,248 @@
                 "label": "X (dimension)",
                 "kind": "column",
                 "required": true
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.pie",
+      "label": "Pie / Donut",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Aggregate a measure by a dimension and render proportional slices",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.pie",
+        "kind": "viz",
+        "label": "Pie / Donut",
+        "description": "Aggregate a measure by a dimension and render proportional slices",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "x",
+                "label": "Slice (dimension)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "y",
+                "label": "Value (measure)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "agg",
+                "label": "Aggregation",
+                "kind": "select",
+                "defaultValue": "sum",
+                "options": [
+                  {
+                    "label": "SUM",
+                    "value": "sum"
+                  },
+                  {
+                    "label": "AVG",
+                    "value": "avg"
+                  },
+                  {
+                    "label": "COUNT",
+                    "value": "count"
+                  },
+                  {
+                    "label": "MIN",
+                    "value": "min"
+                  },
+                  {
+                    "label": "MAX",
+                    "value": "max"
+                  }
+                ]
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.box",
+      "label": "Box Plot",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Five-number summary (min / Q1 / median / Q3 / max) of a measure per category",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.box",
+        "kind": "viz",
+        "label": "Box Plot",
+        "description": "Five-number summary (min / Q1 / median / Q3 / max) of a measure per category",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "x",
+                "label": "X (category)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "y",
+                "label": "Y (measure)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.heatmap",
+      "label": "Heatmap",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Aggregate a measure over two dimensions (x + series) into a color-coded grid",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.heatmap",
+        "kind": "viz",
+        "label": "Heatmap",
+        "description": "Aggregate a measure over two dimensions (x + series) into a color-coded grid",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "x",
+                "label": "X (column dimension)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "series",
+                "label": "Y (row dimension)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "y",
+                "label": "Value (measure)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "agg",
+                "label": "Aggregation",
+                "kind": "select",
+                "defaultValue": "sum",
+                "options": [
+                  {
+                    "label": "SUM",
+                    "value": "sum"
+                  },
+                  {
+                    "label": "AVG",
+                    "value": "avg"
+                  },
+                  {
+                    "label": "COUNT",
+                    "value": "count"
+                  },
+                  {
+                    "label": "MIN",
+                    "value": "min"
+                  },
+                  {
+                    "label": "MAX",
+                    "value": "max"
+                  }
+                ]
               },
               {
                 "key": "limit",

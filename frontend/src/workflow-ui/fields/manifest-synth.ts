@@ -4674,19 +4674,51 @@ function synthDebugTransform(comp: ComponentDef): ComponentManifest {
 
 function synthViz(comp: ComponentDef): ComponentManifest {
     const isHistogram = comp.id === 'viz.histogram';
-    const fields: Field[] = [
-        { key: 'x', label: 'X (dimension)', kind: 'column', required: true },
-    ];
-    if (!isHistogram) {
-        fields.push({ key: 'y', label: 'Y (measure)', kind: 'column', required: true });
-        fields.push({
-            key: 'agg',
-            label: 'Aggregation',
-            kind: 'select',
-            defaultValue: 'sum',
-            options: ['sum', 'avg', 'count', 'min', 'max'].map(f => ({ label: f.toUpperCase(), value: f })),
-        });
-        fields.push({ key: 'series', label: 'Series (optional group-by)', kind: 'column' });
+    const isBox = comp.id === 'viz.box';
+    const isHeatmap = comp.id === 'viz.heatmap';
+    const isPie = comp.id === 'viz.pie' || comp.id === 'viz.donut';
+
+    const aggField: Field = {
+        key: 'agg',
+        label: 'Aggregation',
+        kind: 'select',
+        defaultValue: 'sum',
+        options: ['sum', 'avg', 'count', 'min', 'max'].map(f => ({ label: f.toUpperCase(), value: f })),
+    };
+
+    let fields: Field[];
+    if (isHistogram) {
+        // Per-dimension-value counts: x only.
+        fields = [{ key: 'x', label: 'X (dimension)', kind: 'column', required: true }];
+    } else if (isBox) {
+        // Five-number summary of a measure per category: no aggregation.
+        fields = [
+            { key: 'x', label: 'X (category)', kind: 'column', required: true },
+            { key: 'y', label: 'Y (measure)', kind: 'column', required: true },
+        ];
+    } else if (isHeatmap) {
+        // Two dimensions (x + series) aggregating a measure into a grid.
+        fields = [
+            { key: 'x', label: 'X (column dimension)', kind: 'column', required: true },
+            { key: 'series', label: 'Y (row dimension)', kind: 'column', required: true },
+            { key: 'y', label: 'Value (measure)', kind: 'column', required: true },
+            aggField,
+        ];
+    } else if (isPie) {
+        // Proportional slices: dimension + aggregated measure (no series).
+        fields = [
+            { key: 'x', label: 'Slice (dimension)', kind: 'column', required: true },
+            { key: 'y', label: 'Value (measure)', kind: 'column', required: true },
+            aggField,
+        ];
+    } else {
+        // bar / line / scatter: dimension + measure + agg + optional series.
+        fields = [
+            { key: 'x', label: 'X (dimension)', kind: 'column', required: true },
+            { key: 'y', label: 'Y (measure)', kind: 'column', required: true },
+            aggField,
+            { key: 'series', label: 'Series (optional group-by)', kind: 'column' },
+        ];
     }
     fields.push({
         key: 'limit',
