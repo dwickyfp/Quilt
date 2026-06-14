@@ -4,7 +4,7 @@
 
 <h3>Pipelines you can see. Data that stays yours.</h3>
 
-<p><b>Quilt</b> is an open-source, offline-first desktop studio for visual ETL / ELT. Drag a pipeline onto the canvas, or just describe what you need in plain English to <b>Qunnie</b> — the on-device AI assistant — and execute at native speed through DuckDB. 290+ connectors, 127 transforms, a built-in scheduler, and an AI that runs entirely on your own CPU. Ships as a ~65&nbsp;MB single-file desktop app. No cloud, no servers, no lock-in, no telemetry.</p>
+<p><b>Quilt</b> is an open-source, offline-first desktop studio for visual ETL / ELT. Drag a pipeline onto the canvas, or just describe what you need in plain English to <b>Qunnie</b> — the on-device AI assistant — and execute at native speed through DuckDB. 290+ connectors, 136 transforms, a built-in scheduler, and an AI that runs entirely on your own CPU. Ships as a ~65&nbsp;MB single-file desktop app. No cloud, no servers, no lock-in, no telemetry.</p>
 
 <p>
 <img alt="status" src="https://img.shields.io/badge/status-beta-6366F1"/>
@@ -60,12 +60,12 @@
 
 - [Capabilities matrix](#capabilities)
 - [Sources](#sources-74-available)
-- [Transforms](#transforms-127-available)
+- [Transforms](#transforms-136-available)
 - [Sinks](#sinks-58-available)
 - [Data quality](#data-quality-13-available)
 - [Custom code](#custom-code-7-available)
 - [Control flow](#control-flow-19-available)
-- [Machine learning](#machine-learning-10-available)
+- [Machine learning](#machine-learning-18-available)
 - [Deep learning](#deep-learning-2-available)
 - [Visualization](#visualization-4-available)
 - [Advanced settings](#advanced-settings-per-node)
@@ -112,7 +112,7 @@ Three things make Quilt different from the heavyweights and the toy ETL tools:
 3. **A self-contained binary you can audit.** ~65 MB download. Engines install on first launch. Workspaces are plain files in a folder you choose. Diff them, branch them, ship them.
 
 <div align="center">
-<img src="docs/assets/flow.svg" alt="Sources flow through 127 transforms into files, databases, object storage, vector stores, and AI" width="100%"/>
+<img src="docs/assets/flow.svg" alt="Sources flow through 136 transforms into files, databases, object storage, vector stores, and AI" width="100%"/>
 </div>
 
 ---
@@ -211,9 +211,9 @@ Quilt is in **public beta**. The visual designer, the DuckDB execution engine, t
 
 **Scope, stated plainly:** Quilt is a single-machine, embedded studio. If you outgrow one box, point Quilt's output at the system that scales (a warehouse, an object store, a lakehouse). It will not pretend to be a cluster.
 
-The component palette ships **315 nodes** so the roadmap is visible in the product itself:
+The component palette ships **362 nodes** so the roadmap is visible in the product itself:
 
-- **294 available** runs on the DuckDB engine today
+- **341 available** runs on the DuckDB engine today
 - **5 preview** is configurable in the designer (drag, wire, set properties); execution is being wired engine-by-engine
 - **16 planned** is reserved in the palette but not yet executable - see [`docs/roadmap.md`](docs/roadmap.md)
 
@@ -251,7 +251,7 @@ Quilt is not a CSV tool with extras. It reads a broad set of formats and sources
 
 For CSV / TSV sources, the **Schema** panel accepts an optional per-column **Format** (a `strptime` token string such as `%d/%m/%Y`) on Date and Timestamp columns. Several date columns can each parse a different layout in one read - the column is read as text and re-parsed with its own format, working around DuckDB's single global date format. A value that does not match its format becomes null rather than failing the run.
 
-### Transforms (127 available)
+### Transforms (136 available)
 
 | Group | Operations |
 |---|---|
@@ -263,9 +263,10 @@ For CSV / TSV sources, the **Schema** panel accepts an optional per-column **For
 | **Window** | Row Number, Rank, Dense Rank, Lead, Lag, First Value, Last Value, NTile |
 | **Strings** | Regex Replace, Regex Extract, Regex Match, Split, Concat, Trim, Case Change, Length, Substring, Format, Hash (md5 / sha1 / sha256), IP Parse, URL Parse, Text Similarity (Levenshtein / Jaro-Winkler / Jaccard), Base64, Pad, Text Match |
 | **Date / Time** | Parse, Format, Extract Part, Date Diff / Add, Truncate, Timezone Convert, Time Bin, Current Timestamp, Epoch Convert |
-| **Numeric** | Round, Modulo, Absolute, Logarithm, Power, Square Root, Bucketize, Z-Score, Clamp, Sign |
+| **Numeric** | Round, Modulo, Absolute, Logarithm, Power, Square Root, Bucketize, Z-Score, Min-Max Normalize, Clamp, Sign |
 | **JSON / nested** | Parse, Stringify, Flatten, JSONPath Extract, Merge Objects, Array Aggregate |
 | **Array** | Explode / Unnest, Collect List, Element At, Contains, Distinct, Length |
+| **Statistics & ML prep** | Descriptive Summary (count / mean / stddev / min / median / max per column), Pairwise Correlation (Pearson r per column pair), Hypothesis Test (independent t-test / one-way ANOVA / chi-square independence — emits statistic + df + p-value, verified against SciPy), K-Fold Assign (seeded reproducible fold ids for cross-validation), Impute (fill nulls with mean / median / mode), Label Encode (categories → integer codes), Min-Max Normalize |
 | **Pivot / shape** | Pivot, Unpivot, Denormalize, Normalize, Transpose |
 | **CDC / SCD** | Incremental Load (watermark column; saves the high-water mark to workspace state and advances only on a fully successful run), Diff Detect, SCD Type 1, SCD Type 2 (valid_from / valid_to / is_current), Merge / Upsert (universal across embedded, network, warehouse and Mongo sinks, with optional delete propagation driven by a CDC change-type column), DuckLake CDC change-feed reader, Row Hash (md5 / sha1 / sha256 fingerprint), Audit Stamp (`_loaded_at` / `_loaded_date` / `_source` / `_batch_id`) |
 | **AI / Search** | **Vector Similarity Search** (cosine / L2 / inner product over FLOAT[N] via `vss`), **Full-Text Search** (BM25 via `fts`), **Embeddings** (OpenAI-compatible `/v1/embeddings`), **LLM Transform** (per-row chat completion with `{column}` templates), **Classify** (LLM-backed, normalizes to UNKNOWN), **Text Chunker** (RAG-ready, pure local), **PII Redact** (regex - emails / phones / SSNs / cards), **Semantic Dedupe** (cosine over precomputed embeddings) |
@@ -352,14 +353,14 @@ Validators split their input: passing rows continue on the main port, failures r
 | **Die / Fail** | Stop the run with a message: always, only when the input has rows, or only when empty (`ctl.die`) |
 | **Schedule** | Cron / interval / file-watch triggers via the orchestration crate |
 
-### Machine learning (10 available)
+### Machine learning (18 available)
 
 Train, apply, and evaluate classic ML models directly on the canvas - in-engine, no Python runtime. Learners emit a model on a dedicated **model** port; wire it into a Predictor (and feed a held-out set into a Scorer) to close the loop.
 
 | Group | Components |
 |---|---|
 | **Preparation** | Partition (train / test split: `random` or `stratified`, seeded for reproducibility) |
-| **Learners (train)** | Linear Regression, Logistic Regression, Decision Tree, Random Forest, k-NN, k-Means (unsupervised clustering) |
+| **Learners (train)** | Linear Regression, Ridge, Lasso, ElasticNet, Logistic Regression, Gaussian Naive Bayes, Decision Tree (classifier + regressor), Random Forest (classifier + regressor), k-NN (classifier + regressor), k-Means + DBSCAN (unsupervised clustering) |
 | **Apply & evaluate** | Predictor (append a prediction column from a trained model), Scorer (accuracy / precision / recall + confusion matrix for classification; RMSE / MAE / R² for regression) |
 | **Export** | Model Writer (classic ML → portable JSON params + features + labels; ONNX → copies the `.onnx` file) |
 
@@ -537,7 +538,7 @@ A wider tour of the workflow.
 | Step | What you do | Where to look |
 |---|---|---|
 | **1. Sources** | Drag a source, point it at a file / DB / cloud URL / SaaS endpoint. Click **Autodetect schema** to read columns + a sample. | [Sources reference](#sources-74-available) |
-| **2. Transforms** | Wire transforms to source output ports. Configure in the Properties panel. **Preview** tab shows live rows; **Plan** tab shows generated SQL. | [Transforms reference](#transforms-127-available) |
+| **2. Transforms** | Wire transforms to source output ports. Configure in the Properties panel. **Preview** tab shows live rows; **Plan** tab shows generated SQL. | [Transforms reference](#transforms-136-available) |
 | **3. Data quality** | Drop in a validator (Not-Null, Range, Regex, Uniqueness). Passing rows continue on the main port; failures route to the **reject** port. | [Data quality reference](#data-quality-13-available) |
 | **4. Sinks** | Finish with a sink (file, DB, cloud, vector DB, message bus, email). Set write mode (overwrite, append, truncate, upsert). | [Sinks reference](#sinks-58-available) |
 | **5. Run** | Press **Run** to execute on DuckDB. Nodes light up stage by stage; **Output** + **Console** show row counts, timing, errors. Stop button kills mid-run. | [Run feedback](#orchestration-and-workspace) |
