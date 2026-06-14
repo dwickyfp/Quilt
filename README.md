@@ -141,7 +141,7 @@ The same graph runs identically from your laptop to a scheduled job to a server 
 
 > Describe what you need. Qunnie builds, inspects, and fixes the pipeline with you.
 
-The sidebar on the right is **Qunnie**, Quilt's built-in AI assistant. It comes with a bundled **Qwen 2.5 Coder 1.5B** model through **llama.cpp** (downloaded once, ~1.1 GB, runs on your CPU) and can also drive any model you point it at. Ask in plain English; Qunnie can answer, generate a pipeline, modify the graph you already have, or work a multi-step task as an agent.
+The sidebar on the right is **Qunnie**, Quilt's built-in AI assistant. Point it at OpenAI, Claude, or any **OpenAI-compatible** endpoint in **Settings -> AI**, and ask in plain English; Qunnie can answer, generate a pipeline, modify the graph you already have, or work a multi-step task as an agent.
 
 <div align="center">
 <img src="docs/assets/qunnie-flow.svg" alt="Ask Qunnie in plain English; it builds, compiles, runs, and lands the pipeline with a human-in-the-loop approval step" width="100%"/>
@@ -149,13 +149,12 @@ The sidebar on the right is **Qunnie**, Quilt's built-in AI assistant. It comes 
 
 ### Multiple providers, multiple models
 
-Qunnie is no longer tied to one model. In **Settings -> AI** you can register several providers at once, each with its own list of models, and switch between them from a **dropdown right above the chat input**.
+In **Settings -> AI** you can register several providers at once, each with its own list of models, and switch between them from a **dropdown right above the chat input**.
 
 | | |
 |---|---|
-| **Bundled model** | The Qwen model runs as a `llama-server` subprocess on `127.0.0.1`, with no API key. Use it as-is, or point Qunnie at a hosted model instead. |
 | **Bring your own** | Add OpenAI, Claude, or any **OpenAI-compatible** endpoint (Ollama, LM Studio, vLLM, llama.cpp, Cohere, Voyage). OpenAI-compatible endpoints can be saved **without an API key** for keyless local servers. |
-| **Per-model switching** | Configure `gpt-4o`, `claude-sonnet`, and a local model side by side; pick the right one per task from the chat dropdown. |
+| **Per-model switching** | Configure `gpt-4o`, `claude-sonnet`, and a self-hosted model side by side; pick the right one per task from the chat dropdown. |
 
 ### Agentic, with a human in the loop
 
@@ -186,7 +185,7 @@ Because the assistant can now propose edits, it ships with layered guardrails:
 | **New session** | The **plus** button starts a fresh chat; the previous one is saved automatically. |
 | **Resumes where you left off** | Closing and reopening the panel restores your last active session instead of starting blank. |
 
-> **A note on model choice:** the agentic loop, tool-calling, and graph edits shine with a capable model (GPT-4o, Claude Sonnet, or a larger local model). The default 1.5B local model is great for quick pipeline generation and offline use, but small models are less reliable at multi-step tool use - point Qunnie at a bigger model via the provider settings when you want it to act as an agent.
+> **A note on model choice:** the agentic loop, tool-calling, and graph edits shine with a capable model (GPT-4o, Claude Sonnet, or a strong open model you host yourself). Smaller models are fine for quick pipeline generation but less reliable at multi-step tool use - point Qunnie at a bigger model via the provider settings when you want it to act as an agent.
 
 ---
 
@@ -195,7 +194,7 @@ Because the assistant can now propose edits, it ships with layered guardrails:
 | | |
 |---|---|
 | **Visual, never opaque** | The canvas compiles to SQL you can read, and every node has a live preview tab. No black box. |
-| **AI in the box** | A built-in assistant with a bundled model (no API key needed), or point it at OpenAI / Claude / any OpenAI-compatible endpoint. |
+| **AI in the box** | A built-in assistant you point at OpenAI, Claude, or any OpenAI-compatible endpoint - no separate app, it lives in the canvas sidebar. |
 | **More than ETL** | Descriptive statistics, hypothesis tests, 24 ML nodes (train / cross-validate / select features / PCA / one-hot / score), and ONNX deep-learning inference run on the same canvas — no Python runtime. |
 | **Single-file binary, no bundled DB** | ~65 MB app (it embeds the headless runner + MCP server). DuckDB downloads on first launch with a guided step. AI engine is opt-in. |
 | **Native speed** | Execution runs through DuckDB: vectorized, columnar, local. A clean-and-export job that crawls in a spreadsheet finishes in milliseconds. |
@@ -459,7 +458,8 @@ Quilt ships a thin shell and installs its engines on first launch.
 | Engine | Role | Status |
 |---|---|---|
 | **DuckDB** | Default execution engine: analytics, file formats, cloud reads, SQL pushdown. Tracking **v1.5.3** (latest stable). | Working |
-| **Qunnie AI Assistant** | Local chat assistant via **llama.cpp** + **Qwen 2.5 Coder 1.5B GGUF**. Downloads ~1.1 GB; runs entirely offline once installed. Managed as a `llama-server` subprocess exposing an OpenAI-compatible API on `127.0.0.1`. | Installable |
+
+The **Qunnie AI assistant** is not an installed engine - it talks to whatever OpenAI-compatible endpoint you configure in **Settings -> AI** (OpenAI, Claude, or a self-hosted server), so there is no model download.
 
 ### First-launch extension pre-fetch
 
@@ -483,12 +483,13 @@ Pick the binary for your OS from the [latest release](https://github.com/dwickyf
 
 The single-file binary above is all you need for **Build Pipeline** too: the headless runner is embedded into the app at build time, and exporting a pipeline produces ONE self-contained executable (the engine, the DuckDB CLI, any needed extensions, and the resolved pipeline are all inside that one file). Copy that single file to your server and run or schedule it - no separate runner download required.
 
-The binary is ~55-78 MB depending on platform (it embeds the headless runner and the bundled MCP server). On first launch you'll be guided through downloading two engines into your app-data directory:
+The binary is ~55-78 MB depending on platform (it embeds the headless runner and the bundled MCP server). On first launch you'll be guided through downloading the execution engine into your app-data directory:
 
 | Engine | Size | Required? | What it powers |
 |---|---|---|---|
 | **DuckDB CLI** | ~30 MB + extensions | **Yes** - cannot run pipelines without it | Every source / transform / sink that runs as SQL |
-| **Qunnie AI Assistant** | ~1.1 GB (llama-server + Qwen 2.5 Coder 1.5B GGUF) | Optional | The chat sidebar that generates pipelines from natural language |
+
+The Qunnie AI assistant needs no download - it calls whatever OpenAI-compatible endpoint you set in **Settings -> AI**.
 
 App-data location:
 - Windows: `%APPDATA%\io.quilt.app\engines\`
@@ -504,7 +505,7 @@ Delete the `engines/` folder if you ever want to force a fresh install.
 1. **Download** the binary for your OS (see [Download / Install](#download--install) above) - or [build from source](#build-from-source).
 2. **Launch it.** First run shows the setup modal:
    - Click **Install** on DuckDB (required, takes ~30 s).
-   - Optionally click **Install** on Qunnie AI Assistant (~1.1 GB, takes 5-10 min on average broadband).
+   - Optionally open **Settings -> AI** and add an OpenAI-compatible provider (OpenAI, Claude, or a self-hosted endpoint) to enable the Qunnie assistant.
 3. **Pick a workspace folder.** Pipelines, connections, context variables, and routines live there as plain files.
 4. **Build a pipeline two ways:**
    - **Drag + wire**: drag a **CSV source** in, point it at [`samples/orders.csv`](samples/orders.csv), hit **Autodetect schema**. Drag a **Filter**, wire it up. Drag a **Parquet sink** with an output path. Press **Run**, watch the nodes light up.
@@ -969,7 +970,7 @@ quilt/
 
 - The **frontend** (React with [@xyflow/react](https://reactflow.dev/)) is the visual designer; it talks to the Rust core over Tauri commands.
 - **duckdb-engine** topologically sorts the graph, lowers each node into SQL, and executes by shelling out to the downloaded DuckDB CLI. Non-sink nodes materialize as tables so later stages can reference them; sinks become `COPY ... TO` statements; cancel kills the process. No statically linked database, so the binary stays small.
-- **Qunnie** is the AI assistant: a `llama-server` subprocess on `127.0.0.1` exposing an OpenAI-compatible chat-completions API (or any OpenAI/Claude/OpenAI-compatible endpoint you configure). The chat panel streams from it via SSE and runs a bounded ReAct loop. Tool calls are plain JSON blocks the panel parses; canvas mutations are gated behind explicit human approval, and layered guardrails (prompt hardening, graph-aware validation, loop limits) keep it constrained to the pipeline domain. The model itself has no direct fs/net access - it can only request tools the app chooses to expose.
+- **Qunnie** is the AI assistant: it talks to any OpenAI-compatible chat-completions endpoint you configure (OpenAI, Claude, or a self-hosted server such as Ollama / LM Studio / vLLM / llama.cpp). The chat panel streams from it via SSE and runs a bounded ReAct loop. Tool calls are plain JSON blocks the panel parses; canvas mutations are gated behind explicit human approval, and layered guardrails (prompt hardening, graph-aware validation, loop limits) keep it constrained to the pipeline domain. The model has no direct fs/net access - it can only request tools the app chooses to expose.
 - **Everything persists** to the workspace folder you choose, as plain JSON and Markdown files.
 
 ---
@@ -983,7 +984,7 @@ A few knobs you can set without touching code.
 | **Theme** | Topbar sun/moon toggle | Light / dark, persisted to `localStorage` |
 | **Workspace** | Topbar workspace pill -> Switch | Change the folder Quilt reads/writes to |
 | **Active context** | Topbar context dropdown | Switches which context variables resolve at run time |
-| **AI Assistant baseURL** | `xf.ai.llm` / `xf.ai.embed` / `xf.ai.classify` props | Point at any OpenAI-compatible endpoint (default: Qunnie's local llama-server) |
+| **AI Assistant baseURL** | `xf.ai.llm` / `xf.ai.embed` / `xf.ai.classify` props | Point at any OpenAI-compatible endpoint (OpenAI, Claude, or a self-hosted server) |
 | **Per-stage retry** | Properties panel -> Advanced tab | Total attempts + linear-scaled backoff per stage |
 | **Per-stage memory cap** | Properties panel -> Advanced tab | `PRAGMA memory_limit` applied just to that stage |
 | **DuckDB extensions** | Pre-fetched at install; lazy-loaded for `spatial` | See [First-launch extension pre-fetch](#first-launch-extension-pre-fetch) |
@@ -1022,9 +1023,9 @@ Yes, free + open source. Dual-licensed **MIT OR Apache-2.0**. You can use it com
 <details>
 <summary><b>Does Quilt send my data anywhere?</b></summary>
 
-No. The app runs entirely on your machine. The engines (DuckDB, llama.cpp) are downloaded from official upstream releases on first launch and then run locally. The only network calls Quilt makes on your behalf are the ones your pipelines explicitly do (e.g. a `src.s3` reading from your S3 bucket, or `xf.ai.embed` if you configure it to hit OpenAI).
+No. The app runs on your machine and the DuckDB engine is downloaded from its official upstream release on first launch, then runs locally. The only network calls Quilt makes on your behalf are the ones your pipelines explicitly do (e.g. a `src.s3` reading from your S3 bucket, or `xf.ai.embed` if you configure it to hit OpenAI) and the AI requests Qunnie sends to whatever provider you configured in **Settings -> AI**.
 
-Qunnie AI Assistant runs **fully offline** once the model is downloaded.
+Qunnie talks to whichever OpenAI-compatible endpoint you point it at - a hosted API like OpenAI / Claude, or a server you run yourself.
 
 </details>
 
@@ -1045,16 +1046,16 @@ No - Quilt downloads it for you on first launch. The download is ~30 MB and incl
 <details>
 <summary><b>How big is the binary, exactly?</b></summary>
 
-About 55-78 MB depending on platform (macOS ~54-67, Windows ~59-68, Linux ~66-78); it embeds the headless runner and the MCP server. The engines aren't statically linked - DuckDB (~50 MB with extensions) and the Qunnie LLM (~1.1 GB for the Qwen GGUF) both download on first launch with a guided installer into your app-data folder, so they update independently of the app.
+About 55-78 MB depending on platform (macOS ~54-67, Windows ~59-68, Linux ~66-78); it embeds the headless runner and the MCP server. DuckDB (~50 MB with extensions) isn't statically linked - it downloads on first launch with a guided installer into your app-data folder, so it updates independently of the app. Qunnie adds nothing to the download; it calls a remote OpenAI-compatible API.
 
 </details>
 
 <details>
-<summary><b>Can I use OpenAI / Claude / Cohere instead of the local Qunnie?</b></summary>
+<summary><b>Which AI providers can Qunnie use?</b></summary>
 
-Yes, in two places:
+Any OpenAI-compatible provider, in two places:
 
-- **The Qunnie chat panel** now supports multiple providers. Open **Settings -> AI**, add an OpenAI, Claude, or any OpenAI-compatible provider (each with its own list of models), and switch between them from the dropdown above the chat input. OpenAI-compatible endpoints can be saved without an API key for keyless local servers. Hosted models are also where the agentic loop performs best.
+- **The Qunnie chat panel.** Open **Settings -> AI**, add OpenAI, Claude, or any OpenAI-compatible provider (each with its own list of models), and switch between them from the dropdown above the chat input. OpenAI-compatible endpoints can be saved without an API key for keyless self-hosted servers. Hosted models are where the agentic loop performs best.
 - **The AI transforms** (`xf.ai.embed`, `xf.ai.llm`, `xf.ai.classify`) accept a `baseUrl` + `apiKey`. Point them at any OpenAI-compatible `/v1/...` endpoint and Quilt uses that at pipeline runtime.
 
 </details>
@@ -1083,14 +1084,14 @@ Yes. **Build Pipeline** (right-click a pipeline) produces a single self-containe
 <details>
 <summary><b>Is the Qunnie AI assistant any good?</b></summary>
 
-For 90% of common pipelines (read source -> simple transforms -> sink), the default local Qwen 2.5 Coder model handles structured-JSON generation well. For long, complex pipelines you'll likely want to iterate: describe the first half, click insert, then ask for the next half. For agentic work - multi-step tool use, inspecting and editing an existing graph - point Qunnie at a more capable model (GPT-4o, Claude Sonnet, or a larger local model) via **Settings -> AI**; small local models are less reliable at multi-step tool calling.
+For 90% of common pipelines (read source -> simple transforms -> sink), a mid-tier model handles structured-JSON generation well. For long, complex pipelines you'll likely want to iterate: describe the first half, click insert, then ask for the next half. For agentic work - multi-step tool use, inspecting and editing an existing graph - point Qunnie at a more capable model (GPT-4o, Claude Sonnet, or a strong self-hosted model) via **Settings -> AI**; smaller models are less reliable at multi-step tool calling.
 
 </details>
 
 <details>
-<summary><b>Does the Qunnie panel need internet after install?</b></summary>
+<summary><b>Does the Qunnie panel need internet?</b></summary>
 
-No. Once `llama-server` and the Qwen GGUF are downloaded into your app-data directory, Qunnie runs fully offline. Tested by killing wifi and asking it for a pipeline - works fine.
+Yes - Qunnie calls an OpenAI-compatible API, so it needs network access to whatever provider you configured (a hosted API, or a server on your own network / machine). If you run a local OpenAI-compatible server (Ollama, LM Studio, vLLM, llama.cpp), Qunnie works without going out to the internet.
 
 </details>
 
@@ -1116,7 +1117,7 @@ See the [Contributing](#contributing) section and `crates/duckdb-engine/src/plan
 |---|---|---|
 | **Window opens but content shows "localhost refused to connect"** | Release binary built without `--features custom-protocol` (the v0.0.7 bug) | Rebuild with `cargo build --release --features custom-protocol` per [Build from source](#build-from-source). The release workflow already passes this flag. |
 | **"DuckDB CLI not found"** on Run | First-launch installer was skipped or interrupted | Open the engine setup modal from the toolbar; click Install on DuckDB |
-| **"Couldn't download Qunnie AI Assistant (HTTP 404)"** | Pinned llama.cpp build temporarily unavailable from upstream | Bump `LLAMACPP_BUILD` in `apps/desktop/src/engine_manager.rs` to a recent stable, rebuild |
+| **Chat panel says "no AI provider configured" / Qunnie won't respond** | No provider added yet, or a bad API key / base URL | Open **Settings -> AI**, add an OpenAI-compatible provider, and check the key and base URL |
 | **Linux: app won't launch, missing libwebkit** | WebKitGTK 4.1 isn't installed | `sudo apt install libwebkit2gtk-4.1-0` (Debian/Ubuntu) or your distro's equivalent |
 | **macOS: "App can't be opened because Apple cannot check it"** | Gatekeeper, unsigned binary | Right-click the binary -> Open -> Open Anyway |
 | **Pipeline runs but a connector errors with "extension not loaded"** | Lazy-loaded extension (e.g. `spatial`) downloaded mid-run and failed | Run `duckdb :memory: -c "INSTALL spatial; LOAD spatial;"` from a terminal to pre-install; relaunch Quilt |
@@ -1205,4 +1206,4 @@ Licensed under either of **MIT** or **Apache-2.0** at your option.
 <sub>Built with Rust, Tauri, React, and DuckDB by <a href="https://github.com/dwickyfp">Dwicky Feri</a></sub>
 </div>
 
-<!-- Suggested GitHub topics: etl, elt, data-engineering, data-pipeline, duckdb, rust, tauri, react, typescript, statistics, machine-learning, deep-learning, onnx, embedded, drag-and-drop, data-cleaning, vector-database, ai, ai-assistant, llm, llama-cpp, qwen, desktop-app, no-code, low-code, sql, pipeline-builder -->
+<!-- Suggested GitHub topics: etl, elt, data-engineering, data-pipeline, duckdb, rust, tauri, react, typescript, statistics, machine-learning, deep-learning, onnx, embedded, drag-and-drop, data-cleaning, vector-database, ai, ai-assistant, llm, openai, desktop-app, no-code, low-code, sql, pipeline-builder -->
