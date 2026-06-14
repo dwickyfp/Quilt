@@ -3,13 +3,13 @@
 
   <!-- Quilt patchwork mark -->
   <g transform="translate(14,14) scale(0.115)">
-    <rect x="16" y="16" width="106" height="106" rx="24" fill="#3B3D8F"/>
-    <rect x="134" y="16" width="106" height="106" rx="24" fill="#1F9E8E"/>
-    <rect x="16" y="134" width="106" height="106" rx="24" fill="#F5A21E"/>
-    <rect x="134" y="134" width="106" height="106" rx="24" fill="#2563EB"/>
-    <g stroke="#FFFFFF" stroke-opacity="0.92" stroke-width="7" stroke-linecap="round" stroke-dasharray="14 12">
-      <line x1="128" y1="26" x2="128" y2="230"/>
-      <line x1="26" y1="128" x2="230" y2="128"/>
+    <rect x="16" y="16" width="106" height="106" rx="26" fill="#2DD4BF"/>
+    <rect x="134" y="16" width="106" height="106" rx="26" fill="#38BDF8"/>
+    <rect x="16" y="134" width="106" height="106" rx="26" fill="#A855F7"/>
+    <rect x="134" y="134" width="106" height="106" rx="26" fill="#6366F1"/>
+    <g stroke="#FFFFFF" stroke-opacity="0.95" stroke-width="7" stroke-linecap="round" fill="none" stroke-dasharray="11 10">
+      <path d="M26 128 C 70 94, 92 162, 128 128 S 188 94, 230 128"/>
+      <path d="M128 26 C 94 70, 162 92, 128 128 S 94 188, 128 230"/>
     </g>
   </g>
 

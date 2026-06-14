@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Quilt">
-  <!-- Quilt patchwork mark: 2x2 grid of colored squares joined by a dashed white stitch cross.
-       Self-contained colors so the mark renders identically across light/dark themes. -->
-  <rect x="16" y="16" width="106" height="106" rx="24" fill="#3B3D8F"/>
-  <rect x="134" y="16" width="106" height="106" rx="24" fill="#1F9E8E"/>
-  <rect x="16" y="134" width="106" height="106" rx="24" fill="#F5A21E"/>
-  <rect x="134" y="134" width="106" height="106" rx="24" fill="#2563EB"/>
-  <g stroke="#FFFFFF" stroke-opacity="0.92" stroke-width="7" stroke-linecap="round" stroke-dasharray="14 12">
-    <line x1="128" y1="26" x2="128" y2="230"/>
-    <line x1="26" y1="128" x2="230" y2="128"/>
+  <!-- Quilt patchwork mark (light theme): 2x2 cool-tone tiles woven by two curved
+       slate stitch threads for contrast on light backgrounds. -->
+  <rect x="16" y="16" width="106" height="106" rx="26" fill="#2DD4BF"/>
+  <rect x="134" y="16" width="106" height="106" rx="26" fill="#38BDF8"/>
+  <rect x="16" y="134" width="106" height="106" rx="26" fill="#A855F7"/>
+  <rect x="134" y="134" width="106" height="106" rx="26" fill="#6366F1"/>
+  <g stroke="#0B0F17" stroke-opacity="0.55" stroke-width="7" stroke-linecap="round" fill="none" stroke-dasharray="11 10">
+    <path d="M26 128 C 70 94, 92 162, 128 128 S 188 94, 230 128"/>
+    <path d="M128 26 C 94 70, 162 92, 128 128 S 94 188, 128 230"/>
   </g>
 </svg>

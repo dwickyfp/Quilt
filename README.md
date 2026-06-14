@@ -2,14 +2,14 @@
 
 <img src="docs/assets/hero.svg" alt="Quilt" width="100%"/>
 
-<h3>The local-first data studio with a built-in AI assistant.</h3>
+<h3>Pipelines you can see. Data that stays yours.</h3>
 
-<p><b>Quilt</b> is an open-source desktop ETL / ELT studio. Drag a pipeline onto the canvas, describe what you need in plain English to <b>Qunnie</b> (the on-device AI assistant), and execute at native speed through DuckDB. 290+ connectors, 50+ transforms, a built-in scheduler, and a chat assistant that runs entirely on your CPU. Ships as a ~65 MB single-file desktop app. No cloud, no servers, no lock-in.</p>
+<p><b>Quilt</b> is an open-source, offline-first desktop studio for visual ETL / ELT. Drag a pipeline onto the canvas, or just describe what you need in plain English to <b>Qunnie</b> — the on-device AI assistant — and execute at native speed through DuckDB. 290+ connectors, 127 transforms, a built-in scheduler, and an AI that runs entirely on your own CPU. Ships as a ~65&nbsp;MB single-file desktop app. No cloud, no servers, no lock-in, no telemetry.</p>
 
 <p>
-<img alt="status" src="https://img.shields.io/badge/status-beta-3b82f6"/>
-<img alt="license" src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue"/>
-<img alt="platforms" src="https://img.shields.io/badge/platforms-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-2b6cb0"/>
+<img alt="status" src="https://img.shields.io/badge/status-beta-6366F1"/>
+<img alt="license" src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-7C3AED"/>
+<img alt="platforms" src="https://img.shields.io/badge/platforms-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-0EA5E9"/>
 <img alt="rust" src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white"/>
 <img alt="tauri" src="https://img.shields.io/badge/Tauri%202-24C8DB?logo=tauri&logoColor=white"/>
 <img alt="react" src="https://img.shields.io/badge/React%2019-20232A?logo=react&logoColor=61DAFB"/>
@@ -31,6 +31,7 @@
 **Get started**
 
 - [What is Quilt?](#what-is-quilt)
+- [Why this fork?](#why-this-fork)
 - [Quickstart (60 s)](#quickstart-60-seconds)
 - [Download / Install](#download--install)
 - [Build from source](#build-from-source)
@@ -106,8 +107,20 @@ Three things make Quilt different from the heavyweights and the toy ETL tools:
 3. **A self-contained binary you can audit.** ~65 MB download. Engines install on first launch. Workspaces are plain files in a folder you choose. Diff them, branch them, ship them.
 
 <div align="center">
-<img src="docs/assets/flow.svg" alt="Sources flow through 50+ transforms into files, databases, object storage, vector stores, and AI" width="100%"/>
+<img src="docs/assets/flow.svg" alt="Sources flow through 127 transforms into files, databases, object storage, vector stores, and AI" width="100%"/>
 </div>
+
+---
+
+## Why this fork?
+
+Quilt began as a fork of **duckle** and has grown its own identity and roadmap. The work here focuses on three areas:
+
+- **Multi-workspace.** Open several workspace folders at once in one window, each as its own root in the Project tree — edit and run pipelines across all of them without one replacing another. Schedules fire per workspace, to their own folder.
+- **A distinct visual identity.** New "Aurora" palette (teal → indigo → violet) across the app and docs, while keeping the patchwork mark that gives Quilt its name.
+- **Honest engineering.** Pure, unit-tested cores for the tricky bits (workspace namespacing, save routing, per-workspace scheduling), verified end to end — lint, tests, and a real build — before anything ships.
+
+Everything below is the full capability surface, kept intact and current.
 
 ---
 
