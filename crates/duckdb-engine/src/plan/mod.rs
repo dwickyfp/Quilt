@@ -162,6 +162,7 @@ pub enum RuntimeSpec {
     MlLearner(MlLearnerSpec),
     MlPredict(MlPredictSpec),
     MlScore(MlScoreSpec),
+    StatTest(StatTestSpec),
     ModelWriter(ModelWriterSpec),
     OnnxReader(OnnxReaderSpec),
     OnnxPredict(OnnxPredictSpec),
@@ -579,6 +580,7 @@ fn build_stage(
     let mut ml_learner: Option<MlLearnerSpec> = None;
     let mut ml_predict: Option<MlPredictSpec> = None;
     let mut ml_score: Option<MlScoreSpec> = None;
+    let mut stat_test: Option<StatTestSpec> = None;
     let mut model_writer: Option<ModelWriterSpec> = None;
     let mut onnx_reader: Option<OnnxReaderSpec> = None;
     let mut onnx_predict: Option<OnnxPredictSpec> = None;
@@ -3122,6 +3124,22 @@ fn build_stage(
                 .unwrap_or_else(|| "classification".into()),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "xf.stat.test" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let test = string_prop(&props, "test")
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "ttest".into());
+        stat_test = Some(StatTestSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            test,
+            value_column: string_prop(&props, "valueColumn").unwrap_or_default(),
+            group_column: string_prop(&props, "groupColumn").unwrap_or_default(),
+            column_column: string_prop(&props, "columnColumn").unwrap_or_default(),
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "ml.model.writer" {
         let model_node_id = model_input
             .ok_or_else(|| EngineError::Config(format!(
@@ -3536,6 +3554,7 @@ fn build_stage(
         .or_else(|| ml_learner.map(RuntimeSpec::MlLearner))
         .or_else(|| ml_predict.map(RuntimeSpec::MlPredict))
         .or_else(|| ml_score.map(RuntimeSpec::MlScore))
+        .or_else(|| stat_test.map(RuntimeSpec::StatTest))
         .or_else(|| model_writer.map(RuntimeSpec::ModelWriter))
         .or_else(|| onnx_reader.map(RuntimeSpec::OnnxReader))
         .or_else(|| onnx_predict.map(RuntimeSpec::OnnxPredict))

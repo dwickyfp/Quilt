@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 361,
+  "componentCount": 362,
   "components": [
     {
       "id": "src.csv",
@@ -20276,6 +20276,97 @@
                 "label": "Output column",
                 "kind": "text",
                 "placeholder": "fold"
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "xf.stat.test",
+      "label": "Hypothesis Test",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "Run a statistical hypothesis test and emit a (metric, value) table with the test statistic, degrees of freedom, and p-value. test=ttest (2-group Student t; valueColumn + groupColumn), anova (one-way F across >=2 groups; valueColumn + groupColumn), or chi2 (independence on a contingency table; groupColumn = row factor + columnColumn). p-values computed in-engine, verified against SciPy.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "xf.stat.test",
+        "kind": "transform",
+        "label": "Hypothesis Test",
+        "description": "Run a statistical hypothesis test and emit a (metric, value) table with the test statistic, degrees of freedom, and p-value. test=ttest (2-group Student t; valueColumn + groupColumn), anova (one-way F across >=2 groups; valueColumn + groupColumn), or chi2 (independence on a contingency table; groupColumn = row factor + columnColumn). p-values computed in-engine, verified against SciPy.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Hypothesis Test",
+            "fields": [
+              {
+                "key": "test",
+                "label": "Test",
+                "kind": "select",
+                "options": [
+                  "ttest",
+                  "anova",
+                  "chi2"
+                ],
+                "defaultValue": "ttest"
+              },
+              {
+                "key": "valueColumn",
+                "label": "Value column (ttest/anova)",
+                "kind": "column"
+              },
+              {
+                "key": "groupColumn",
+                "label": "Group column (ttest/anova) / row factor (chi2)",
+                "kind": "column"
+              },
+              {
+                "key": "columnColumn",
+                "label": "Column factor (chi2 only)",
+                "kind": "column"
               }
             ]
           }

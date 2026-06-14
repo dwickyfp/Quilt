@@ -661,6 +661,146 @@ impl DuckdbEngine {
         ))
     }
 
+    /// xf.stat.test: run a hypothesis test over the upstream rows and emit a
+    /// small (metric, value) table. Mirrors run_ml_score's shape; the actual
+    /// statistics + p-values live in the dependency-free `crate::stats` module.
+    pub(crate) fn run_stat_test(
+        &self,
+        db: &Path,
+        spec: &plan::StatTestSpec,
+    ) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+        let rows = self.run_rows(
+            Some(db),
+            &format!("SELECT * FROM {};", plan::quote_ident(&spec.from_view)),
+        )?;
+        if rows.is_empty() {
+            return Err(EngineError::Query(format!(
+                "xf.stat.test: no rows from {}",
+                spec.from_view
+            )));
+        }
+
+        let bad = |m: &str| EngineError::Config(format!("xf.stat.test ({}): {}", spec.test, m));
+
+        let metrics: Vec<JsonValue> = match spec.test.as_str() {
+            "ttest" => {
+                if spec.value_column.is_empty() || spec.group_column.is_empty() {
+                    return Err(bad("valueColumn and groupColumn are required"));
+                }
+                // Partition the value column by the (exactly two) group labels.
+                let mut keys: Vec<String> = Vec::new();
+                let mut samples: Vec<Vec<f64>> = Vec::new();
+                for r in &rows {
+                    let g = label_of(r.get(&spec.group_column));
+                    let idx = match keys.iter().position(|k| k == &g) {
+                        Some(i) => i,
+                        None => {
+                            keys.push(g);
+                            samples.push(Vec::new());
+                            keys.len() - 1
+                        }
+                    };
+                    samples[idx].push(cell_to_f64(r.get(&spec.value_column)));
+                }
+                if samples.len() != 2 {
+                    return Err(bad("groupColumn must have exactly 2 distinct values"));
+                }
+                let (t, df, p) = crate::stats::ttest_ind(&samples[0], &samples[1])
+                    .ok_or_else(|| bad("each group needs >= 2 values with non-zero variance"))?;
+                vec![
+                    json!({ "metric": "t", "value": t }),
+                    json!({ "metric": "df", "value": df }),
+                    json!({ "metric": "p_value", "value": p }),
+                    json!({ "metric": "group_a", "value": keys[0] }),
+                    json!({ "metric": "group_b", "value": keys[1] }),
+                ]
+            }
+            "anova" => {
+                if spec.value_column.is_empty() || spec.group_column.is_empty() {
+                    return Err(bad("valueColumn and groupColumn are required"));
+                }
+                let mut keys: Vec<String> = Vec::new();
+                let mut groups: Vec<Vec<f64>> = Vec::new();
+                for r in &rows {
+                    let g = label_of(r.get(&spec.group_column));
+                    let idx = match keys.iter().position(|k| k == &g) {
+                        Some(i) => i,
+                        None => {
+                            keys.push(g);
+                            groups.push(Vec::new());
+                            keys.len() - 1
+                        }
+                    };
+                    groups[idx].push(cell_to_f64(r.get(&spec.value_column)));
+                }
+                let (f, df_b, df_w, p) = crate::stats::anova_oneway(&groups)
+                    .ok_or_else(|| bad("need >= 2 groups and more rows than groups"))?;
+                vec![
+                    json!({ "metric": "F", "value": f }),
+                    json!({ "metric": "df_between", "value": df_b }),
+                    json!({ "metric": "df_within", "value": df_w }),
+                    json!({ "metric": "p_value", "value": p }),
+                    json!({ "metric": "groups", "value": keys.len() as f64 }),
+                ]
+            }
+            "chi2" => {
+                if spec.group_column.is_empty() || spec.column_column.is_empty() {
+                    return Err(bad("groupColumn (row factor) and columnColumn are required"));
+                }
+                // Build an R x C contingency table of raw counts.
+                let mut row_keys: Vec<String> = Vec::new();
+                let mut col_keys: Vec<String> = Vec::new();
+                let mut table: Vec<Vec<f64>> = Vec::new();
+                for r in &rows {
+                    let rk = label_of(r.get(&spec.group_column));
+                    let ck = label_of(r.get(&spec.column_column));
+                    let ri = match row_keys.iter().position(|k| k == &rk) {
+                        Some(i) => i,
+                        None => {
+                            row_keys.push(rk);
+                            table.push(vec![0.0; col_keys.len()]);
+                            row_keys.len() - 1
+                        }
+                    };
+                    let ci = match col_keys.iter().position(|k| k == &ck) {
+                        Some(i) => i,
+                        None => {
+                            col_keys.push(ck);
+                            for trow in table.iter_mut() {
+                                trow.push(0.0);
+                            }
+                            col_keys.len() - 1
+                        }
+                    };
+                    table[ri][ci] += 1.0;
+                }
+                let (chi2, df, p) = crate::stats::chi2_independence(&table)
+                    .ok_or_else(|| bad("need a >= 2x2 contingency table with a non-zero total"))?;
+                vec![
+                    json!({ "metric": "chi2", "value": chi2 }),
+                    json!({ "metric": "df", "value": df }),
+                    json!({ "metric": "p_value", "value": p }),
+                    json!({ "metric": "rows", "value": row_keys.len() as f64 }),
+                    json!({ "metric": "cols", "value": col_keys.len() as f64 }),
+                ]
+            }
+            other => {
+                return Err(bad(&format!(
+                    "unknown test '{}' (expected ttest | anova | chi2)",
+                    other
+                )));
+            }
+        };
+
+        let count = metrics.len();
+        materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &metrics)?;
+        Ok(format!(
+            "xf.stat.test ({}): {} metric row(s) -> {}",
+            spec.test, count, spec.node_id
+        ))
+    }
+
     /// ml.model.writer: export the upstream model artifact to a file for use
     /// on other platforms. Auto-detects the artifact type stored in the model
     /// node's __quilt_model cell: a base64-bincode classic-ML bundle is decoded

@@ -3314,6 +3314,19 @@ function synthNumericTransform(comp: ComponentDef): ComponentManifest {
             },
         ], 'upstream');
     }
+    if (comp.id === 'xf.stat.test') {
+        return base(comp, [
+            {
+                label: 'Hypothesis Test',
+                fields: [
+                    { key: 'test', label: 'Test', kind: 'select', options: ['ttest', 'anova', 'chi2'], defaultValue: 'ttest' },
+                    { key: 'valueColumn', label: 'Value column (ttest/anova)', kind: 'column' },
+                    { key: 'groupColumn', label: 'Group column (ttest/anova) / row factor (chi2)', kind: 'column' },
+                    { key: 'columnColumn', label: 'Column factor (chi2 only)', kind: 'column' },
+                ],
+            },
+        ], 'upstream');
+    }
     if (comp.id === 'xf.num.bucketize') {
         return base(comp, [
             {

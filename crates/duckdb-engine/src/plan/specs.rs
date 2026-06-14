@@ -1283,6 +1283,24 @@ pub struct MlScoreSpec {
     pub task: String,
 }
 
+/// xf.stat.test: run a statistical hypothesis test over the upstream rows and
+/// emit a small (metric, value) table. `test` selects ttest / anova / chi2.
+#[derive(Debug, Clone)]
+pub struct StatTestSpec {
+    pub node_id: String,
+    pub from_view: String,
+    /// "ttest" | "anova" | "chi2".
+    pub test: String,
+    /// Numeric value column (ttest/anova) — the measured quantity.
+    pub value_column: String,
+    /// Grouping column whose distinct values define the samples/groups
+    /// (ttest needs exactly 2 groups; anova needs >=2). For chi2 this is the
+    /// ROW factor.
+    pub group_column: String,
+    /// chi2 only: the COLUMN factor of the contingency table.
+    pub column_column: String,
+}
+
 /// dl.onnx.reader: register an on-disk ONNX model file as a model artifact
 /// keyed by this node's id, for a downstream ONNX Predictor.
 #[derive(Debug, Clone)]
