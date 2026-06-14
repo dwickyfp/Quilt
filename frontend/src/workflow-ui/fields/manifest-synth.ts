@@ -3277,7 +3277,7 @@ function synthNumericTransform(comp: ComponentDef): ComponentManifest {
                 label: 'Impute Missing',
                 fields: [
                     { key: 'column', label: 'Column', kind: 'column', required: true },
-                    { key: 'strategy', label: 'Strategy', kind: 'select', options: ['mean', 'median'], defaultValue: 'mean' },
+                    { key: 'strategy', label: 'Strategy', kind: 'select', options: [{ label: 'Mean', value: 'mean' }, { label: 'Median', value: 'median' }], defaultValue: 'mean' },
                 ],
             },
         ], 'upstream');
@@ -3319,7 +3319,7 @@ function synthNumericTransform(comp: ComponentDef): ComponentManifest {
             {
                 label: 'Hypothesis Test',
                 fields: [
-                    { key: 'test', label: 'Test', kind: 'select', options: ['ttest', 'anova', 'chi2'], defaultValue: 'ttest' },
+                    { key: 'test', label: 'Test', kind: 'select', options: [{ label: 't-test', value: 'ttest' }, { label: 'ANOVA', value: 'anova' }, { label: 'Chi-squared', value: 'chi2' }], defaultValue: 'ttest' },
                     { key: 'valueColumn', label: 'Value column (ttest/anova)', kind: 'column' },
                     { key: 'groupColumn', label: 'Group column (ttest/anova) / row factor (chi2)', kind: 'column' },
                     { key: 'columnColumn', label: 'Column factor (chi2 only)', kind: 'column' },
