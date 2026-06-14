@@ -15,6 +15,16 @@ on:
         required: false
         default: ''
 
+# Harden cargo's network layer against transient crates.io fetch failures.
+# The CDN occasionally drops HTTP/2 streams mid-download ("[16] Error in the
+# HTTP2 framing layer"); forcing HTTP/1.1 + the sparse protocol and bumping
+# retries makes the dependency fetch resilient to those flakes.
+env:
+  CARGO_NET_RETRY: '10'
+  CARGO_HTTP_MULTIPLEXING: 'false'
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
+
 jobs:
   # Single point that creates the draft release so the per-OS build
   # jobs don't race on `gh release create`.
