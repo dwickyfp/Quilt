@@ -575,6 +575,15 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // Cross-Validator - labeled data in, metrics table out (orchestrates
+    // train/predict/score over k folds internally).
+    if (id === 'ml.crossval') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [MAIN_OUT],
+        };
+    }
+
     // Viz charts - terminal: one main input, no output (renders a chart).
     if (comp.kind === 'viz') {
         return {
@@ -4997,6 +5006,110 @@ function synthMl(comp: ComponentDef): ComponentManifest {
             );
         }
         return base(comp, [{ label: 'Training', fields }], 'upstream');
+    }
+
+    if (id === 'ml.crossval') {
+        return base(comp, [
+            {
+                label: 'Cross-Validation',
+                fields: [
+                    {
+                        key: 'algorithm',
+                        label: 'Algorithm',
+                        kind: 'select',
+                        defaultValue: 'forest',
+                        options: [
+                            { label: 'Linear Regression', value: 'linreg' },
+                            { label: 'Logistic Regression', value: 'logreg' },
+                            { label: 'Decision Tree', value: 'tree' },
+                            { label: 'Random Forest', value: 'forest' },
+                            { label: 'KNN', value: 'knn' },
+                            { label: 'Decision Tree (reg)', value: 'tree.reg' },
+                            { label: 'Random Forest (reg)', value: 'forest.reg' },
+                            { label: 'KNN (reg)', value: 'knn.reg' },
+                            { label: 'Ridge', value: 'ridge' },
+                            { label: 'Lasso', value: 'lasso' },
+                            { label: 'ElasticNet', value: 'elasticnet' },
+                            { label: 'Naive Bayes', value: 'nb.gaussian' },
+                            { label: 'XGBoost (classifier)', value: 'xgb' },
+                            { label: 'XGBoost (regressor)', value: 'xgb.reg' },
+                        ],
+                    },
+                    {
+                        key: 'targetColumn',
+                        label: 'Target column',
+                        kind: 'column',
+                        required: true,
+                    },
+                    {
+                        key: 'featureColumns',
+                        label: 'Feature columns',
+                        kind: 'columns',
+                        description: 'Predictor columns. Leave empty to use all other numeric columns.',
+                    },
+                    {
+                        key: 'task',
+                        label: 'Task',
+                        kind: 'select',
+                        defaultValue: 'classification',
+                        options: [
+                            { label: 'Classification (accuracy)', value: 'classification' },
+                            { label: 'Regression (RMSE)', value: 'regression' },
+                        ],
+                    },
+                    {
+                        key: 'folds',
+                        label: 'Folds (k)',
+                        kind: 'integer',
+                        defaultValue: 5,
+                        description: 'Number of cross-validation folds (min 2).',
+                    },
+                    {
+                        key: 'seed',
+                        label: 'Seed',
+                        kind: 'integer',
+                        defaultValue: 42,
+                        description: 'Deterministic fold-assignment seed.',
+                    },
+                    {
+                        key: 'maxDepth',
+                        label: 'Max depth (tree/forest/xgb)',
+                        kind: 'integer',
+                        defaultValue: 10,
+                    },
+                    {
+                        key: 'nTrees',
+                        label: 'Trees / boosting iterations (forest/xgb)',
+                        kind: 'integer',
+                        defaultValue: 100,
+                    },
+                    {
+                        key: 'k',
+                        label: 'Neighbors k (knn)',
+                        kind: 'integer',
+                        defaultValue: 5,
+                    },
+                    {
+                        key: 'alpha',
+                        label: 'Alpha (ridge/lasso/elasticnet)',
+                        kind: 'number',
+                        defaultValue: 1.0,
+                    },
+                    {
+                        key: 'l1Ratio',
+                        label: 'L1 ratio (elasticnet)',
+                        kind: 'number',
+                        defaultValue: 0.5,
+                    },
+                    {
+                        key: 'learningRate',
+                        label: 'Learning rate (xgb)',
+                        kind: 'number',
+                        defaultValue: 0.1,
+                    },
+                ],
+            },
+        ], 'upstream');
     }
 
     if (id === 'dl.onnx.reader') {

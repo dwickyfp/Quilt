@@ -860,6 +860,7 @@ export const PALETTE: Category[] = [
                 components: [
                     ml('ml.predict', 'Predictor', 'available', 'Apply a trained model (model port) to incoming rows. Appends a prediction column (default `prediction`). Props: outputColumn. Wire the data into main and the Learner into the model port.'),
                     ml('ml.score', 'Scorer', 'available', 'Evaluate predictions against ground truth. Props: actualColumn, predictedColumn, task (`classification` or `regression`). Emits a metrics table: accuracy/precision/recall + confusion matrix for classification, RMSE/MAE/R² for regression.'),
+                    ml('ml.crossval', 'Cross-Validator', 'available', 'Automated k-fold cross-validation. Trains the chosen learner `folds` times (default 5), each holding out one fold for testing, and emits a metrics table: per-fold score plus a mean+std row. Props: algorithm (linreg/logreg/tree/forest/knn/ridge/lasso/elasticnet/xgb/xgb.reg/...), targetColumn, featureColumns, folds, seed, task (`classification`→accuracy or `regression`→RMSE), plus learner hyperparams (maxDepth/nTrees/k/alpha/l1Ratio/learningRate). Wire the data into main — no separate predict/score nodes needed.'),
                 ],
             },
             {

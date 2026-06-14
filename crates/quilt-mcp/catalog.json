@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 370,
+  "componentCount": 371,
   "components": [
     {
       "id": "src.csv",
@@ -43706,6 +43706,201 @@
                     "value": "regression"
                   }
                 ]
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.crossval",
+      "label": "Cross-Validator",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Automated k-fold cross-validation. Trains the chosen learner `folds` times (default 5), each holding out one fold for testing, and emits a metrics table: per-fold score plus a mean+std row. Props: algorithm (linreg/logreg/tree/forest/knn/ridge/lasso/elasticnet/xgb/xgb.reg/...), targetColumn, featureColumns, folds, seed, task (`classification`→accuracy or `regression`→RMSE), plus learner hyperparams (maxDepth/nTrees/k/alpha/l1Ratio/learningRate). Wire the data into main — no separate predict/score nodes needed.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.crossval",
+        "kind": "ml",
+        "label": "Cross-Validator",
+        "description": "Automated k-fold cross-validation. Trains the chosen learner `folds` times (default 5), each holding out one fold for testing, and emits a metrics table: per-fold score plus a mean+std row. Props: algorithm (linreg/logreg/tree/forest/knn/ridge/lasso/elasticnet/xgb/xgb.reg/...), targetColumn, featureColumns, folds, seed, task (`classification`→accuracy or `regression`→RMSE), plus learner hyperparams (maxDepth/nTrees/k/alpha/l1Ratio/learningRate). Wire the data into main — no separate predict/score nodes needed.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Cross-Validation",
+            "fields": [
+              {
+                "key": "algorithm",
+                "label": "Algorithm",
+                "kind": "select",
+                "defaultValue": "forest",
+                "options": [
+                  {
+                    "label": "Linear Regression",
+                    "value": "linreg"
+                  },
+                  {
+                    "label": "Logistic Regression",
+                    "value": "logreg"
+                  },
+                  {
+                    "label": "Decision Tree",
+                    "value": "tree"
+                  },
+                  {
+                    "label": "Random Forest",
+                    "value": "forest"
+                  },
+                  {
+                    "label": "KNN",
+                    "value": "knn"
+                  },
+                  {
+                    "label": "Decision Tree (reg)",
+                    "value": "tree.reg"
+                  },
+                  {
+                    "label": "Random Forest (reg)",
+                    "value": "forest.reg"
+                  },
+                  {
+                    "label": "KNN (reg)",
+                    "value": "knn.reg"
+                  },
+                  {
+                    "label": "Ridge",
+                    "value": "ridge"
+                  },
+                  {
+                    "label": "Lasso",
+                    "value": "lasso"
+                  },
+                  {
+                    "label": "ElasticNet",
+                    "value": "elasticnet"
+                  },
+                  {
+                    "label": "Naive Bayes",
+                    "value": "nb.gaussian"
+                  },
+                  {
+                    "label": "XGBoost (classifier)",
+                    "value": "xgb"
+                  },
+                  {
+                    "label": "XGBoost (regressor)",
+                    "value": "xgb.reg"
+                  }
+                ]
+              },
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "task",
+                "label": "Task",
+                "kind": "select",
+                "defaultValue": "classification",
+                "options": [
+                  {
+                    "label": "Classification (accuracy)",
+                    "value": "classification"
+                  },
+                  {
+                    "label": "Regression (RMSE)",
+                    "value": "regression"
+                  }
+                ]
+              },
+              {
+                "key": "folds",
+                "label": "Folds (k)",
+                "kind": "integer",
+                "defaultValue": 5,
+                "description": "Number of cross-validation folds (min 2)."
+              },
+              {
+                "key": "seed",
+                "label": "Seed",
+                "kind": "integer",
+                "defaultValue": 42,
+                "description": "Deterministic fold-assignment seed."
+              },
+              {
+                "key": "maxDepth",
+                "label": "Max depth (tree/forest/xgb)",
+                "kind": "integer",
+                "defaultValue": 10
+              },
+              {
+                "key": "nTrees",
+                "label": "Trees / boosting iterations (forest/xgb)",
+                "kind": "integer",
+                "defaultValue": 100
+              },
+              {
+                "key": "k",
+                "label": "Neighbors k (knn)",
+                "kind": "integer",
+                "defaultValue": 5
+              },
+              {
+                "key": "alpha",
+                "label": "Alpha (ridge/lasso/elasticnet)",
+                "kind": "number",
+                "defaultValue": 1
+              },
+              {
+                "key": "l1Ratio",
+                "label": "L1 ratio (elasticnet)",
+                "kind": "number",
+                "defaultValue": 0.5
+              },
+              {
+                "key": "learningRate",
+                "label": "Learning rate (xgb)",
+                "kind": "number",
+                "defaultValue": 0.1
               }
             ]
           }

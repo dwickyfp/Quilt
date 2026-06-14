@@ -1290,6 +1290,33 @@ pub struct MlScoreSpec {
     pub task: String,
 }
 
+/// ml.crossval: automated k-fold cross-validation. Trains the chosen learner k
+/// times (each time holding out one fold for testing) and emits a metrics
+/// table: per-fold scores plus a mean row. Orchestrates the existing
+/// run_ml_learner / run_ml_predict / run_ml_score code paths internally.
+#[derive(Debug, Clone)]
+pub struct MlCrossvalSpec {
+    pub node_id: String,
+    pub from_view: String,
+    /// Learner algorithm suffix (linreg / forest / xgb / xgb.reg / ...).
+    pub algorithm: String,
+    pub target_column: String,
+    pub feature_columns: Vec<String>,
+    pub max_depth: usize,
+    pub n_trees: usize,
+    pub k: usize,
+    pub max_iter: usize,
+    pub alpha: f64,
+    pub l1_ratio: f64,
+    pub learning_rate: f64,
+    /// Number of CV folds.
+    pub folds: usize,
+    /// Seed for reproducible fold assignment.
+    pub seed: u64,
+    /// "classification" or "regression" — selects the scoring metrics.
+    pub task: String,
+}
+
 /// xf.stat.test: run a statistical hypothesis test over the upstream rows and
 /// emit a small (metric, value) table. `test` selects ttest / anova / chi2.
 #[derive(Debug, Clone)]

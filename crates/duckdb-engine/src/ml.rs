@@ -781,6 +781,188 @@ impl DuckdbEngine {
         ))
     }
 
+    /// ml.crossval: automated k-fold cross-validation. Trains the chosen
+    /// learner `folds` times — each time holding out one fold for testing — by
+    /// reusing the existing run_ml_learner / run_ml_predict code paths on
+    /// per-fold temp tables. Emits a metrics table: one score row per fold plus
+    /// a mean row (with std). No new model logic — the 12 learners are exercised
+    /// through their already-verified paths.
+    pub(crate) fn run_ml_crossval(
+        &self,
+        db: &Path,
+        spec: &plan::MlCrossvalSpec,
+    ) -> Result<String, EngineError> {
+        use std::hash::{Hash, Hasher};
+        self.check_cancelled()?;
+        let rows = self.run_rows(
+            Some(db),
+            &format!("SELECT * FROM {};", plan::quote_ident(&spec.from_view)),
+        )?;
+        if rows.is_empty() {
+            return Err(EngineError::Query(format!(
+                "ml.crossval: no rows from {}",
+                spec.from_view
+            )));
+        }
+        let folds = spec.folds.max(2);
+        if rows.len() < folds {
+            return Err(EngineError::Config(format!(
+                "ml.crossval: need at least {} rows for {} folds, got {}",
+                folds,
+                folds,
+                rows.len()
+            )));
+        }
+
+        // Deterministic fold assignment: hash(seed, row index) % folds. Stable
+        // for a given (seed, row order) so runs are reproducible.
+        let assign: Vec<usize> = (0..rows.len())
+            .map(|i| {
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                spec.seed.hash(&mut h);
+                (i as u64).hash(&mut h);
+                (h.finish() % folds as u64) as usize
+            })
+            .collect();
+
+        let regression = spec.task == "regression";
+        let train_tbl = format!("{}__cv_train", spec.node_id);
+        let test_tbl = format!("{}__cv_test", spec.node_id);
+        let model_tbl = format!("{}__cv_model", spec.node_id);
+        let pred_tbl = format!("{}__cv_pred", spec.node_id);
+        let metric_name = if regression { "rmse" } else { "accuracy" };
+
+        let mut fold_scores: Vec<f64> = Vec::with_capacity(folds);
+        let mut metrics: Vec<JsonValue> = Vec::new();
+
+        for fold in 0..folds {
+            self.check_cancelled()?;
+            let train: Vec<JsonValue> = rows
+                .iter()
+                .zip(assign.iter())
+                .filter(|(_, &f)| f != fold)
+                .map(|(r, _)| r.clone())
+                .collect();
+            let test: Vec<JsonValue> = rows
+                .iter()
+                .zip(assign.iter())
+                .filter(|(_, &f)| f == fold)
+                .map(|(r, _)| r.clone())
+                .collect();
+            if train.is_empty() || test.is_empty() {
+                continue;
+            }
+
+            // Materialize this fold's train/test as temp tables the existing
+            // learner/predictor methods can SELECT from.
+            materialize_jsonobjects_as_table(&self.bin, db, &train_tbl, &train)?;
+            materialize_jsonobjects_as_table(&self.bin, db, &test_tbl, &test)?;
+
+            // 1) Train on the train table -> model table (verified path).
+            let learner_spec = plan::MlLearnerSpec {
+                node_id: model_tbl.clone(),
+                from_view: train_tbl.clone(),
+                algorithm: spec.algorithm.clone(),
+                target_column: spec.target_column.clone(),
+                feature_columns: spec.feature_columns.clone(),
+                max_depth: spec.max_depth,
+                n_trees: spec.n_trees,
+                k: spec.k,
+                max_iter: spec.max_iter,
+                alpha: spec.alpha,
+                l1_ratio: spec.l1_ratio,
+                eps: 0.5,
+                min_samples: 5,
+                learning_rate: spec.learning_rate,
+            };
+            self.run_ml_learner(db, &learner_spec)?;
+
+            // 2) Predict on the held-out test table.
+            let predict_spec = plan::MlPredictSpec {
+                node_id: pred_tbl.clone(),
+                from_view: test_tbl.clone(),
+                model_node_id: model_tbl.clone(),
+                output_column: "__cv_pred".into(),
+            };
+            self.run_ml_predict(db, &predict_spec)?;
+
+            // 3) Score: read predictions back and compute the fold metric.
+            let scored = self.run_rows(
+                Some(db),
+                &format!("SELECT * FROM {};", plan::quote_ident(&pred_tbl)),
+            )?;
+            let score = if regression {
+                let actual: Vec<f64> = scored
+                    .iter()
+                    .map(|r| cell_to_f64(r.get(&spec.target_column)))
+                    .collect();
+                let predicted: Vec<f64> = scored
+                    .iter()
+                    .map(|r| cell_to_f64(r.get("__cv_pred")))
+                    .collect();
+                smartcore::metrics::mean_squared_error(&actual, &predicted).sqrt()
+            } else {
+                // Encode actual+predicted through one shared label space.
+                let mut labels: Vec<String> = Vec::new();
+                let enc = |raw: String, labels: &mut Vec<String>| -> i64 {
+                    match labels.iter().position(|l| l == &raw) {
+                        Some(i) => i as i64,
+                        None => {
+                            labels.push(raw);
+                            (labels.len() - 1) as i64
+                        }
+                    }
+                };
+                let actual: Vec<i64> = scored
+                    .iter()
+                    .map(|r| enc(label_of(r.get(&spec.target_column)), &mut labels))
+                    .collect();
+                let predicted: Vec<i64> = scored
+                    .iter()
+                    .map(|r| enc(label_of(r.get("__cv_pred")), &mut labels))
+                    .collect();
+                smartcore::metrics::accuracy(&actual, &predicted)
+            };
+            fold_scores.push(score);
+            metrics.push(json!({
+                "fold": fold,
+                "metric": metric_name,
+                "value": score,
+                "test_rows": test.len(),
+            }));
+        }
+
+        // Best-effort cleanup of the per-fold temp tables.
+        for t in [&train_tbl, &test_tbl, &model_tbl, &pred_tbl] {
+            let _ = self.run(
+                Some(db),
+                &format!("DROP TABLE IF EXISTS {};", plan::quote_ident(t)),
+                false,
+            );
+        }
+
+        if fold_scores.is_empty() {
+            return Err(EngineError::Query(
+                "ml.crossval: no fold produced a score".into(),
+            ));
+        }
+        let nfolds = fold_scores.len();
+        let mean = fold_scores.iter().sum::<f64>() / nfolds as f64;
+        let var = fold_scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / nfolds as f64;
+        metrics.push(json!({
+            "fold": "mean",
+            "metric": metric_name,
+            "value": mean,
+            "std": var.sqrt(),
+        }));
+
+        materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &metrics)?;
+        Ok(format!(
+            "ml.crossval ({}, {}): {} folds, mean {}={:.4} -> {}",
+            spec.algorithm, spec.task, nfolds, metric_name, mean, spec.node_id
+        ))
+    }
+
     /// xf.stat.test: run a hypothesis test over the upstream rows and emit a
     /// small (metric, value) table. Mirrors run_ml_score's shape; the actual
     /// statistics + p-values live in the dependency-free `crate::stats` module.
