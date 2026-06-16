@@ -189,38 +189,95 @@ export async function pickWorkspaceDirectory(): Promise<string | null> {
     }
 }
 
-/**
- * Create the minimal v2 scaffold files in an empty directory so
- * loadWorkspace treats it as a valid workspace. Called automatically
- * by loadWorkspace when both v2 and v1 loads fail.
- */
-async function scaffoldEmptyWorkspace(dirPath: string): Promise<void> {
-    const { exists, writeTextFile, mkdir } = await fs();
+// ---- Resilient workspace completion -----------------------------------
 
-    // Create subdirectories
-    for (const sub of [PIPELINES_DIR, CONNECTIONS_DIR, CONTEXTS_DIR, ROUTINES_DIR]) {
-        const d = joinPath(dirPath, sub);
-        if (!(await exists(d))) {
-            try { await mkdir(d); } catch { /* may already exist */ }
+const STANDARD_FOLDERS = [
+    { id: 'pipelines', name: 'Pipelines', parentId: 'root' },
+    { id: 'connections', name: 'Connections', parentId: 'root' },
+    { id: 'contexts', name: 'Contexts', parentId: 'root' },
+    { id: 'routines', name: 'Routines', parentId: 'root' },
+];
+
+/**
+ * Ensure a workspace directory has all the pieces Quilt expects.
+ * Handles every partial state:
+ *   - quilt.json missing           → create with defaults
+ *   - repository.json missing      → create with root + folders
+ *   - repo has no project root     → inject one
+ *   - standard folders missing     → add them to repo
+ *   - subdirectories missing       → mkdir
+ *
+ * Safe on fully-formed workspaces (no-ops when everything is present).
+ */
+export async function ensureWorkspaceComplete(dirPath: string): Promise<void> {
+    const { exists, writeTextFile, readTextFile, mkdir } = await fs();
+    const folderName = dirPath.split(/[/\\]/).filter(Boolean).pop() ?? 'Workspace';
+
+    // 1. quilt.json
+    const metaPath = joinPath(dirPath, METADATA_FILE);
+    let metaChanged = false;
+    let meta: { version?: number; jobs?: unknown[]; activeJobId?: string };
+    if (await exists(metaPath)) {
+        try {
+            meta = JSON.parse(await readTextFile(metaPath));
+        } catch {
+            meta = { version: 2, jobs: [], activeJobId: '' };
+            metaChanged = true;
+        }
+    } else {
+        meta = { version: 2, jobs: [], activeJobId: '' };
+        metaChanged = true;
+    }
+    if (!meta.version) { meta.version = 2; metaChanged = true; }
+    if (!meta.jobs) { meta.jobs = []; metaChanged = true; }
+    if (meta.activeJobId === undefined) { meta.activeJobId = ''; metaChanged = true; }
+    if (metaChanged) {
+        await writeTextFile(metaPath, JSON.stringify(meta, null, 2));
+    }
+
+    // 2. repository.json
+    const repoPath = joinPath(dirPath, REPOSITORY_FILE);
+    let repoChanged = false;
+    let repo: Array<Record<string, unknown>>;
+    if (await exists(repoPath)) {
+        try {
+            repo = JSON.parse(await readTextFile(repoPath));
+            if (!Array.isArray(repo)) { repo = []; repoChanged = true; }
+        } catch {
+            repo = [];
+            repoChanged = true;
+        }
+    } else {
+        repo = [];
+        repoChanged = true;
+    }
+
+    // 2a. Ensure project root exists
+    if (!repo.some(it => it.type === 'project')) {
+        repo.unshift({ id: 'root', name: folderName, type: 'project' });
+        repoChanged = true;
+    }
+
+    // 2b. Ensure standard folders exist
+    const rootId = repo.find(it => it.type === 'project')?.id ?? 'root';
+    for (const sf of STANDARD_FOLDERS) {
+        if (!repo.some(it => it.id === sf.id && it.type === 'folder')) {
+            repo.push({ id: sf.id, name: sf.name, type: 'folder', parentId: rootId });
+            repoChanged = true;
         }
     }
 
-    const folderName = dirPath.split(/[/\\]/).filter(Boolean).pop() ?? 'Workspace';
+    if (repoChanged) {
+        await writeTextFile(repoPath, JSON.stringify(repo, null, 2));
+    }
 
-    await writeTextFile(
-        joinPath(dirPath, METADATA_FILE),
-        JSON.stringify({ version: 2, jobs: [], activeJobId: '' }, null, 2),
-    );
-    await writeTextFile(
-        joinPath(dirPath, REPOSITORY_FILE),
-        JSON.stringify([
-            { id: 'root', name: folderName, type: 'project' },
-            { id: 'pipelines', name: 'Pipelines', type: 'folder', parentId: 'root' },
-            { id: 'connections', name: 'Connections', type: 'folder', parentId: 'root' },
-            { id: 'contexts', name: 'Contexts', type: 'folder', parentId: 'root' },
-            { id: 'routines', name: 'Routines', type: 'folder', parentId: 'root' },
-        ], null, 2),
-    );
+    // 3. Subdirectories
+    for (const sub of [PIPELINES_DIR, CONNECTIONS_DIR, CONTEXTS_DIR, ROUTINES_DIR]) {
+        const d = joinPath(dirPath, sub);
+        if (!(await exists(d))) {
+            try { await mkdir(d); } catch { /* race-safe */ }
+        }
+    }
 }
 
 type FsLib = typeof import('@tauri-apps/plugin-fs');
@@ -306,12 +363,31 @@ export async function loadWorkspace(path: string): Promise<WorkspaceState | null
     if (!isTauri()) return null;
     try {
         const v2 = await loadV2(path);
-        if (v2) return v2;
+        if (v2) {
+            await ensureWorkspaceComplete(path);
+            return v2;
+        }
         const v1 = await loadAndMigrateV1(path);
-        if (v1) return v1;
+        if (v1) {
+            await ensureWorkspaceComplete(path);
+            return v1;
+        }
         // Empty directory — scaffold a fresh workspace so it loads cleanly.
-        await scaffoldEmptyWorkspace(path);
-        return { version: 2, repo: [], pipelineData: {}, jobs: [], activeJobId: '' };
+        const folderName = path.split(/[/\\]/).filter(Boolean).pop() ?? 'Workspace';
+        await ensureWorkspaceComplete(path);
+        return {
+            version: 2,
+            repo: [
+                { id: 'root', name: folderName, type: 'project' },
+                { id: 'pipelines', name: 'Pipelines', type: 'folder', parentId: 'root' },
+                { id: 'connections', name: 'Connections', type: 'folder', parentId: 'root' },
+                { id: 'contexts', name: 'Contexts', type: 'folder', parentId: 'root' },
+                { id: 'routines', name: 'Routines', type: 'folder', parentId: 'root' },
+            ],
+            pipelineData: {},
+            jobs: [],
+            activeJobId: '',
+        };
     } catch (err) {
         console.error('Failed to load workspace', err);
         return null;

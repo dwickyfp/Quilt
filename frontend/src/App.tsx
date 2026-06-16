@@ -560,9 +560,10 @@ export default function App() {
     // replace the others), so several workspaces can be worked on at once.
     const handleSwitchWorkspace = useCallback(async () => {
         if (!isInTauri()) return;
-        const { pickWorkspaceDirectory } = await import('./workspace');
+        const { pickWorkspaceDirectory, ensureWorkspaceComplete } = await import('./workspace');
         const picked = await pickWorkspaceDirectory();
         if (!picked) return;
+        await ensureWorkspaceComplete(picked);
         addWorkspace(picked);
     }, [addWorkspace]);
 
