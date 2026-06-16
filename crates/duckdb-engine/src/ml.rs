@@ -23,7 +23,6 @@ use smartcore::ensemble::random_forest_classifier::{
     RandomForestClassifier, RandomForestClassifierParameters,
 };
 use smartcore::decomposition::pca::{PCA, PCAParameters};
-use smartcore::linalg::basic::arrays::Array;
 use smartcore::linalg::basic::matrix::DenseMatrix;
 use smartcore::linear::linear_regression::{LinearRegression, LinearRegressionParameters};
 use smartcore::linear::logistic_regression::{LogisticRegression, LogisticRegressionParameters};
@@ -139,7 +138,6 @@ enum Model {
         features: Vec<String>,
         labels: Vec<String>,
         support_vectors: Vec<Vec<f64>>,
-        sv_labels: Vec<i64>,
         weights: Vec<f64>,
         bias: f64,
         kernel_type: String,
@@ -622,34 +620,10 @@ impl DuckdbEngine {
                 let b_val: f64 = svc_val.get("b")
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0);
-                // Recover per-SV labels from training data.
-                // smartcore's w[] = raw alpha (not alpha*y). For the correct decision
-                // function f(x) = b + Σ(α_i · y_i · K(sv_i, x)), we need y_i.
-                // Match each SV back to training data to recover its label.
-                let mut sv_labels: Vec<i64> = Vec::with_capacity(sv.len());
-                let n_train = x.shape().0;
-                for sv_row in &sv {
-                    let mut best_label: i64 = 1;
-                    let mut min_dist = f64::INFINITY;
-                    for ti in 0..n_train {
-                        let mut dist: f64 = 0.0;
-                        let mut exact = true;
-                        for (fi, svv) in sv_row.iter().enumerate() {
-                            let tv: f64 = *x.get((ti, fi));
-                            let diff = tv - svv;
-                            if diff.abs() >= 1e-10 { exact = false; }
-                            dist += diff * diff;
-                        }
-                        if exact { best_label = y[ti]; break; }
-                        if dist < min_dist { min_dist = dist; best_label = y[ti]; }
-                    }
-                    sv_labels.push(best_label);
-                }
                 Model::Svc {
                     features,
                     labels,
                     support_vectors: sv,
-                    sv_labels,
                     weights: w_vec,
                     bias: b_val,
                     kernel_type: spec.kernel.clone(),

@@ -57,3 +57,4 @@ coverage/
 
 # stray sink test outputs
 samples/*.parquet
+house-price-demo/
