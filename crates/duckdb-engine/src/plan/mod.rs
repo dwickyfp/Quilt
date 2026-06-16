@@ -162,6 +162,7 @@ pub enum RuntimeSpec {
     MlLearner(MlLearnerSpec),
     MlPredict(MlPredictSpec),
     MlScore(MlScoreSpec),
+    MlFeatureImportance(MlFeatureImportanceSpec),
     MlCrossval(MlCrossvalSpec),
     MlFeatureSelect(MlFeatureSelectSpec),
     MlPca(MlPcaSpec),
@@ -584,6 +585,7 @@ fn build_stage(
     let mut ml_learner: Option<MlLearnerSpec> = None;
     let mut ml_predict: Option<MlPredictSpec> = None;
     let mut ml_score: Option<MlScoreSpec> = None;
+    let mut ml_feature_importance: Option<MlFeatureImportanceSpec> = None;
     let mut ml_crossval: Option<MlCrossvalSpec> = None;
     let mut ml_featureselect: Option<MlFeatureSelectSpec> = None;
     let mut ml_pca: Option<MlPcaSpec> = None;
@@ -3137,6 +3139,18 @@ fn build_stage(
                 .unwrap_or_else(|| "classification".into()),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "ml.feature.importance" {
+        let model_node_id = model_input
+            .ok_or_else(|| EngineError::Config(format!(
+                "{}: connect a trained Learner to the model port",
+                component_id
+            )))?
+            .to_string();
+        ml_feature_importance = Some(MlFeatureImportanceSpec {
+            node_id: node.id.clone(),
+            model_node_id,
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "ml.crossval" {
         let from_view = inputs
             .main()
@@ -3160,6 +3174,10 @@ fn build_stage(
             alpha: props.get("alpha").and_then(|v| v.as_f64()).unwrap_or(1.0),
             l1_ratio: props.get("l1Ratio").and_then(|v| v.as_f64()).unwrap_or(0.5),
             learning_rate: props.get("learningRate").and_then(|v| v.as_f64()).unwrap_or(0.1),
+            kernel: string_prop(&props, "kernel").filter(|s| !s.is_empty()).unwrap_or_else(|| "rbf".into()),
+            c: props.get("c").and_then(|v| v.as_f64()).unwrap_or(1.0),
+            epsilon: props.get("epsilon").and_then(|v| v.as_f64()).unwrap_or(0.1),
+            gamma: props.get("gamma").and_then(|v| v.as_f64()).unwrap_or(0.0),
             folds: props.get("folds").and_then(|v| v.as_u64()).unwrap_or(5).max(2) as usize,
             seed: props.get("seed").and_then(|v| v.as_u64()).unwrap_or(42),
             task: string_prop(&props, "task")
@@ -3190,6 +3208,10 @@ fn build_stage(
             alpha: props.get("alpha").and_then(|v| v.as_f64()).unwrap_or(1.0),
             l1_ratio: props.get("l1Ratio").and_then(|v| v.as_f64()).unwrap_or(0.5),
             learning_rate: props.get("learningRate").and_then(|v| v.as_f64()).unwrap_or(0.1),
+            kernel: string_prop(&props, "kernel").filter(|s| !s.is_empty()).unwrap_or_else(|| "rbf".into()),
+            c: props.get("c").and_then(|v| v.as_f64()).unwrap_or(1.0),
+            epsilon: props.get("epsilon").and_then(|v| v.as_f64()).unwrap_or(0.1),
+            gamma: props.get("gamma").and_then(|v| v.as_f64()).unwrap_or(0.0),
             folds: props.get("folds").and_then(|v| v.as_u64()).unwrap_or(5).max(2) as usize,
             seed: props.get("seed").and_then(|v| v.as_u64()).unwrap_or(42),
             max_features: props.get("maxFeatures").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
@@ -3836,6 +3858,7 @@ fn build_stage(
         .or_else(|| ml_learner.map(RuntimeSpec::MlLearner))
         .or_else(|| ml_predict.map(RuntimeSpec::MlPredict))
         .or_else(|| ml_score.map(RuntimeSpec::MlScore))
+        .or_else(|| ml_feature_importance.map(RuntimeSpec::MlFeatureImportance))
         .or_else(|| ml_crossval.map(RuntimeSpec::MlCrossval))
         .or_else(|| ml_featureselect.map(RuntimeSpec::MlFeatureSelect))
         .or_else(|| ml_pca.map(RuntimeSpec::MlPca))

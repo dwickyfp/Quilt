@@ -4,7 +4,7 @@
 
 <h3>Pipelines you can see — ETL, statistics, machine learning, and deep learning on one canvas.</h3>
 
-<p><b>Quilt</b> is an open-source desktop studio for visual data work: <b>ETL / ELT plus statistics, machine learning, and deep learning</b>, all on one canvas. Drag a pipeline together, or just describe what you need in plain English to <b>Qunnie</b> — the built-in AI assistant — and execute at native speed through DuckDB. 290+ connectors, 136 transforms, in-engine statistics and 26 ML nodes, ONNX deep-learning inference, 10 inline charts, and a built-in scheduler. Ships as a ~65&nbsp;MB single-file desktop app.</p>
+<p><b>Quilt</b> is an open-source desktop studio for visual data work: <b>ETL / ELT plus statistics, machine learning, and deep learning</b>, all on one canvas. Drag a pipeline together, or just describe what you need in plain English to <b>Qunnie</b> — the built-in AI assistant — and execute at native speed through DuckDB. 290+ connectors, 136 transforms, in-engine statistics and 27 ML nodes, ONNX deep-learning inference, 10 inline charts, and a built-in scheduler. Ships as a ~65&nbsp;MB single-file desktop app.</p>
 
 <p>
 <img alt="status" src="https://img.shields.io/badge/status-beta-6366F1"/>
@@ -110,7 +110,7 @@ Quilt is more than an ETL tool. The same canvas that moves and reshapes data als
 
 1. **An AI assistant that ships in the box.** Describe the pipeline you want in English; Qunnie writes the JSON and drops it onto the canvas, no API key required.
 2. **290+ connectors at install time.** Files, lakehouses, SQL databases, warehouses, NoSQL, vector DBs, streaming brokers, SaaS REST/GraphQL APIs, even FTP and IMAP - working today, not coming-soon.
-3. **Data science on the same graph.** Statistics (summary, correlation, t-test / ANOVA / chi-square), 26 ML nodes (learners, cross-validation, feature selection, PCA, one-hot, scoring), ONNX deep-learning inference, and 10 inline charts all live in the palette next to the ETL nodes.
+3. **Data science on the same graph.** Statistics (summary, correlation, t-test / ANOVA / chi-square), 27 ML nodes (learners, cross-validation, feature selection, PCA, one-hot, scoring), ONNX deep-learning inference, and 10 inline charts all live in the palette next to the ETL nodes.
 
 <div align="center">
 <img src="docs/assets/flow.svg" alt="Sources flow through 136 transforms into files, databases, object storage, vector stores, and AI" width="100%"/>
@@ -195,7 +195,7 @@ Because the assistant can now propose edits, it ships with layered guardrails:
 |---|---|
 | **Visual, never opaque** | The canvas compiles to SQL you can read, and every node has a live preview tab. No black box. |
 | **AI in the box** | A built-in assistant you point at OpenAI, Claude, or any OpenAI-compatible endpoint - no separate app, it lives in the canvas sidebar. |
-| **More than ETL** | Descriptive statistics, hypothesis tests, 26 ML nodes (train / cross-validate / select features / PCA / one-hot / score), and ONNX deep-learning inference run on the same canvas — no Python runtime. |
+| **More than ETL** | Descriptive statistics, hypothesis tests, 27 ML nodes (train / cross-validate / select features / PCA / one-hot / score), and ONNX deep-learning inference run on the same canvas — no Python runtime. |
 | **Single-file binary, no bundled DB** | ~65 MB app (it embeds the headless runner + MCP server). DuckDB downloads on first launch with a guided step. AI engine is opt-in. |
 | **Native speed** | Execution runs through DuckDB: vectorized, columnar, local. A clean-and-export job that crawls in a spreadsheet finishes in milliseconds. |
 | **Git-friendly by design** | Pipelines, connections, contexts, and routines persist as plain files in a folder you pick. Diff them, branch them, review them. |

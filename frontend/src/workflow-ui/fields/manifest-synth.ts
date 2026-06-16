@@ -559,6 +559,14 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // Feature Importance - model in only, outputs importance table.
+    if (id === 'ml.feature.importance') {
+        return {
+            inputs: [MODEL_IN],
+            outputs: [],
+        };
+    }
+
     // Predictor - data in + model in, predictions out.
     if (id === 'ml.predict' || id === 'dl.onnx.predict') {
         return {

@@ -1317,12 +1317,28 @@ pub struct MlCrossvalSpec {
     pub alpha: f64,
     pub l1_ratio: f64,
     pub learning_rate: f64,
+    /// SVM kernel type: "linear" or "rbf" (default "rbf").
+    pub kernel: String,
+    /// SVM regularization parameter C (default 1.0).
+    pub c: f64,
+    /// SVR epsilon-tube width (default 0.1).
+    pub epsilon: f64,
+    /// RBF kernel gamma (default 0 = auto = 1/n_features).
+    pub gamma: f64,
     /// Number of CV folds.
     pub folds: usize,
     /// Seed for reproducible fold assignment.
     pub seed: u64,
     /// "classification" or "regression" — selects the scoring metrics.
     pub task: String,
+}
+
+/// ml.feature.importance: extract feature importance from a trained model.
+/// For tree-based models: computes split-based importance. For linear models: absolute coefficients.
+#[derive(Debug, Clone)]
+pub struct MlFeatureImportanceSpec {
+    pub node_id: String,
+    pub model_node_id: String,
 }
 
 /// ml.featureselect: greedy forward feature selection driven by k-fold CV.
@@ -1344,6 +1360,14 @@ pub struct MlFeatureSelectSpec {
     pub alpha: f64,
     pub l1_ratio: f64,
     pub learning_rate: f64,
+    /// SVM kernel type: "linear" or "rbf" (default "rbf").
+    pub kernel: String,
+    /// SVM regularization parameter C (default 1.0).
+    pub c: f64,
+    /// SVR epsilon-tube width (default 0.1).
+    pub epsilon: f64,
+    /// RBF kernel gamma (default 0 = auto = 1/n_features).
+    pub gamma: f64,
     pub folds: usize,
     pub seed: u64,
     /// Stop after this many selected features; 0 = no cap.

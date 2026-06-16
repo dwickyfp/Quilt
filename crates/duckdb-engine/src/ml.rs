@@ -24,6 +24,7 @@ use smartcore::ensemble::random_forest_classifier::{
 };
 use smartcore::decomposition::pca::{PCA, PCAParameters};
 use smartcore::linalg::basic::matrix::DenseMatrix;
+use smartcore::linalg::basic::arrays::Array;
 use smartcore::linear::linear_regression::{LinearRegression, LinearRegressionParameters};
 use smartcore::linear::logistic_regression::{LogisticRegression, LogisticRegressionParameters};
 use smartcore::linear::ridge_regression::{RidgeRegression, RidgeRegressionParameters};
@@ -54,6 +55,16 @@ use gbdt::gradient_boost::GBDT;
 const MODEL_COLUMN: &str = "__quilt_model";
 
 type Matrix = DenseMatrix<f64>;
+
+/// A single binary SVM classifier (used inside OvR multi-class).
+#[derive(Serialize, Deserialize)]
+struct SvcBinary {
+    support_vectors: Vec<Vec<f64>>,
+    weights: Vec<f64>,
+    bias: f64,
+    kernel_type: String,
+    kernel_gamma: f64,
+}
 
 /// Classifiers learn on integer-encoded class labels and remember the
 /// original string labels so predictions decode back to the user's values.
@@ -134,14 +145,12 @@ enum Model {
         model: GBDT,
     },
     /// Support Vector Classifier with owned model (no borrowed lifetime).
+    /// For multi-class: stores N binary OvR classifiers (one per class).
     Svc {
         features: Vec<String>,
         labels: Vec<String>,
-        support_vectors: Vec<Vec<f64>>,
-        weights: Vec<f64>,
-        bias: f64,
-        kernel_type: String,
-        kernel_gamma: f64,
+        /// For binary: single entry. For multi-class OvR: one per class.
+        classifiers: Vec<SvcBinary>,
     },
     /// Support Vector Regressor with owned model (no borrowed lifetime).
     Svr {
@@ -370,6 +379,92 @@ fn decode_class_preds(preds: Vec<i64>, labels: &[String]) -> Vec<JsonValue> {
         .collect()
 }
 
+/// Extract feature importance from a smartcore DecisionTree serialized to JSON.
+/// The JSON has a `nodes` array where each node has `split_feature` and
+/// optionally `split_score`. We accumulate split_score per feature.
+fn extract_tree_importance_from_json(val: &JsonValue, n_features: usize) -> Vec<f64> {
+    let mut scores = vec![0.0f64; n_features];
+    if let Some(nodes) = val.get("nodes").and_then(|v| v.as_array()) {
+        for node in nodes {
+            let feat = node.get("split_feature").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+            let score = node.get("split_score").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let has_split = node.get("split_value").and_then(|v| v.as_f64());
+            if has_split.is_some() && feat < n_features && score > 0.0 {
+                scores[feat] += score;
+            }
+        }
+    }
+    scores
+}
+
+/// Extract feature importance from a smartcore RandomForest serialized to JSON.
+/// Walks the `trees` array (each element is a DecisionTree JSON with `nodes`).
+fn extract_forest_importance_from_json(val: &JsonValue, n_features: usize) -> Vec<f64> {
+    let mut scores = vec![0.0f64; n_features];
+    if let Some(trees) = val.get("trees").and_then(|v| v.as_array()) {
+        for tree in trees {
+            let tree_scores = extract_tree_importance_from_json(tree, n_features);
+            for (i, s) in tree_scores.iter().enumerate() {
+                scores[i] += s;
+            }
+        }
+    }
+    scores
+}
+
+/// Extract feature importance from a GBDT model serialized to JSON.
+/// The JSON has `trees` (each a `DecisionTree`) where nodes contain
+/// `feature_index` and `feature_value`.
+fn extract_gbdt_importance_from_json(val: &JsonValue, n_features: usize) -> Vec<f64> {
+    let mut scores = vec![0.0f64; n_features];
+    if let Some(trees) = val.get("trees").and_then(|v| v.as_array()) {
+        for tree in trees {
+            // GBDT trees store nodes in a binary_tree structure.
+            // The JSON has `nodes` with DTNode objects having `feature_index`.
+            walk_gbdt_tree_nodes(tree, &mut scores, n_features);
+        }
+    }
+    scores
+}
+
+/// Recursively walk a GBDT DecisionTree JSON to accumulate feature importance.
+fn walk_gbdt_tree_nodes(val: &JsonValue, scores: &mut [f64], n_features: usize) {
+    if let Some(nodes) = val.get("nodes").and_then(|v| v.as_array()) {
+        for node in nodes {
+            let is_leaf = node.get("is_leaf").and_then(|v| v.as_bool()).unwrap_or(true);
+            if !is_leaf {
+                let feat = node.get("feature_index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                if feat < n_features {
+                    scores[feat] += 1.0;
+                }
+            }
+        }
+    }
+    // GBDT may also store the tree in a nested `root` / children structure.
+    // Walk that too if present.
+    if let Some(root) = val.get("root") {
+        walk_gbdt_node_recursive(root, scores, n_features);
+    }
+    if let Some(left) = val.get("left") {
+        walk_gbdt_node_recursive(left, scores, n_features);
+    }
+    if let Some(right) = val.get("right") {
+        walk_gbdt_node_recursive(right, scores, n_features);
+    }
+}
+
+fn walk_gbdt_node_recursive(node: &JsonValue, scores: &mut [f64], n_features: usize) {
+    if let Some(val) = node.get("value") {
+        walk_gbdt_tree_nodes(val, scores, n_features);
+    }
+    if let Some(left) = node.get("left") {
+        walk_gbdt_node_recursive(left, scores, n_features);
+    }
+    if let Some(right) = node.get("right") {
+        walk_gbdt_node_recursive(right, scores, n_features);
+    }
+}
+
 impl DuckdbEngine {
     /// ml.learner.*: train a model and store it as a one-row table named after
     /// this node so the downstream Predictor (which reads via the model edge)
@@ -587,48 +682,66 @@ impl DuckdbEngine {
                 Model::XgbReg { features, model: m }
             }
             "svc" => {
-                // Binary classification. smartcore SVC requires labels -1/+1.
                 let (encoded, labels) = encode_labels(&rows, &spec.target_column);
-                if labels.len() != 2 {
-                    return Err(EngineError::Config(format!(
-                        "ml.learner.svc: binary classification needs exactly 2 classes, found {}",
-                        labels.len()
-                    )));
+                let n_classes = labels.len();
+                if n_classes < 2 {
+                    return Err(EngineError::Config(
+                        "ml.learner.svc: need at least 2 classes".into(),
+                    ));
                 }
-                // Map encoded 0/1 → -1/+1
-                let y: Vec<i64> = encoded.iter().map(|&v| if v == 0 { -1 } else { 1 }).collect();
-                let gamma = if spec.gamma > 0.0 { spec.gamma } else { 1.0 / features.len() as f64 };
-                let params = match spec.kernel.as_str() {
-                    "linear" => SVCParameters::default().with_c(spec.c).with_kernel(Kernels::linear()),
-                    _ => SVCParameters::default().with_c(spec.c).with_kernel(Kernels::rbf().with_gamma(gamma)),
+                let gamma = if spec.gamma > 0.0 {
+                    spec.gamma
+                } else {
+                    1.0 / features.len() as f64
                 };
-                let svc = SVC::fit(&x, &y, &params).map_err(fit_failed)?;
-                // Serialize trained model to JSON, then deserialize to concrete type.
-                // After round-trip, parameters is None (#[serde.skip]), but
-                // instances/w/b are owned and survive.
-                let svc_json = serde_json::to_string(&svc)
-                    .map_err(|e| EngineError::Query(format!("svc json: {}", e)))?;
-                let svc_val: serde_json::Value = serde_json::from_str(&svc_json)
-                    .map_err(|e| EngineError::Query(format!("svc parse: {}", e)))?;
-                // Extract fields from JSON Value
-                let sv: Vec<Vec<f64>> = svc_val.get("instances")
-                    .and_then(|v| serde_json::from_value(v.clone()).ok())
-                    .unwrap_or_default();
-                let w_vec: Vec<f64> = svc_val.get("w")
-                    .and_then(|v| serde_json::from_value(v.clone()).ok())
-                    .unwrap_or_default();
-                let b_val: f64 = svc_val.get("b")
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(0.0);
-                Model::Svc {
-                    features,
-                    labels,
-                    support_vectors: sv,
-                    weights: w_vec,
-                    bias: b_val,
-                    kernel_type: spec.kernel.clone(),
-                    kernel_gamma: gamma,
+                let make_params = || match spec.kernel.as_str() {
+                    "linear" => SVCParameters::default()
+                        .with_c(spec.c)
+                        .with_kernel(Kernels::linear()),
+                    _ => SVCParameters::default()
+                        .with_c(spec.c)
+                        .with_kernel(Kernels::rbf().with_gamma(gamma)),
+                };
+
+                let mut classifiers: Vec<SvcBinary> = Vec::with_capacity(n_classes);
+
+                if n_classes == 2 {
+                    // Binary: single classifier with -1/+1 labels.
+                    let y: Vec<i64> = encoded.iter().map(|&v| if v == 0 { -1 } else { 1 }).collect();
+                    let params = make_params();
+                    let svc = SVC::fit(&x, &y, &params).map_err(fit_failed)?;
+                    let svc_json = serde_json::to_string(&svc)
+                        .map_err(|e| EngineError::Query(format!("svc json: {}", e)))?;
+                    let svc_val: serde_json::Value = serde_json::from_str(&svc_json)
+                        .map_err(|e| EngineError::Query(format!("svc parse: {}", e)))?;
+                    classifiers.push(SvcBinary {
+                        support_vectors: svc_val.get("instances").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default(),
+                        weights: svc_val.get("w").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default(),
+                        bias: svc_val.get("b").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                        kernel_type: spec.kernel.clone(),
+                        kernel_gamma: gamma,
+                    });
+                } else {
+                    // Multi-class OvR: train N binary classifiers (class_i vs rest).
+                    for cls in 0..n_classes {
+                        let y: Vec<i64> = encoded.iter().map(|&v| if v == cls as i64 { 1 } else { -1 }).collect();
+                        let params = make_params();
+                    let svc = SVC::fit(&x, &y, &params).map_err(fit_failed)?;
+                        let svc_json = serde_json::to_string(&svc)
+                            .map_err(|e| EngineError::Query(format!("svc json: {}", e)))?;
+                        let svc_val: serde_json::Value = serde_json::from_str(&svc_json)
+                            .map_err(|e| EngineError::Query(format!("svc parse: {}", e)))?;
+                        classifiers.push(SvcBinary {
+                            support_vectors: svc_val.get("instances").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default(),
+                            weights: svc_val.get("w").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default(),
+                            bias: svc_val.get("b").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                            kernel_type: spec.kernel.clone(),
+                            kernel_gamma: gamma,
+                        });
+                    }
                 }
+
+                Model::Svc { features, labels, classifiers }
             }
             "svr" => {
                 let y: Vec<f64> = rows.iter()
@@ -801,21 +914,28 @@ impl DuckdbEngine {
                     .map(|v| json!(v))
                     .collect()
             }
-            Model::Svc { support_vectors, weights, bias, labels, kernel_type, kernel_gamma, .. } => {
-                // smartcore's w[] already includes y_i (sign-baked alpha).
-                // Decision function: f(x) = b + sum(w[i] * K(sv[i], x))
-                let n_sv = support_vectors.len();
+            Model::Svc { classifiers, labels, .. } => {
+                // OvR: compute decision score for each binary classifier,
+                // pick the class with the highest score.
                 rows.iter().map(|row| {
                     let xi: Vec<f64> = features.iter()
                         .map(|f| cell_to_f64(row.get(f)))
                         .collect();
-                    let mut f = *bias;
-                    for i in 0..n_sv {
-                        let k = svm_kernel_apply(kernel_type, *kernel_gamma, &xi, &support_vectors[i]);
-                        f += weights[i] * k;
+                    let mut best_score = f64::NEG_INFINITY;
+                    let mut best_cls: usize = 0;
+                    for (cls_idx, clf) in classifiers.iter().enumerate() {
+                        let n_sv = clf.support_vectors.len();
+                        let mut f = clf.bias;
+                        for i in 0..n_sv {
+                            let k = svm_kernel_apply(&clf.kernel_type, clf.kernel_gamma, &xi, &clf.support_vectors[i]);
+                            f += clf.weights[i] * k;
+                        }
+                        if f > best_score {
+                            best_score = f;
+                            best_cls = cls_idx;
+                        }
                     }
-                    let cls_idx: usize = if f > 0.0 { 1 } else { 0 };
-                    json!(labels.get(cls_idx).cloned().unwrap_or_else(|| cls_idx.to_string()))
+                    json!(labels.get(best_cls).cloned().unwrap_or_else(|| best_cls.to_string()))
                 }).collect()
             }
             Model::Svr { support_vectors, weights, bias, kernel_type, kernel_gamma, .. } => {
@@ -932,6 +1052,163 @@ impl DuckdbEngine {
         ))
     }
 
+    /// ml.feature.importance: extract per-feature importance from a trained
+    /// model. For tree-based models, importance is proportional to how often
+    /// (and how strongly) each feature is used in splits. For linear models,
+    /// importance is the absolute coefficient value. Outputs rows
+    /// (feature, importance) sorted descending by importance.
+    pub(crate) fn run_ml_feature_importance(
+        &self,
+        db: &Path,
+        spec: &plan::MlFeatureImportanceSpec,
+    ) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+        let model = self.load_model(db, &spec.model_node_id)?;
+        let features = model.features().to_vec();
+        let n = features.len();
+        if n == 0 {
+            materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &[])?;
+            return Ok(format!("ml.feature.importance: 0 features -> {}", spec.node_id));
+        }
+
+        // Importance scores aligned with the `features` vec.
+        let scores: Vec<f64> = match &model {
+            // --- Linear models: absolute coefficient values ---
+            Model::LinReg { model, .. } => {
+                let coef = model.coefficients();
+                let (_, ncols) = coef.shape();
+                (0..n).map(|i| {
+                    if ncols > 1 { coef.get((0, i)).abs() } else { coef.get((i, 0)).abs() }
+                }).collect()
+            }
+            Model::Ridge { model, .. } => {
+                let coef = model.coefficients();
+                let (_, ncols) = coef.shape();
+                (0..n).map(|i| {
+                    if ncols > 1 { coef.get((0, i)).abs() } else { coef.get((i, 0)).abs() }
+                }).collect()
+            }
+            Model::Lasso { model, .. } => {
+                let coef = model.coefficients();
+                let (_, ncols) = coef.shape();
+                (0..n).map(|i| {
+                    if ncols > 1 { coef.get((0, i)).abs() } else { coef.get((i, 0)).abs() }
+                }).collect()
+            }
+            Model::ElasticNet { model, .. } => {
+                let coef = model.coefficients();
+                let (_, ncols) = coef.shape();
+                (0..n).map(|i| {
+                    if ncols > 1 { coef.get((0, i)).abs() } else { coef.get((i, 0)).abs() }
+                }).collect()
+            }
+            Model::LogReg { model, .. } => {
+                let coef = model.coefficients();
+                let (nrows, ncols) = coef.shape();
+                // Multi-class: sum absolute coefficients across classes.
+                (0..n).map(|i| {
+                    if ncols == n {
+                        // rows = classes, cols = features
+                        (0..nrows).map(|r| coef.get((r, i)).abs()).sum()
+                    } else if nrows == n {
+                        // rows = features, cols = classes
+                        (0..ncols).map(|c| coef.get((i, c)).abs()).sum()
+                    } else {
+                        coef.get((i % nrows, i % ncols)).abs()
+                    }
+                }).collect()
+            }
+            // --- Tree-based models: count split usage via JSON serialization ---
+            Model::Tree { model, .. } => {
+                extract_tree_importance_from_json(
+                    &serde_json::to_value(model)
+                        .map_err(|e| EngineError::Query(format!("ml.feature.importance: json: {}", e)))?,
+                    n,
+                )
+            }
+            Model::TreeReg { model, .. } => {
+                extract_tree_importance_from_json(
+                    &serde_json::to_value(model)
+                        .map_err(|e| EngineError::Query(format!("ml.feature.importance: json: {}", e)))?,
+                    n,
+                )
+            }
+            Model::Forest { model, .. } => {
+                extract_forest_importance_from_json(
+                    &serde_json::to_value(model)
+                        .map_err(|e| EngineError::Query(format!("ml.feature.importance: json: {}", e)))?,
+                    n,
+                )
+            }
+            Model::ForestReg { model, .. } => {
+                extract_forest_importance_from_json(
+                    &serde_json::to_value(model)
+                        .map_err(|e| EngineError::Query(format!("ml.feature.importance: json: {}", e)))?,
+                    n,
+                )
+            }
+            // --- GBDT models: count feature_index across all tree nodes ---
+            Model::Xgb { model, .. } => {
+                extract_gbdt_importance_from_json(
+                    &serde_json::to_value(model)
+                        .map_err(|e| EngineError::Query(format!("ml.feature.importance: json: {}", e)))?,
+                    n,
+                )
+            }
+            Model::XgbReg { model, .. } => {
+                extract_gbdt_importance_from_json(
+                    &serde_json::to_value(model)
+                        .map_err(|e| EngineError::Query(format!("ml.feature.importance: json: {}", e)))?,
+                    n,
+                )
+            }
+            // --- Unsupported models ---
+            Model::Svc { .. } | Model::Svr { .. } => {
+                return Err(EngineError::Config(
+                    "ml.feature.importance: SVM models do not support feature importance".into(),
+                ));
+            }
+            Model::Knn { .. } | Model::KnnReg { .. } => {
+                return Err(EngineError::Config(
+                    "ml.feature.importance: KNN models do not support feature importance".into(),
+                ));
+            }
+            Model::KMeans { .. } => {
+                return Err(EngineError::Config(
+                    "ml.feature.importance: KMeans does not support feature importance".into(),
+                ));
+            }
+            Model::Dbscan { .. } => {
+                return Err(EngineError::Config(
+                    "ml.feature.importance: DBSCAN does not support feature importance".into(),
+                ));
+            }
+            Model::GaussianNb { .. } => {
+                return Err(EngineError::Config(
+                    "ml.feature.importance: GaussianNB does not support feature importance".into(),
+                ));
+            }
+        };
+
+        // Build (feature, importance) rows sorted descending.
+        let mut pairs: Vec<(String, f64)> = features.into_iter().zip(scores).collect();
+        let total: f64 = pairs.iter().map(|(_, s)| *s).sum();
+        if total > 0.0 {
+            for s in pairs.iter_mut().map(|(_, s)| s) { *s /= total; }
+        }
+        pairs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let rows: Vec<JsonValue> = pairs
+            .into_iter()
+            .map(|(feat, imp)| json!({ "feature": feat, "importance": imp }))
+            .collect();
+        let count = rows.len();
+        materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &rows)?;
+        Ok(format!(
+            "ml.feature.importance: {} features -> {}",
+            count, spec.node_id
+        ))
+    }
+
     /// Run k-fold CV for one feature subset and return the per-fold
     /// (score, test_row_count). Shared by ml.crossval and ml.featureselect so
     /// both exercise the identical, already-verified learner/predictor paths.
@@ -952,6 +1229,10 @@ impl DuckdbEngine {
         alpha: f64,
         l1_ratio: f64,
         learning_rate: f64,
+        kernel: &str,
+        c: f64,
+        epsilon: f64,
+        gamma: f64,
         folds: usize,
         seed: u64,
         regression: bool,
@@ -1016,10 +1297,10 @@ impl DuckdbEngine {
                 eps: 0.5,
                 min_samples: 5,
                 learning_rate,
-                kernel: "rbf".into(),
-                c: 1.0,
-                epsilon: 0.1,
-                gamma: 0.0,
+                kernel: kernel.to_string(),
+                c,
+                epsilon,
+                gamma,
             };
             self.run_ml_learner(db, &learner_spec)?;
 
@@ -1132,6 +1413,10 @@ impl DuckdbEngine {
             spec.alpha,
             spec.l1_ratio,
             spec.learning_rate,
+            &spec.kernel,
+            spec.c,
+            spec.epsilon,
+            spec.gamma,
             folds,
             spec.seed,
             regression,
@@ -1246,6 +1531,10 @@ impl DuckdbEngine {
                 spec.alpha,
                 spec.l1_ratio,
                 spec.learning_rate,
+                &spec.kernel,
+                spec.c,
+                spec.epsilon,
+                spec.gamma,
                 folds,
                 spec.seed,
                 regression,

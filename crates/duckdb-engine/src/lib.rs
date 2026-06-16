@@ -1011,6 +1011,7 @@ impl DuckdbEngine {
                     Some(RuntimeSpec::MlLearner(spec)) => self.run_ml_learner(&db_path, spec),
                     Some(RuntimeSpec::MlPredict(spec)) => self.run_ml_predict(&db_path, spec),
                     Some(RuntimeSpec::MlScore(spec)) => self.run_ml_score(&db_path, spec),
+                    Some(RuntimeSpec::MlFeatureImportance(spec)) => self.run_ml_feature_importance(&db_path, spec),
                     Some(RuntimeSpec::MlCrossval(spec)) => self.run_ml_crossval(&db_path, spec),
                     Some(RuntimeSpec::MlFeatureSelect(spec)) => {
                         self.run_ml_featureselect(&db_path, spec)

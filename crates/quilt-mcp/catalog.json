@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 376,
+  "componentCount": 377,
   "components": [
     {
       "id": "src.csv",
@@ -43579,7 +43579,7 @@
       "label": "Support Vector Classifier",
       "kind": "ml",
       "availability": "available",
-      "summary": "Train a support vector machine classifier (binary). Props: targetColumn, featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port.",
+      "summary": "Train a support vector machine classifier (binary). Props: targetColumn, featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port. ⚠️ Recommended: pipe features through xf.num.zscore first — SVM is sensitive to feature scales; unscaled data (e.g. area 0-500 vs bedrooms 0-5) causes degenerate predictions.",
       "ports": {
         "inputs": [
           {
@@ -43600,7 +43600,7 @@
         "id": "ml.learner.svc",
         "kind": "ml",
         "label": "Support Vector Classifier",
-        "description": "Train a support vector machine classifier (binary). Props: targetColumn, featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port.",
+        "description": "Train a support vector machine classifier (binary). Props: targetColumn, featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port. ⚠️ Recommended: pipe features through xf.num.zscore first — SVM is sensitive to feature scales; unscaled data (e.g. area 0-500 vs bedrooms 0-5) causes degenerate predictions.",
         "schemaSource": "upstream",
         "sections": [
           {
@@ -43673,7 +43673,7 @@
       "label": "Support Vector Regressor",
       "kind": "ml",
       "availability": "available",
-      "summary": "Train a support vector machine regressor (numeric target). Props: targetColumn (numeric), featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), epsilon (margin width, default 0.1), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port.",
+      "summary": "Train a support vector machine regressor (numeric target). Props: targetColumn (numeric), featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), epsilon (margin width, default 0.1), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port. ⚠️ Recommended: pipe features through xf.num.zscore first — SVM is sensitive to feature scales; unscaled data causes poor R².",
       "ports": {
         "inputs": [
           {
@@ -43694,7 +43694,7 @@
         "id": "ml.learner.svr",
         "kind": "ml",
         "label": "Support Vector Regressor",
-        "description": "Train a support vector machine regressor (numeric target). Props: targetColumn (numeric), featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), epsilon (margin width, default 0.1), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port.",
+        "description": "Train a support vector machine regressor (numeric target). Props: targetColumn (numeric), featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), epsilon (margin width, default 0.1), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port. ⚠️ Recommended: pipe features through xf.num.zscore first — SVM is sensitive to feature scales; unscaled data causes poor R².",
         "schemaSource": "upstream",
         "sections": [
           {
@@ -43919,6 +43919,41 @@
               "type": "main"
             }
           ]
+        }
+      }
+    },
+    {
+      "id": "ml.feature.importance",
+      "label": "Feature Importance",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Extract feature importance from a trained model (model port). For linear models: absolute coefficients. For tree models: split usage counts. For GBDT: feature_index counts. Outputs a table sorted by importance (feature, importance, percentage). Supports: linreg, ridge, lasso, elasticnet, logreg, tree, forest, xgb, xgb.reg.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "ml.feature.importance",
+        "kind": "ml",
+        "label": "Feature Importance",
+        "description": "Extract feature importance from a trained model (model port). For linear models: absolute coefficients. For tree models: split usage counts. For GBDT: feature_index counts. Outputs a table sorted by importance (feature, importance, percentage). Supports: linreg, ridge, lasso, elasticnet, logreg, tree, forest, xgb, xgb.reg.",
+        "schemaSource": "upstream",
+        "sections": [],
+        "ports": {
+          "inputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ],
+          "outputs": []
         }
       }
     },
