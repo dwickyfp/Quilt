@@ -24,6 +24,9 @@ env:
   CARGO_HTTP_MULTIPLEXING: 'false'
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
   CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
+  # Force JS-based actions (checkout, setup-node) to use Node 24 before the
+  # Sept 16 2026 removal of Node 20 on GitHub-hosted runners.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   # Single point that creates the draft release so the per-OS build
