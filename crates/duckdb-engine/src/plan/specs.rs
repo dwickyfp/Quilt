@@ -1333,6 +1333,26 @@ pub struct MlCrossvalSpec {
     pub task: String,
 }
 
+/// ml.gridsearch: exhaustive grid search over hyperparameter combinations using
+/// k-fold cross-validation. Parses a JSON `paramGrid` (e.g.
+/// `{"maxDepth":[3,5,7],"nTrees":[10,50,100]}`), generates the cartesian
+/// product of all values, runs crossval for each combination, and emits a
+/// ranked results table sorted by best score.
+#[derive(Debug, Clone)]
+pub struct MlGridSearchSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub algorithm: String,
+    pub target_column: String,
+    pub feature_columns: Vec<String>,
+    pub folds: usize,
+    pub seed: u64,
+    pub task: String,
+    /// JSON string of param_name → array of values, e.g.
+    /// `{"maxDepth":[3,5,7],"nTrees":[10,50,100]}`.
+    pub param_grid: String,
+}
+
 /// ml.feature.importance: extract feature importance from a trained model.
 /// For tree-based models: computes split-based importance. For linear models: absolute coefficients.
 #[derive(Debug, Clone)]
@@ -1394,6 +1414,21 @@ pub struct MlPcaSpec {
     pub output_prefix: String,
     /// Drop the original feature columns from the output.
     pub drop_features: bool,
+}
+
+/// ml.forecast.arima: ARIMA(p,d,q) time series forecasting. A single
+/// fit+forecast node — fits an ARIMA model on a univariate time series column
+/// and outputs actuals, fitted values, and multi-step forecasts with confidence
+/// intervals. No model round-trip / predict contract.
+#[derive(Debug, Clone)]
+pub struct MlForecastArimaSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub target_column: String,
+    pub p: usize,
+    pub d: usize,
+    pub q: usize,
+    pub steps: usize,
 }
 
 /// ml.onehot: one-hot encode categorical columns. A single transform node —

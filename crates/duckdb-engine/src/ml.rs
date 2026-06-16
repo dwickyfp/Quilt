@@ -161,6 +161,18 @@ enum Model {
         kernel_type: String,
         kernel_gamma: f64,
     },
+    /// ARIMA(p,d,q) time series model — pure-Rust OLS-based estimation.
+    Arima {
+        ar_coefficients: Vec<f64>,
+        ma_coefficients: Vec<f64>,
+        intercept: f64,
+        residuals: Vec<f64>,
+        last_values: Vec<f64>,
+        original_series: Vec<f64>,
+        d: usize,
+        p: usize,
+        q: usize,
+    },
 }
 
 impl Model {
@@ -184,6 +196,7 @@ impl Model {
             | Model::XgbReg { features, .. }
             | Model::Svc { features, .. }
             | Model::Svr { features, .. } => features,
+            Model::Arima { .. } => &[],
         }
     }
 
@@ -207,6 +220,7 @@ impl Model {
             Model::XgbReg { .. } => "xgb.reg",
             Model::Svc { .. } => "svc",
             Model::Svr { .. } => "svr",
+            Model::Arima { .. } => "arima",
         }
     }
 
@@ -462,6 +476,222 @@ fn walk_gbdt_node_recursive(node: &JsonValue, scores: &mut [f64], n_features: us
     }
     if let Some(right) = node.get("right") {
         walk_gbdt_node_recursive(right, scores, n_features);
+    }
+}
+
+// ── ARIMA helpers ─────────────────────────────────────────────────────
+
+/// Solve the OLS normal equations β = (XᵀX)⁻¹ Xᵀy using Gaussian
+/// elimination with partial pivoting. `x` is n×p (each inner Vec is one
+/// row), `y` is length n.  Returns β of length p.
+fn solve_ols(x: &[Vec<f64>], y: &[f64]) -> Vec<f64> {
+    let n = x.len();
+    let p = if n > 0 { x[0].len() } else { return vec![] };
+    debug_assert_eq!(y.len(), n);
+
+    // Compute XᵀX (p×p) and Xᵀy (p).
+    let mut ata = vec![vec![0.0f64; p]; p];
+    let mut aty = vec![0.0f64; p];
+    for i in 0..n {
+        for r in 0..p {
+            aty[r] += x[i][r] * y[i];
+            for c in r..p {
+                ata[r][c] += x[i][r] * x[i][c];
+            }
+        }
+    }
+    // Mirror upper triangle.
+    for r in 0..p {
+        for c in (r + 1)..p {
+            ata[c][r] = ata[r][c];
+        }
+    }
+
+    // Gaussian elimination with partial pivoting.
+    for col in 0..p {
+        // Find pivot.
+        let mut max_val = ata[col][col].abs();
+        let mut max_row = col;
+        for row in (col + 1)..p {
+            if ata[row][col].abs() > max_val {
+                max_val = ata[row][col].abs();
+                max_row = row;
+            }
+        }
+        if max_val < 1e-15 {
+            continue; // singular column — leave coefficient at 0
+        }
+        // Swap rows.
+        ata.swap(col, max_row);
+        aty.swap(col, max_row);
+        // Eliminate below.
+        for row in (col + 1)..p {
+            let factor = ata[row][col] / ata[col][col];
+            for k in col..p {
+                ata[row][k] -= factor * ata[col][k];
+            }
+            aty[row] -= factor * aty[col];
+        }
+    }
+    // Back-substitution.
+    let mut beta = vec![0.0f64; p];
+    for i in (0..p).rev() {
+        let mut sum = aty[i];
+        for j in (i + 1)..p {
+            sum -= ata[i][j] * beta[j];
+        }
+        beta[i] = if ata[i][i].abs() > 1e-15 {
+            sum / ata[i][i]
+        } else {
+            0.0
+        };
+    }
+    beta
+}
+
+/// Undifference a forecast or fitted series back to the original scale.
+/// `diffed` is the differenced (or forecast-differenced) values;
+/// `original` is the full original series (used to recover the starting
+/// levels for each differencing round); `d` is the number of differencing
+/// passes.
+/// Reverse d-order differencing. `diffed` has length = original_len - d.
+/// To reconstruct, we prepend the first d values of the original series
+/// and cumulative-sum each level back.
+fn undifference(diffed: &[f64], original: &[f64], d: usize) -> Vec<f64> {
+    if d == 0 {
+        return diffed.to_vec();
+    }
+    // For d-th order differencing, the first d values of the original series
+    // are lost. We recover them from the original, then cumulative-sum.
+    // Simple approach: collect the "seed" values that precede the diffed range.
+    let mut seeds: Vec<f64> = Vec::new();
+    // Compute the (d-1)-th order differenced series to find the seed for level d.
+    let mut level = original.to_vec();
+    for d_i in (1..d).rev() {
+        // diff once more to go down levels
+        let mut diff = Vec::with_capacity(level.len().saturating_sub(1));
+        for i in 1..level.len() {
+            diff.push(level[i] - level[i - 1]);
+        }
+        level = diff;
+    }
+    // `level` is now the (d-1)-th order differenced series.
+    // The first value of level is the seed for undifferencing level d.
+    // But actually we need ALL d seed values from the original.
+    // Simpler: just collect original[0..d] as seeds.
+    seeds = original[..d.min(original.len())].to_vec();
+
+    let mut result = diffed.to_vec();
+    for d_i in (0..d).rev() {
+        // The seed for this level is seeds[d_i] (or 0 if out of range).
+        let seed = if d_i < seeds.len() { seeds[d_i] } else { 0.0 };
+        let mut cum = Vec::with_capacity(result.len() + 1);
+        cum.push(seed);
+        for v in &result {
+            cum.push(cum.last().unwrap() + v);
+        }
+        result = cum;
+    }
+    result
+}
+
+/// Round to 6 decimal places (tidy JSON output).
+fn round6(v: f64) -> f64 {
+    (v * 1_000_000.0).round() / 1_000_000.0
+}
+
+/// Generate the cartesian product of a list of lists. E.g.
+/// `[[1,2],[3,4]]` → `[[1,3],[1,4],[2,3],[2,4]]`.
+fn cartesian_product<T: Clone>(lists: &[Vec<T>]) -> Vec<Vec<T>> {
+    if lists.is_empty() {
+        return vec![vec![]];
+    }
+    let mut result = vec![vec![]];
+    for list in lists {
+        let mut next = Vec::new();
+        for combo in &result {
+            for item in list {
+                let mut new_combo = combo.clone();
+                new_combo.push(item.clone());
+                next.push(new_combo);
+            }
+        }
+        result = next;
+    }
+    result
+}
+
+/// Apply a single hyperparameter value to an MlCrossvalSpec by name.
+/// Supports: maxDepth, nTrees, k, maxIter, alpha, l1Ratio, learningRate,
+/// kernel, c, epsilon, gamma, folds, seed.
+fn apply_param(spec: &mut plan::MlCrossvalSpec, name: &str, value: &JsonValue) {
+    match name {
+        "maxDepth" => {
+            if let Some(v) = value.as_u64() {
+                spec.max_depth = v as usize;
+            }
+        }
+        "nTrees" => {
+            if let Some(v) = value.as_u64() {
+                spec.n_trees = v as usize;
+            }
+        }
+        "k" => {
+            if let Some(v) = value.as_u64() {
+                spec.k = v as usize;
+            }
+        }
+        "maxIter" => {
+            if let Some(v) = value.as_u64() {
+                spec.max_iter = v as usize;
+            }
+        }
+        "alpha" => {
+            if let Some(v) = value.as_f64() {
+                spec.alpha = v;
+            }
+        }
+        "l1Ratio" => {
+            if let Some(v) = value.as_f64() {
+                spec.l1_ratio = v;
+            }
+        }
+        "learningRate" => {
+            if let Some(v) = value.as_f64() {
+                spec.learning_rate = v;
+            }
+        }
+        "kernel" => {
+            if let Some(v) = value.as_str() {
+                spec.kernel = v.to_string();
+            }
+        }
+        "c" => {
+            if let Some(v) = value.as_f64() {
+                spec.c = v;
+            }
+        }
+        "epsilon" => {
+            if let Some(v) = value.as_f64() {
+                spec.epsilon = v;
+            }
+        }
+        "gamma" => {
+            if let Some(v) = value.as_f64() {
+                spec.gamma = v;
+            }
+        }
+        "folds" => {
+            if let Some(v) = value.as_u64() {
+                spec.folds = (v as usize).max(2);
+            }
+        }
+        "seed" => {
+            if let Some(v) = value.as_u64() {
+                spec.seed = v;
+            }
+        }
+        _ => {} // Unknown param — silently ignore.
     }
 }
 
@@ -952,6 +1182,11 @@ impl DuckdbEngine {
                     json!(f)
                 }).collect()
             }
+            Model::Arima { .. } => {
+                return Err(EngineError::Query(
+                    "ml.predict: ARIMA models do not support row-wise prediction; use ml.forecast.arima instead".into(),
+                ));
+            }
         };
 
         for (row, pred) in rows.iter_mut().zip(preds.into_iter()) {
@@ -1186,6 +1421,11 @@ impl DuckdbEngine {
             Model::GaussianNb { .. } => {
                 return Err(EngineError::Config(
                     "ml.feature.importance: GaussianNB does not support feature importance".into(),
+                ));
+            }
+            Model::Arima { .. } => {
+                return Err(EngineError::Config(
+                    "ml.feature.importance: ARIMA does not support feature importance".into(),
                 ));
             }
         };
@@ -1451,6 +1691,191 @@ impl DuckdbEngine {
         Ok(format!(
             "ml.crossval ({}, {}): {} folds, mean {}={:.4} -> {}",
             spec.algorithm, spec.task, nfolds, metric_name, mean, spec.node_id
+        ))
+    }
+
+    /// ml.gridsearch: exhaustive grid search over hyperparameter combinations.
+    /// Parses the JSON `param_grid` into a map of param → Vec<values>, generates
+    /// the cartesian product, runs crossval for each combination, and emits a
+    /// ranked results table (rank, params_json, mean_score, std_score).
+    pub(crate) fn run_ml_grid_search(
+        &self,
+        db: &Path,
+        spec: &plan::MlGridSearchSpec,
+    ) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+
+        // Parse the param grid JSON.
+        let grid: std::collections::HashMap<String, Vec<JsonValue>> =
+            serde_json::from_str(&spec.param_grid).map_err(|e| {
+                EngineError::Config(format!("ml.gridsearch: invalid paramGrid JSON: {}", e))
+            })?;
+
+        // Generate all combinations (cartesian product).
+        let param_names: Vec<String> = grid.keys().cloned().collect();
+        let param_values: Vec<Vec<JsonValue>> = param_names
+            .iter()
+            .map(|k| grid[k].clone())
+            .collect();
+        let combos = cartesian_product(&param_values);
+
+        if combos.is_empty() {
+            return Err(EngineError::Config(
+                "ml.gridsearch: paramGrid is empty or has no values".into(),
+            ));
+        }
+
+        let regression = spec.task == "regression";
+        let metric_name = if regression { "rmse" } else { "accuracy" };
+
+        // Load data once.
+        let rows = self.run_rows(
+            Some(db),
+            &format!("SELECT * FROM {};", plan::quote_ident(&spec.from_view)),
+        )?;
+        if rows.is_empty() {
+            return Err(EngineError::Query(format!(
+                "ml.gridsearch: no rows from {}",
+                spec.from_view
+            )));
+        }
+        let folds = spec.folds.max(2);
+        if rows.len() < folds {
+            return Err(EngineError::Config(format!(
+                "ml.gridsearch: need at least {} rows for {} folds, got {}",
+                folds, folds, rows.len()
+            )));
+        }
+
+        // Try each combination.
+        struct ComboResult {
+            params_json: String,
+            mean_score: f64,
+            std_score: f64,
+        }
+        let mut results: Vec<ComboResult> = Vec::new();
+        let total_combos = combos.len();
+
+        for (idx, combo) in combos.iter().enumerate() {
+            self.check_cancelled()?;
+
+            // Build a params JSON object from this combo.
+            let mut params_map = serde_json::Map::new();
+            for (i, name) in param_names.iter().enumerate() {
+                params_map.insert(name.clone(), combo[i].clone());
+            }
+            let params_json = serde_json::to_string(&params_map).unwrap_or_default();
+
+            // Build an MlCrossvalSpec with the combo's hyperparameters applied.
+            let mut cv_spec = plan::MlCrossvalSpec {
+                node_id: format!("{}__gs_{}", spec.node_id, idx),
+                from_view: spec.from_view.clone(),
+                algorithm: spec.algorithm.clone(),
+                target_column: spec.target_column.clone(),
+                feature_columns: spec.feature_columns.clone(),
+                folds: spec.folds,
+                seed: spec.seed,
+                task: spec.task.clone(),
+                max_depth: 10,
+                n_trees: 100,
+                k: 5,
+                max_iter: 100,
+                alpha: 1.0,
+                l1_ratio: 0.5,
+                learning_rate: 0.1,
+                kernel: "rbf".into(),
+                c: 1.0,
+                epsilon: 0.1,
+                gamma: 0.0,
+            };
+
+            // Apply each param from the combo.
+            for (i, name) in param_names.iter().enumerate() {
+                apply_param(&mut cv_spec, name, &combo[i]);
+            }
+
+            let fold_results = self.cv_fold_scores(
+                db,
+                &cv_spec.node_id,
+                &rows,
+                &cv_spec.algorithm,
+                &cv_spec.target_column,
+                &cv_spec.feature_columns,
+                cv_spec.max_depth,
+                cv_spec.n_trees,
+                cv_spec.k,
+                cv_spec.max_iter,
+                cv_spec.alpha,
+                cv_spec.l1_ratio,
+                cv_spec.learning_rate,
+                &cv_spec.kernel,
+                cv_spec.c,
+                cv_spec.epsilon,
+                cv_spec.gamma,
+                folds,
+                cv_spec.seed,
+                regression,
+            )?;
+
+            if !fold_results.is_empty() {
+                let fold_scores: Vec<f64> = fold_results.iter().map(|(s, _)| *s).collect();
+                let nf = fold_scores.len();
+                let mean = fold_scores.iter().sum::<f64>() / nf as f64;
+                let var =
+                    fold_scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / nf as f64;
+                results.push(ComboResult {
+                    params_json,
+                    mean_score: mean,
+                    std_score: var.sqrt(),
+                });
+            }
+        }
+
+        if results.is_empty() {
+            return Err(EngineError::Query(
+                "ml.gridsearch: no combination produced a score".into(),
+            ));
+        }
+
+        // Sort: higher accuracy is better, lower RMSE is better.
+        if regression {
+            results.sort_by(|a, b| {
+                a.mean_score
+                    .partial_cmp(&b.mean_score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        } else {
+            results.sort_by(|a, b| {
+                b.mean_score
+                    .partial_cmp(&a.mean_score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+        }
+
+        // Build output table: rank, params, mean_score, std_score.
+        let output_rows: Vec<JsonValue> = results
+            .into_iter()
+            .enumerate()
+            .map(|(rank, r)| {
+                json!({
+                    "rank": rank + 1,
+                    "params": r.params_json,
+                    "mean_score": r.mean_score,
+                    "std_score": r.std_score,
+                })
+            })
+            .collect();
+
+        let best_mean = output_rows
+            .first()
+            .and_then(|r| r.get("mean_score"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+
+        materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &output_rows)?;
+        Ok(format!(
+            "ml.gridsearch ({}, {}): {} combos, best mean {}={:.4} -> {}",
+            spec.algorithm, spec.task, total_combos, metric_name, best_mean, spec.node_id
         ))
     }
 
@@ -1791,6 +2216,265 @@ impl DuckdbEngine {
             spec.columns.len(),
             added_cols,
             spec.node_id
+        ))
+    }
+
+    /// ml.forecast.arima: ARIMA(p,d,q) time series forecasting.
+    ///
+    /// Differences the series d times, fits AR coefficients via OLS (normal
+    /// equations with Gaussian elimination), optionally estimates MA coefficients
+    /// via conditional sum of squares (CSS), forecasts h steps ahead, and
+    /// undifferences back to the original scale.
+    ///
+    /// Output: table with columns (index, actual, fitted, forecast, lower_ci, upper_ci).
+    pub(crate) fn run_ml_forecast_arima(
+        &self,
+        db: &Path,
+        spec: &plan::MlForecastArimaSpec,
+    ) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+
+        let rows = self.run_rows(
+            Some(db),
+            &format!(
+                "SELECT {} FROM {};",
+                plan::quote_ident(&spec.target_column),
+                plan::quote_ident(&spec.from_view)
+            ),
+        )?;
+        if rows.is_empty() {
+            return Err(EngineError::Query(format!(
+                "ml.forecast.arima: no rows from {}",
+                spec.from_view
+            )));
+        }
+
+        let original: Vec<f64> = rows
+            .iter()
+            .map(|r| cell_to_f64(r.get(&spec.target_column)))
+            .collect();
+        let n = original.len();
+
+        // Minimum length check: need enough observations after differencing
+        // to fit AR(p) + MA(q).
+        let min_needed = spec.d + spec.p + spec.q + 1;
+        if n < min_needed {
+            return Err(EngineError::Query(format!(
+                "ml.forecast.arima: need >= {} observations for ARIMA({},{},{}), got {}",
+                min_needed, spec.p, spec.d, spec.q, n
+            )));
+        }
+
+        // ── Step 1: Difference d times ───────────────────────────────────
+        let mut z = original.clone();
+        for _ in 0..spec.d {
+            if z.len() < 2 {
+                return Err(EngineError::Query(
+                    "ml.forecast.arima: series too short after differencing".into(),
+                ));
+            }
+            let mut diffed = Vec::with_capacity(z.len() - 1);
+            for i in 1..z.len() {
+                diffed.push(z[i] - z[i - 1]);
+            }
+            z = diffed;
+        }
+
+        let p = spec.p;
+        let q = spec.q;
+        let z_len = z.len();
+
+        // We need at least max(p, q) observations to build the design matrix.
+        let start = p.max(q);
+        if z_len <= start {
+            return Err(EngineError::Query(format!(
+                "ml.forecast.arima: after differencing, series has {} points; need > max(p,q) = {}",
+                z_len, start
+            )));
+        }
+
+        // ── Step 2: Fit AR coefficients via OLS ──────────────────────────
+        // For pure AR (q==0): y_t = c + φ₁y_{t-1} + ... + φₚy_{t-p}
+        // For ARMA (q>0): iterative CSS: regress on [z_{t-1}..z_{t-p}, e_{t-1}..e_{t-q}]
+        let n_design = z_len - start;
+        let ncols = p + q + 1; // +1 for intercept
+
+        // Build initial residuals (zeros for MA terms).
+        let mut residuals: Vec<f64> = vec![0.0; z_len];
+
+        // Iterative CSS: up to 30 iterations or until convergence.
+        let max_iter = if q > 0 { 30 } else { 1 };
+        let mut ar_coefficients = vec![0.0f64; p];
+        let mut ma_coefficients = vec![0.0f64; q];
+        let mut intercept = 0.0f64;
+
+        for _iter in 0..max_iter {
+            // Build design matrix X and target y for the ARMA regression.
+            let mut x_data: Vec<Vec<f64>> = Vec::with_capacity(n_design);
+            let mut y_data: Vec<f64> = Vec::with_capacity(n_design);
+
+            for t in start..z_len {
+                let mut row = Vec::with_capacity(ncols);
+                // AR terms
+                for i in 1..=p {
+                    row.push(z[t - i]);
+                }
+                // MA terms (use previously estimated residuals)
+                for j in 1..=q {
+                    row.push(residuals[t - j]);
+                }
+                // Intercept column
+                row.push(1.0);
+                x_data.push(row);
+                y_data.push(z[t]);
+            }
+
+            // Solve via normal equations: β = (XᵀX)⁻¹ Xᵀy
+            let beta = solve_ols(&x_data, &y_data);
+
+            if beta.len() != ncols {
+                return Err(EngineError::Query(
+                    "ml.forecast.arima: OLS solver returned wrong dimension".into(),
+                ));
+            }
+
+            // Extract coefficients.
+            let new_ar: Vec<f64> = beta[0..p].to_vec();
+            let new_ma: Vec<f64> = if q > 0 { beta[p..p + q].to_vec() } else { vec![] };
+            let new_intercept = beta[p + q];
+
+            // Recompute residuals with the new coefficients.
+            for t in start..z_len {
+                let mut fitted = new_intercept;
+                for i in 0..p {
+                    fitted += new_ar[i] * z[t - i - 1];
+                }
+                for j in 0..q {
+                    fitted += new_ma[j] * residuals[t - j - 1];
+                }
+                residuals[t] = z[t] - fitted;
+            }
+
+            // Check convergence (for ARMA only).
+            if q > 0 {
+                let delta: f64 = ar_coefficients
+                    .iter()
+                    .zip(new_ar.iter())
+                    .map(|(a, b)| (a - b).powi(2))
+                    .sum::<f64>()
+                    + ma_coefficients
+                        .iter()
+                        .zip(new_ma.iter())
+                        .map(|(a, b)| (a - b).powi(2))
+                        .sum::<f64>();
+                ar_coefficients = new_ar;
+                ma_coefficients = new_ma;
+                intercept = new_intercept;
+                if delta < 1e-10 {
+                    break;
+                }
+            } else {
+                ar_coefficients = new_ar;
+                ma_coefficients = new_ma;
+                intercept = new_intercept;
+            }
+        }
+
+        // ── Step 3: Compute fitted values on differenced series ──────────
+        let mut fitted_z = vec![0.0f64; z_len];
+        for t in start..z_len {
+            let mut val = intercept;
+            for i in 0..p {
+                val += ar_coefficients[i] * z[t - i - 1];
+            }
+            for j in 0..q {
+                val += ma_coefficients[j] * residuals[t - j - 1];
+            }
+            fitted_z[t] = val;
+        }
+
+        // ── Step 4: Multi-step forecast on differenced scale ─────────────
+        // For forecasting, future ε are assumed 0; use a rolling buffer.
+        let mut z_ext = z.clone();
+        let mut res_ext = residuals.clone();
+        let mut forecast_z = Vec::with_capacity(spec.steps);
+
+        for _ in 0..spec.steps {
+            let t = z_ext.len();
+            let mut val = intercept;
+            for i in 0..p {
+                let idx = t.checked_sub(i + 1);
+                val += ar_coefficients[i] * idx.map(|k| z_ext[k]).unwrap_or(0.0);
+            }
+            for j in 0..q {
+                let idx = t.checked_sub(j + 1);
+                val += ma_coefficients[j] * idx.map(|k| res_ext[k]).unwrap_or(0.0);
+            }
+            forecast_z.push(val);
+            z_ext.push(val);
+            res_ext.push(0.0); // future residuals assumed 0
+        }
+
+        // ── Step 5: Undifference to original scale ───────────────────────
+        // Reconstruct fitted values on the original scale.
+        let fitted_original = undifference(&fitted_z, &original, spec.d);
+        let forecast_original = undifference(&forecast_z, &original, spec.d);
+
+        // ── Step 6: Confidence intervals (simple residual std-based) ─────
+        let residual_std = {
+            let res_slice = &residuals[start..];
+            let mean = res_slice.iter().sum::<f64>() / res_slice.len() as f64;
+            let var = res_slice
+                .iter()
+                .map(|r| (r - mean).powi(2))
+                .sum::<f64>()
+                / (res_slice.len().max(2) - 1) as f64;
+            var.sqrt()
+        };
+
+        // ── Step 7: Build output table ───────────────────────────────────
+        let mut out: Vec<JsonValue> = Vec::with_capacity(n + spec.steps);
+
+        // Actual + fitted rows (original series length).
+        // fitted_original now has n values (seed + reconstructed).
+        for i in 0..n {
+            let actual = original[i];
+            let fitted = if i < fitted_original.len() && i >= spec.d {
+                Some(fitted_original[i])
+            } else {
+                None
+            };
+            let mut row = serde_json::Map::new();
+            row.insert("index".into(), json!(i));
+            row.insert("actual".into(), json!(actual));
+            match fitted {
+                Some(f) => row.insert("fitted".into(), json!(round6(f))),
+                None => row.insert("fitted".into(), JsonValue::Null),
+            };
+            row.insert("forecast".into(), JsonValue::Null);
+            row.insert("lower_ci".into(), JsonValue::Null);
+            row.insert("upper_ci".into(), JsonValue::Null);
+            out.push(JsonValue::Object(row));
+        }
+
+        // Forecast rows.
+        for (h, fc) in forecast_original.iter().enumerate() {
+            let idx = n + h;
+            let ci_scale = residual_std * ((h + 1) as f64).sqrt();
+            let mut row = serde_json::Map::new();
+            row.insert("index".into(), json!(idx));
+            row.insert("actual".into(), JsonValue::Null);
+            row.insert("fitted".into(), JsonValue::Null);
+            row.insert("forecast".into(), json!(round6(*fc)));
+            row.insert("lower_ci".into(), json!(round6(fc - 1.96 * ci_scale)));
+            row.insert("upper_ci".into(), json!(round6(fc + 1.96 * ci_scale)));
+            out.push(JsonValue::Object(row));
+        }
+
+        materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &out)?;
+        Ok(format!(
+            "ml.forecast.arima({},{},{}): {} rows fitted + {} steps forecast -> {}",
+            spec.p, spec.d, spec.q, n, spec.steps, spec.node_id
         ))
     }
 

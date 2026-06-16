@@ -567,6 +567,14 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // ARIMA Forecaster - data in, forecast out (no model port).
+    if (id === 'ml.forecast.arima') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [],
+        };
+    }
+
     // Predictor - data in + model in, predictions out.
     if (id === 'ml.predict' || id === 'dl.onnx.predict') {
         return {
@@ -586,6 +594,14 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
     // Cross-Validator - labeled data in, metrics table out (orchestrates
     // train/predict/score over k folds internally).
     if (id === 'ml.crossval') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [MAIN_OUT],
+        };
+    }
+
+    // Grid Search - labeled data in, ranked results table out.
+    if (id === 'ml.gridsearch') {
         return {
             inputs: [MAIN_IN],
             outputs: [MAIN_OUT],
@@ -5170,6 +5186,82 @@ function synthMl(comp: ComponentDef): ComponentManifest {
                         label: 'Learning rate (xgb)',
                         kind: 'number',
                         defaultValue: 0.1,
+                    },
+                ],
+            },
+        ], 'upstream');
+    }
+
+    if (id === 'ml.gridsearch') {
+        return base(comp, [
+            {
+                label: 'Grid Search',
+                fields: [
+                    {
+                        key: 'algorithm',
+                        label: 'Algorithm',
+                        kind: 'select',
+                        defaultValue: 'forest',
+                        options: [
+                            { label: 'Linear Regression', value: 'linreg' },
+                            { label: 'Logistic Regression', value: 'logreg' },
+                            { label: 'Decision Tree', value: 'tree' },
+                            { label: 'Random Forest', value: 'forest' },
+                            { label: 'KNN', value: 'knn' },
+                            { label: 'Decision Tree (reg)', value: 'tree.reg' },
+                            { label: 'Random Forest (reg)', value: 'forest.reg' },
+                            { label: 'KNN (reg)', value: 'knn.reg' },
+                            { label: 'Ridge', value: 'ridge' },
+                            { label: 'Lasso', value: 'lasso' },
+                            { label: 'ElasticNet', value: 'elasticnet' },
+                            { label: 'Naive Bayes', value: 'nb.gaussian' },
+                            { label: 'XGBoost (classifier)', value: 'xgb' },
+                            { label: 'XGBoost (regressor)', value: 'xgb.reg' },
+                        ],
+                    },
+                    {
+                        key: 'targetColumn',
+                        label: 'Target column',
+                        kind: 'column',
+                        required: true,
+                    },
+                    {
+                        key: 'featureColumns',
+                        label: 'Feature columns',
+                        kind: 'columns',
+                        description: 'Predictor columns. Leave empty to use all other numeric columns.',
+                    },
+                    {
+                        key: 'task',
+                        label: 'Task',
+                        kind: 'select',
+                        defaultValue: 'classification',
+                        options: [
+                            { label: 'Classification (accuracy)', value: 'classification' },
+                            { label: 'Regression (RMSE)', value: 'regression' },
+                        ],
+                    },
+                    {
+                        key: 'paramGrid',
+                        label: 'Parameter grid (JSON)',
+                        kind: 'text',
+                        defaultValue: '{}',
+                        placeholder: '{"maxDepth":[3,5,7],"nTrees":[10,50,100]}',
+                        description: 'JSON object mapping hyperparameter names to arrays of values. Keys: maxDepth, nTrees, k, maxIter, alpha, l1Ratio, learningRate, kernel, c, epsilon, gamma, folds, seed.',
+                    },
+                    {
+                        key: 'folds',
+                        label: 'Folds (k)',
+                        kind: 'integer',
+                        defaultValue: 5,
+                        description: 'Number of cross-validation folds per combination (min 2).',
+                    },
+                    {
+                        key: 'seed',
+                        label: 'Seed',
+                        kind: 'integer',
+                        defaultValue: 42,
+                        description: 'Deterministic fold-assignment seed.',
                     },
                 ],
             },

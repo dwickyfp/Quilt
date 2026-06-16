@@ -164,9 +164,11 @@ pub enum RuntimeSpec {
     MlScore(MlScoreSpec),
     MlFeatureImportance(MlFeatureImportanceSpec),
     MlCrossval(MlCrossvalSpec),
+    MlGridSearch(MlGridSearchSpec),
     MlFeatureSelect(MlFeatureSelectSpec),
     MlPca(MlPcaSpec),
     MlOneHot(MlOneHotSpec),
+    MlForecastArima(MlForecastArimaSpec),
     StatTest(StatTestSpec),
     ModelWriter(ModelWriterSpec),
     OnnxReader(OnnxReaderSpec),
@@ -587,9 +589,11 @@ fn build_stage(
     let mut ml_score: Option<MlScoreSpec> = None;
     let mut ml_feature_importance: Option<MlFeatureImportanceSpec> = None;
     let mut ml_crossval: Option<MlCrossvalSpec> = None;
+    let mut ml_gridsearch: Option<MlGridSearchSpec> = None;
     let mut ml_featureselect: Option<MlFeatureSelectSpec> = None;
     let mut ml_pca: Option<MlPcaSpec> = None;
     let mut ml_onehot: Option<MlOneHotSpec> = None;
+    let mut ml_forecast_arima: Option<MlForecastArimaSpec> = None;
     let mut stat_test: Option<StatTestSpec> = None;
     let mut model_writer: Option<ModelWriterSpec> = None;
     let mut onnx_reader: Option<OnnxReaderSpec> = None;
@@ -3185,6 +3189,32 @@ fn build_stage(
                 .unwrap_or_else(|| "classification".into()),
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "ml.gridsearch" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let target_column = string_prop(&props, "targetColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: targetColumn required", component_id)))?;
+        let algorithm = string_prop(&props, "algorithm")
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "forest".into());
+        ml_gridsearch = Some(MlGridSearchSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            algorithm,
+            target_column,
+            feature_columns: columns_list(&props, "featureColumns"),
+            folds: props.get("folds").and_then(|v| v.as_u64()).unwrap_or(5).max(2) as usize,
+            seed: props.get("seed").and_then(|v| v.as_u64()).unwrap_or(42),
+            task: string_prop(&props, "task")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "classification".into()),
+            param_grid: string_prop(&props, "paramGrid")
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "{}".into()),
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "ml.featureselect" {
         let from_view = inputs
             .main()
@@ -3256,6 +3286,23 @@ fn build_stage(
             columns,
             max_categories: props.get("maxCategories").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
             drop_original: props.get("dropOriginal").and_then(|v| v.as_bool()).unwrap_or(false),
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "ml.forecast.arima" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let target_column = string_prop(&props, "targetColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: targetColumn required", component_id)))?;
+        ml_forecast_arima = Some(MlForecastArimaSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            target_column,
+            p: props.get("p").and_then(|v| v.as_u64()).unwrap_or(1).max(1) as usize,
+            d: props.get("d").and_then(|v| v.as_u64()).unwrap_or(1) as usize,
+            q: props.get("q").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
+            steps: props.get("steps").and_then(|v| v.as_u64()).unwrap_or(10).max(1) as usize,
         });
         (String::new(), StageKind::View, None)
     } else if component_id == "xf.stat.test" {
@@ -3860,9 +3907,11 @@ fn build_stage(
         .or_else(|| ml_score.map(RuntimeSpec::MlScore))
         .or_else(|| ml_feature_importance.map(RuntimeSpec::MlFeatureImportance))
         .or_else(|| ml_crossval.map(RuntimeSpec::MlCrossval))
+        .or_else(|| ml_gridsearch.map(RuntimeSpec::MlGridSearch))
         .or_else(|| ml_featureselect.map(RuntimeSpec::MlFeatureSelect))
         .or_else(|| ml_pca.map(RuntimeSpec::MlPca))
         .or_else(|| ml_onehot.map(RuntimeSpec::MlOneHot))
+        .or_else(|| ml_forecast_arima.map(RuntimeSpec::MlForecastArima))
         .or_else(|| stat_test.map(RuntimeSpec::StatTest))
         .or_else(|| model_writer.map(RuntimeSpec::ModelWriter))
         .or_else(|| onnx_reader.map(RuntimeSpec::OnnxReader))
