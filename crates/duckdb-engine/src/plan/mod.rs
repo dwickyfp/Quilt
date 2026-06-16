@@ -169,6 +169,7 @@ pub enum RuntimeSpec {
     MlPca(MlPcaSpec),
     MlOneHot(MlOneHotSpec),
     MlForecastArima(MlForecastArimaSpec),
+    MlAnomalyIsoForest(MlAnomalyIsoForestSpec),
     StatTest(StatTestSpec),
     ModelWriter(ModelWriterSpec),
     OnnxReader(OnnxReaderSpec),
@@ -594,6 +595,7 @@ fn build_stage(
     let mut ml_pca: Option<MlPcaSpec> = None;
     let mut ml_onehot: Option<MlOneHotSpec> = None;
     let mut ml_forecast_arima: Option<MlForecastArimaSpec> = None;
+    let mut ml_anomaly_iso_forest: Option<MlAnomalyIsoForestSpec> = None;
     let mut stat_test: Option<StatTestSpec> = None;
     let mut model_writer: Option<ModelWriterSpec> = None;
     let mut onnx_reader: Option<OnnxReaderSpec> = None;
@@ -3305,6 +3307,22 @@ fn build_stage(
             steps: props.get("steps").and_then(|v| v.as_u64()).unwrap_or(10).max(1) as usize,
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "ml.anomaly.isolation_forest" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!(
+                "ml.anomaly.isolation_forest: main input required"
+            )))?;
+        let feature_columns = columns_list(&props, "featureColumns");
+        ml_anomaly_iso_forest = Some(MlAnomalyIsoForestSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            feature_columns,
+            n_trees: props.get("nTrees").and_then(|v| v.as_u64()).unwrap_or(100) as usize,
+            max_depth: props.get("maxDepth").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
+            contamination: props.get("contamination").and_then(|v| v.as_f64()).unwrap_or(0.1),
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "xf.stat.test" {
         let from_view = inputs
             .main()
@@ -3912,6 +3930,7 @@ fn build_stage(
         .or_else(|| ml_pca.map(RuntimeSpec::MlPca))
         .or_else(|| ml_onehot.map(RuntimeSpec::MlOneHot))
         .or_else(|| ml_forecast_arima.map(RuntimeSpec::MlForecastArima))
+        .or_else(|| ml_anomaly_iso_forest.map(RuntimeSpec::MlAnomalyIsoForest))
         .or_else(|| stat_test.map(RuntimeSpec::StatTest))
         .or_else(|| model_writer.map(RuntimeSpec::ModelWriter))
         .or_else(|| onnx_reader.map(RuntimeSpec::OnnxReader))

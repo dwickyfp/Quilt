@@ -1485,3 +1485,21 @@ pub struct OnnxPredictSpec {
     pub feature_columns: Vec<String>,
     pub output_column: String,
 }
+
+/// ml.anomaly.isolation_forest: train an isolation forest and score each row
+/// with an anomaly score. A standalone transform node (train + score in one
+/// step); no separate predict node needed.
+#[derive(Debug, Clone)]
+pub struct MlAnomalyIsoForestSpec {
+    pub node_id: String,
+    pub from_view: String,
+    /// Feature columns; empty = all numeric columns.
+    pub feature_columns: Vec<String>,
+    /// Number of trees in the ensemble (default 100).
+    pub n_trees: usize,
+    /// Maximum tree depth; 0 = auto (ceil(log2(n_samples))).
+    pub max_depth: usize,
+    /// Expected fraction of anomalies (default 0.1). Used to set the
+    /// score threshold: top contamination% are flagged as anomalies.
+    pub contamination: f64,
+}

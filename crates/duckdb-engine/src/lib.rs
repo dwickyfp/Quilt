@@ -1022,6 +1022,7 @@ impl DuckdbEngine {
                     Some(RuntimeSpec::MlPca(spec)) => self.run_ml_pca(&db_path, spec),
                     Some(RuntimeSpec::MlOneHot(spec)) => self.run_ml_onehot(&db_path, spec),
                     Some(RuntimeSpec::MlForecastArima(spec)) => self.run_ml_forecast_arima(&db_path, spec),
+                    Some(RuntimeSpec::MlAnomalyIsoForest(spec)) => self.run_ml_anomaly_iso_forest(&db_path, spec),
                     Some(RuntimeSpec::StatTest(spec)) => self.run_stat_test(&db_path, spec),
                     Some(RuntimeSpec::ModelWriter(spec)) => self.run_model_writer(&db_path, spec),
                     Some(RuntimeSpec::OnnxReader(spec)) => self.run_onnx_reader(&db_path, spec),

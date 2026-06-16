@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 379,
+  "componentCount": 381,
   "components": [
     {
       "id": "src.csv",
@@ -43575,6 +43575,72 @@
       }
     },
     {
+      "id": "ml.learner.mlp",
+      "label": "MLP Neural Network",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Multi-layer perceptron classifier via SGD backprop. Props: targetColumn, featureColumns, hiddenLayerSize (default 100 via k), learningRate (default 0.01), maxIter (default 200). Binary + multi-class.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.mlp",
+        "kind": "ml",
+        "label": "MLP Neural Network",
+        "description": "Multi-layer perceptron classifier via SGD backprop. Props: targetColumn, featureColumns, hiddenLayerSize (default 100 via k), learningRate (default 0.01), maxIter (default 200). Binary + multi-class.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "ml.learner.svc",
       "label": "Support Vector Classifier",
       "kind": "ml",
@@ -43954,6 +44020,65 @@
             }
           ],
           "outputs": []
+        }
+      }
+    },
+    {
+      "id": "ml.anomaly.isolation_forest",
+      "label": "Isolation Forest",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Anomaly detection via Isolation Forest ensemble. Props: featureColumns, nTrees (default 100), maxDepth (0=auto), contamination (default 0.1). Outputs: original data + anomaly_score + is_anomaly (0/1).",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.anomaly.isolation_forest",
+        "kind": "ml",
+        "label": "Isolation Forest",
+        "description": "Anomaly detection via Isolation Forest ensemble. Props: featureColumns, nTrees (default 100), maxDepth (0=auto), contamination (default 0.1). Outputs: original data + anomaly_score + is_anomaly (0/1).",
+        "schemaSource": "upstream",
+        "sections": [],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
         }
       }
     },

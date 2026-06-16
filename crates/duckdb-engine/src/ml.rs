@@ -66,6 +66,31 @@ struct SvcBinary {
     kernel_gamma: f64,
 }
 
+/// A single isolation tree.  `feature` and `threshold` are stored at the
+/// root for quick top-level access; the recursive tree lives in `left`/`right`.
+#[derive(Serialize, Deserialize, Clone)]
+struct IsoTree {
+    feature: usize,
+    threshold: f64,
+    left: Box<IsoTreeNode>,
+    right: Box<IsoTreeNode>,
+    size: usize,
+}
+
+/// Recursive node of an isolation tree.
+#[derive(Serialize, Deserialize, Clone)]
+enum IsoTreeNode {
+    Branch {
+        feature: usize,
+        threshold: f64,
+        left: Box<IsoTreeNode>,
+        right: Box<IsoTreeNode>,
+    },
+    Leaf {
+        size: usize,
+    },
+}
+
 /// Classifiers learn on integer-encoded class labels and remember the
 /// original string labels so predictions decode back to the user's values.
 /// Regressors and clustering carry no label map.
@@ -161,6 +186,34 @@ enum Model {
         kernel_type: String,
         kernel_gamma: f64,
     },
+    /// Isolation Forest anomaly detector (pure Rust). Trees stored as
+    /// recursive IsoTreeNode structures; `n_samples` is the training set
+    /// size used to normalise path lengths at predict time.
+    IsoForest {
+        features: Vec<String>,
+        trees: Vec<IsoTree>,
+        n_samples: usize,
+        max_depth: usize,
+    },
+    /// Multi-layer perceptron (pure-Rust SGD). Single hidden layer with
+    /// ReLU activation; sigmoid output for binary, softmax for multi-class.
+    MLP {
+        features: Vec<String>,
+        labels: Vec<String>,
+        weights_hidden: Vec<Vec<f64>>,
+        bias_hidden: Vec<f64>,
+        weights_output: Vec<Vec<f64>>,
+        bias_output: Vec<f64>,
+        hidden_size: usize,
+        n_classes: usize,
+    },
+    /// Multi-class gradient-boosted trees via One-vs-Rest. Stores one
+    /// binary GBDT per class (class_i vs rest).
+    XgbMulti {
+        features: Vec<String>,
+        labels: Vec<String>,
+        models: Vec<GBDT>,
+    },
     /// ARIMA(p,d,q) time series model — pure-Rust OLS-based estimation.
     Arima {
         ar_coefficients: Vec<f64>,
@@ -195,7 +248,10 @@ impl Model {
             | Model::Xgb { features, .. }
             | Model::XgbReg { features, .. }
             | Model::Svc { features, .. }
-            | Model::Svr { features, .. } => features,
+            | Model::Svr { features, .. }
+            | Model::IsoForest { features, .. }
+            | Model::MLP { features, .. }
+            | Model::XgbMulti { features, .. } => features,
             Model::Arima { .. } => &[],
         }
     }
@@ -220,6 +276,9 @@ impl Model {
             Model::XgbReg { .. } => "xgb.reg",
             Model::Svc { .. } => "svc",
             Model::Svr { .. } => "svr",
+            Model::IsoForest { .. } => "isoforest",
+            Model::MLP { .. } => "mlp",
+            Model::XgbMulti { .. } => "xgb.multi",
             Model::Arima { .. } => "arima",
         }
     }
@@ -391,6 +450,117 @@ fn decode_class_preds(preds: Vec<i64>, labels: &[String]) -> Vec<JsonValue> {
                 .unwrap_or_else(|| json!(p))
         })
         .collect()
+}
+
+/// Average path length of an unsuccessful BST search in a tree of `n` nodes.
+/// This is the harmonic number H(n-1) + 2*H(1) ≈ 2*ln(n) + 0.5772*2 - 2*(n-1)/n.
+fn isolation_c(n: usize) -> f64 {
+    if n <= 1 { return 0.0; }
+    let n = n as f64;
+    2.0 * (n - 1.0).ln() + 0.5772156649 * 2.0 - 2.0 * (n - 1.0) / n
+}
+
+/// Compute the path length of point `x` in a single isolation tree.
+fn isolation_path_length(x: &[f64], tree: &IsoTree, max_depth: usize) -> f64 {
+    // Start at root
+    let mut depth = 0usize;
+    if x[tree.feature] < tree.threshold {
+        isolation_path_walk(x, &tree.left, depth + 1, max_depth)
+    } else {
+        isolation_path_walk(x, &tree.right, depth + 1, max_depth)
+    }
+}
+
+fn isolation_path_walk(x: &[f64], node: &IsoTreeNode, depth: usize, max_depth: usize) -> f64 {
+    match node {
+        IsoTreeNode::Leaf { size } => {
+            depth as f64 + isolation_c(*size)
+        }
+        IsoTreeNode::Branch { feature, threshold, left, right } => {
+            if depth >= max_depth {
+                return depth as f64;
+            }
+            if x[*feature] < *threshold {
+                isolation_path_walk(x, left, depth + 1, max_depth)
+            } else {
+                isolation_path_walk(x, right, depth + 1, max_depth)
+            }
+        }
+    }
+}
+
+/// Build a single isolation tree by recursive random splits.
+fn build_isolation_tree(
+    data: &[Vec<f64>],
+    rng_seed: &mut u64,
+    max_depth: usize,
+    n_features: usize,
+) -> IsoTree {
+    let n = data.len();
+    // Find min/max per feature in this subset
+    let mut mins = vec![f64::MAX; n_features];
+    let mut maxs = vec![f64::MIN; n_features];
+    for row in data {
+        for j in 0..n_features {
+            if row[j] < mins[j] { mins[j] = row[j]; }
+            if row[j] > maxs[j] { maxs[j] = row[j]; }
+        }
+    }
+    let node = build_isolation_node(data, rng_seed, 0, max_depth, n_features, &mins, &maxs);
+    // Extract root split info from node
+    match node {
+        IsoTreeNode::Branch { feature, threshold, left, right } => {
+            IsoTree { feature, threshold, left, right, size: n }
+        }
+        IsoTreeNode::Leaf { size } => {
+            // Degenerate: single point or all same
+            IsoTree { feature: 0, threshold: 0.0, left: Box::new(IsoTreeNode::Leaf { size }), right: Box::new(IsoTreeNode::Leaf { size: 0 }), size }
+        }
+    }
+}
+
+fn build_isolation_node(
+    data: &[Vec<f64>],
+    rng_seed: &mut u64,
+    depth: usize,
+    max_depth: usize,
+    n_features: usize,
+    mins: &[f64],
+    maxs: &[f64],
+) -> IsoTreeNode {
+    if data.len() <= 1 || depth >= max_depth {
+        return IsoTreeNode::Leaf { size: data.len() };
+    }
+    // Pick random feature with range > 0
+    let rand_usize = |seed: &mut u64, bound: usize| -> usize {
+        *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+        ((*seed >> 33) % bound as u64) as usize
+    };
+    let rand_f64 = |seed: &mut u64| -> f64 {
+        *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+        (*seed >> 11) as f64 / (1u64 << 53) as f64
+    };
+    // Find features with range > 0
+    let valid: Vec<usize> = (0..n_features).filter(|&j| mins[j] < maxs[j]).collect();
+    if valid.is_empty() {
+        return IsoTreeNode::Leaf { size: data.len() };
+    }
+    let feat = valid[rand_usize(rng_seed, valid.len())];
+    let lo = mins[feat];
+    let hi = maxs[feat];
+    let threshold = lo + rand_f64(rng_seed) * (hi - lo);
+    let (left_data, right_data): (Vec<_>, Vec<_>) = data.iter().cloned().partition(|row| row[feat] < threshold);
+    if left_data.is_empty() || right_data.is_empty() {
+        return IsoTreeNode::Leaf { size: data.len() };
+    }
+    // Update mins/maxs for children
+    let (mut lmins, mut lmaxs) = (mins.to_vec(), maxs.to_vec());
+    let (mut rmins, mut rmaxs) = (mins.to_vec(), maxs.to_vec());
+    lmaxs[feat] = lmaxs[feat].min(threshold);
+    rmins[feat] = rmins[feat].max(threshold);
+    let left = Box::new(build_isolation_node(&left_data, rng_seed, depth + 1, max_depth, n_features, &lmins, &lmaxs));
+    let right = Box::new(build_isolation_node(&right_data, rng_seed, depth + 1, max_depth, n_features, &rmins, &rmaxs));
+    IsoTreeNode::Branch { feature: feat, threshold, left, right }
 }
 
 /// Extract feature importance from a smartcore DecisionTree serialized to JSON.
@@ -1007,6 +1177,136 @@ impl DuckdbEngine {
                     kernel_gamma: gamma,
                 }
             }
+            "mlp" => {
+                let (y, labels) = encode_labels(&rows, &spec.target_column);
+                let n_classes = labels.len();
+                if n_classes < 2 {
+                    return Err(EngineError::Config(
+                        "ml.learner.mlp: need at least 2 classes".into(),
+                    ));
+                }
+                let hidden_size = spec.k.max(10);
+                let lr = spec.learning_rate.max(0.0001);
+                let max_iter = spec.max_iter.max(1);
+                let n_features = features.len();
+                // Xavier init
+                let scale_h = (2.0 / n_features as f64).sqrt();
+                let scale_o = (2.0 / hidden_size as f64).sqrt();
+                let mut rng_seed: u64 = 42;
+                let rand_f64 = |seed: &mut u64| -> f64 {
+                    *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                    ((*seed >> 33) as f64 / (1u64 << 31) as f64) - 0.5
+                };
+                let mut weights_hidden: Vec<Vec<f64>> = (0..hidden_size)
+                    .map(|_| (0..n_features).map(|_| rand_f64(&mut rng_seed) * scale_h).collect())
+                    .collect();
+                let mut bias_hidden: Vec<f64> = vec![0.0; hidden_size];
+                let is_binary = n_classes == 2;
+                let out_size = if is_binary { 1 } else { n_classes };
+                let mut weights_output: Vec<Vec<f64>> = (0..out_size)
+                    .map(|_| (0..hidden_size).map(|_| rand_f64(&mut rng_seed) * scale_o).collect())
+                    .collect();
+                let mut bias_output: Vec<f64> = vec![0.0; out_size];
+                let n = rows.len();
+                // SGD training
+                for _epoch in 0..max_iter {
+                    for i in 0..n {
+                        let xi: Vec<f64> = features.iter().map(|f| cell_to_f64(rows[i].get(f))).collect();
+                        // Forward: hidden layer
+                        let mut hidden = vec![0.0f64; hidden_size];
+                        for h in 0..hidden_size {
+                            let mut sum = bias_hidden[h];
+                            for j in 0..n_features {
+                                sum += weights_hidden[h][j] * xi[j];
+                            }
+                            hidden[h] = if sum > 0.0 { sum } else { 0.0 }; // ReLU
+                        }
+                        // Forward: output layer
+                        let mut output = vec![0.0f64; out_size];
+                        for o in 0..out_size {
+                            let mut sum = bias_output[o];
+                            for h in 0..hidden_size {
+                                sum += weights_output[o][h] * hidden[h];
+                            }
+                            output[o] = sum;
+                        }
+                        // Loss gradient + softmax/sigmoid
+                        let mut d_output = vec![0.0f64; out_size];
+                        if is_binary {
+                            let pred = 1.0 / (1.0 + (-output[0]).exp());
+                            let target = if y[i] == 1 { 1.0 } else { 0.0 };
+                            d_output[0] = pred - target;
+                        } else {
+                            // softmax
+                            let max_o = output.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                            let exp_sum: f64 = output.iter().map(|&o| (o - max_o).exp()).sum();
+                            for o in 0..out_size {
+                                let prob = (output[o] - max_o).exp() / exp_sum;
+                                let target = if y[i] == o as i64 { 1.0 } else { 0.0 };
+                                d_output[o] = prob - target;
+                            }
+                        }
+                        // Backprop: output weights
+                        let mut d_hidden = vec![0.0f64; hidden_size];
+                        for o in 0..out_size {
+                            for h in 0..hidden_size {
+                                d_hidden[h] += d_output[o] * weights_output[o][h];
+                                weights_output[o][h] -= lr * d_output[o] * hidden[h];
+                            }
+                            bias_output[o] -= lr * d_output[o];
+                        }
+                        // Backprop: hidden weights (ReLU derivative)
+                        for h in 0..hidden_size {
+                            let d_relu = if hidden[h] > 0.0 { 1.0 } else { 0.0 };
+                            let dh = d_hidden[h] * d_relu;
+                            for j in 0..n_features {
+                                weights_hidden[h][j] -= lr * dh * xi[j];
+                            }
+                            bias_hidden[h] -= lr * dh;
+                        }
+                    }
+                }
+                Model::MLP {
+                    features,
+                    labels,
+                    weights_hidden,
+                    bias_hidden,
+                    weights_output,
+                    bias_output,
+                    hidden_size,
+                    n_classes,
+                }
+            }
+            "xgb.multi" => {
+                let (encoded, labels) = encode_labels(&rows, &spec.target_column);
+                let n_classes = labels.len();
+                if n_classes < 2 {
+                    return Err(EngineError::Config(
+                        "ml.learner.xgb.multi: need at least 2 classes".into(),
+                    ));
+                }
+                let mut models: Vec<GBDT> = Vec::with_capacity(n_classes);
+                for cls in 0..n_classes {
+                    let mut cfg = GbdtConfig::new();
+                    cfg.set_feature_size(features.len());
+                    cfg.set_max_depth(spec.max_depth.max(1) as u32);
+                    cfg.set_iterations(spec.n_trees.max(1));
+                    cfg.set_shrinkage(spec.learning_rate as f32);
+                    cfg.set_loss("LogLikelyhood");
+                    cfg.set_training_optimization_level(0);
+                    let idx_by_row: Vec<i64> = encoded.clone();
+                    let mut i = 0usize;
+                    let mut train = build_gbdt_data(&rows, &features, |_| {
+                        let lbl = if idx_by_row[i] == cls as i64 { 1.0f32 } else { -1.0f32 };
+                        i += 1;
+                        lbl
+                    });
+                    let mut m = GBDT::new(&cfg);
+                    m.fit(&mut train);
+                    models.push(m);
+                }
+                Model::XgbMulti { features, labels, models }
+            }
             other => {
                 return Err(EngineError::Config(format!(
                     "ml.learner: unknown algorithm '{}'",
@@ -1180,6 +1480,76 @@ impl DuckdbEngine {
                         f += weights[i] * k;
                     }
                     json!(f)
+                }).collect()
+            }
+            Model::IsoForest { trees, n_samples, max_depth, .. } => {
+                // Compute anomaly scores inline
+                let c_n = isolation_c(*n_samples);
+                rows.iter().map(|row| {
+                    let xi: Vec<f64> = features.iter().map(|f| cell_to_f64(row.get(f))).collect();
+                    let path_sum: f64 = trees.iter().map(|t| isolation_path_length(&xi, t, *max_depth)).sum();
+                    let mean_path = path_sum / trees.len() as f64;
+                    let score = 2.0f64.powf(-mean_path / c_n);
+                    json!(score)
+                }).collect()
+            }
+            Model::MLP { weights_hidden, bias_hidden, weights_output, bias_output, hidden_size, n_classes, labels, .. } => {
+                let is_binary = *n_classes == 2;
+                let out_size = if is_binary { 1 } else { *n_classes };
+                rows.iter().map(|row| {
+                    let xi: Vec<f64> = features.iter().map(|f| cell_to_f64(row.get(f))).collect();
+                    // Forward: hidden
+                    let mut hidden = vec![0.0f64; *hidden_size];
+                    for h in 0..*hidden_size {
+                        let mut sum = bias_hidden[h];
+                        for j in 0..xi.len() {
+                            sum += weights_hidden[h][j] * xi[j];
+                        }
+                        hidden[h] = if sum > 0.0 { sum } else { 0.0 };
+                    }
+                    // Forward: output
+                    let mut output = vec![0.0f64; out_size];
+                    for o in 0..out_size {
+                        let mut sum = bias_output[o];
+                        for h in 0..*hidden_size {
+                            sum += weights_output[o][h] * hidden[h];
+                        }
+                        output[o] = sum;
+                    }
+                    if is_binary {
+                        let prob = 1.0 / (1.0 + (-output[0]).exp());
+                        let cls = if prob >= 0.5 { 1 } else { 0 };
+                        json!(labels.get(cls).cloned().unwrap_or_else(|| cls.to_string()))
+                    } else {
+                        let max_o = output.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                        let exp_sum: f64 = output.iter().map(|&o| (o - max_o).exp()).sum();
+                        let mut best_cls = 0usize;
+                        let mut best_prob = 0.0f64;
+                        for o in 0..out_size {
+                            let prob = (output[o] - max_o).exp() / exp_sum;
+                            if prob > best_prob {
+                                best_prob = prob;
+                                best_cls = o;
+                            }
+                        }
+                        json!(labels.get(best_cls).cloned().unwrap_or_else(|| best_cls.to_string()))
+                    }
+                }).collect()
+            }
+            Model::XgbMulti { models, labels, .. } => {
+                let test = build_gbdt_test(&rows, &features);
+                // Each model outputs P(+1) for its class; pick highest.
+                let all_probs: Vec<Vec<f32>> = models.iter().map(|m| m.predict(&test)).collect();
+                (0..rows.len()).map(|i| {
+                    let mut best_cls = 0usize;
+                    let mut best_p = f32::NEG_INFINITY;
+                    for (cls, probs) in all_probs.iter().enumerate() {
+                        if probs[i] > best_p {
+                            best_p = probs[i];
+                            best_cls = cls;
+                        }
+                    }
+                    json!(labels.get(best_cls).cloned().unwrap_or_else(|| best_cls.to_string()))
                 }).collect()
             }
             Model::Arima { .. } => {
@@ -1426,6 +1796,11 @@ impl DuckdbEngine {
             Model::Arima { .. } => {
                 return Err(EngineError::Config(
                     "ml.feature.importance: ARIMA does not support feature importance".into(),
+                ));
+            }
+            Model::IsoForest { .. } | Model::MLP { .. } | Model::XgbMulti { .. } => {
+                return Err(EngineError::Config(
+                    "ml.feature.importance: not supported for this model type".into(),
                 ));
             }
         };
@@ -2114,6 +2489,102 @@ impl DuckdbEngine {
             spec.output_prefix,
             ncomp,
             spec.node_id
+        ))
+    }
+
+    /// ml.anomaly.isolation_forest: train an isolation forest and append
+    /// anomaly scores to the input data. A single transform node (no
+    /// separate predict step) — outputs original columns + `anomaly_score`
+    /// + `is_anomaly` (0/1 based on contamination threshold).
+    pub(crate) fn run_ml_anomaly_iso_forest(
+        &self,
+        db: &Path,
+        spec: &plan::MlAnomalyIsoForestSpec,
+    ) -> Result<String, EngineError> {
+        self.check_cancelled()?;
+        let mut rows = self.run_rows(
+            Some(db),
+            &format!("SELECT * FROM {};", plan::quote_ident(&spec.from_view)),
+        )?;
+        if rows.is_empty() {
+            return Err(EngineError::Query(format!(
+                "ml.anomaly.isolation_forest: no rows from {}",
+                spec.from_view
+            )));
+        }
+        let features = resolve_features(&rows, &spec.feature_columns, "")?;
+        let n_features = features.len();
+        if n_features == 0 {
+            return Err(EngineError::Config(
+                "ml.anomaly.isolation_forest: need at least 1 numeric feature column".into(),
+            ));
+        }
+        let n_samples = rows.len();
+        let default_max_depth = ((n_samples as f64).ln() / 2.0_f64.ln()).ceil() as usize;
+        let max_depth = if spec.max_depth == 0 { default_max_depth } else { spec.max_depth };
+        let n_trees = spec.n_trees.max(1);
+
+        // Build feature vectors
+        let data: Vec<Vec<f64>> = rows.iter()
+            .map(|r| features.iter().map(|f| cell_to_f64(r.get(f))).collect())
+            .collect();
+
+        // Train ensemble
+        let mut rng_seed: u64 = 42;
+        let mut trees: Vec<IsoTree> = Vec::with_capacity(n_trees);
+        let subsample_size = 256.min(n_samples);
+        for t in 0..n_trees {
+            // Random subsample (Fisher-Yates shuffle on indices)
+            let mut indices: Vec<usize> = (0..n_samples).collect();
+            for i in (1..n_samples).rev() {
+                rng_seed = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let j = ((rng_seed >> 33) % (i as u64 + 1)) as usize;
+                indices.swap(i, j);
+            }
+            let subset_data: Vec<Vec<f64>> = indices[..subsample_size].iter().map(|&i| data[i].clone()).collect();
+            let tree = build_isolation_tree(&subset_data, &mut rng_seed, max_depth, n_features);
+            trees.push(tree);
+            if (t + 1) % 50 == 0 {
+                self.check_cancelled()?;
+            }
+        }
+
+        // Store model variant (for potential ml.predict use)
+        let _model = Model::IsoForest {
+            features: features.clone(),
+            trees: trees.clone(),
+            n_samples,
+            max_depth,
+        };
+
+        // Compute anomaly scores
+        let c_n = isolation_c(subsample_size);
+        let mut scores: Vec<f64> = Vec::with_capacity(n_samples);
+        for row_data in &data {
+            let path_sum: f64 = trees.iter().map(|t| isolation_path_length(row_data, t, max_depth)).sum();
+            let mean_path = path_sum / n_trees as f64;
+            scores.push(2.0f64.powf(-mean_path / c_n));
+        }
+
+        // Determine threshold from contamination
+        let mut sorted_scores = scores.clone();
+        sorted_scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let threshold_idx = ((1.0 - spec.contamination) * n_samples as f64) as usize;
+        let threshold = sorted_scores[threshold_idx.min(n_samples - 1)];
+
+        // Augment rows
+        for (i, row) in rows.iter_mut().enumerate() {
+            if let Some(obj) = row.as_object_mut() {
+                obj.insert("anomaly_score".into(), json!(scores[i]));
+                obj.insert("is_anomaly".into(), json!(if scores[i] >= threshold { 1 } else { 0 }));
+            }
+        }
+
+        let count = rows.len();
+        materialize_jsonobjects_as_table(&self.bin, db, &spec.node_id, &rows)?;
+        Ok(format!(
+            "ml.anomaly.isolation_forest: {} rows, {} trees -> {}",
+            count, n_trees, spec.node_id
         ))
     }
 
