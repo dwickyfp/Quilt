@@ -3813,7 +3813,7 @@ function synthRoutingControl(comp: ComponentDef): ComponentManifest {
                 { key: 'name', label: 'Variable name', kind: 'text', required: true, description: 'Name of the flow variable to read.' },
                 { key: 'outputColumn', label: 'Output column name', kind: 'text', defaultValue: 'value', description: 'Column name for the emitted value.' },
             ],
-        }], 'none');
+        }], 'autodetect');
     }
     // Loops
     if (id === 'ctl.loop.count') {
