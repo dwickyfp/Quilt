@@ -1419,6 +1419,71 @@ pub(crate) fn build_transpose(inputs: &NodeInputs) -> Result<String, String> {
     ))
 }
 
+/// Conditional Branching (ctl.if). Generates two views from the upstream:
+/// `<node_id>__true` (rows matching the condition) and `<node_id>__false`
+/// (rows NOT matching). VIEW vs TABLE is decided by the same consumer-count
+/// policy as ctl.switch. COALESCE guards NULL conditions so they fall into
+/// the false branch (matching SQL ternary logic: NULL IS NOT TRUE).
+pub(crate) fn build_if_views(
+    node_id: &str,
+    upstream: &str,
+    condition: &str,
+    consumer_count: &HashMap<String, usize>,
+) -> String {
+    let force_views = std::env::var("QUILT_FORCE_VIEWS")
+        .map(|v| {
+            let v = v.trim();
+            v == "1" || v.eq_ignore_ascii_case("true")
+        })
+        .unwrap_or(false);
+    let kw = |relation: &str| -> &'static str {
+        let consumers = consumer_count.get(relation).copied().unwrap_or(0);
+        if force_views || consumers <= 1 {
+            "VIEW"
+        } else {
+            "TABLE"
+        }
+    };
+    let up = quote_ident(upstream);
+    let coalesced = format!("COALESCE(({}), FALSE)", condition);
+
+    let true_rel = format!("{}__true", node_id);
+    let false_rel = format!("{}__false", node_id);
+
+    let mut stmts: Vec<String> = Vec::new();
+
+    // True branch: rows where the condition holds.
+    let true_consumers = consumer_count.get(&true_rel).copied().unwrap_or(0);
+    if true_consumers >= 1 || force_views {
+        stmts.push(format!(
+            "CREATE OR REPLACE {} {} AS SELECT * FROM {} WHERE {}",
+            kw(&true_rel),
+            quote_ident(&true_rel),
+            up,
+            coalesced,
+        ));
+    }
+
+    // False branch: rows where the condition does NOT hold (including NULL).
+    let false_consumers = consumer_count.get(&false_rel).copied().unwrap_or(0);
+    if false_consumers >= 1 || force_views {
+        stmts.push(format!(
+            "CREATE OR REPLACE {} {} AS SELECT * FROM {} WHERE NOT {}",
+            kw(&false_rel),
+            quote_ident(&false_rel),
+            up,
+            coalesced,
+        ));
+    }
+
+    // Always emit at least a passthrough so the stage SQL is never empty.
+    if stmts.is_empty() {
+        stmts.push(passthrough_view_sql(node_id, upstream));
+    }
+
+    stmts.join("; ")
+}
+
 /// Switch / Conditional Split. Routes rows to case_1 ... case_N output
 /// ports based on the form's `branches` (a key-value of branch name
 /// -> boolean SQL expression). First-match-wins: a row that satisfied

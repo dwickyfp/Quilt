@@ -486,11 +486,22 @@ impl DuckdbEngine {
                     if hits.contains(&stage.node_id) {
                         let key = &keys[&stage.node_id];
                         let pq = dir.join(format!("{}.parquet", key));
-                        stage.sql = format!(
-                            "CREATE OR REPLACE VIEW {} AS SELECT * FROM read_parquet('{}')",
-                            plan::quote_ident(&stage.node_id),
-                            sql_escape(&pq.to_string_lossy()),
-                        );
+                        // Re-verify existence: a parallel test may have
+                        // cleaned up the temp cache dir between the initial
+                        // check and now. If missing, treat as a miss.
+                        if pq.exists() {
+                            stage.sql = format!(
+                                "CREATE OR REPLACE VIEW {} AS SELECT * FROM read_parquet('{}')",
+                                plan::quote_ident(&stage.node_id),
+                                sql_escape(&pq.to_string_lossy()),
+                            );
+                        } else if cacheable.contains(&stage.node_id)
+                            && !matches!(stage.kind, StageKind::Sink)
+                        {
+                            hits.remove(&stage.node_id);
+                            cache_misses
+                                .push((stage.node_id.clone(), keys[&stage.node_id].clone()));
+                        }
                     } else if cacheable.contains(&stage.node_id)
                         && !matches!(stage.kind, StageKind::Sink)
                     {
@@ -563,12 +574,14 @@ impl DuckdbEngine {
         // recent ctl.try (no stacked nesting yet - DAG block refactor
         // would add that).
         let mut installed_fallback: Option<String> = None;
+        // Flow variables: xf.variable.set stores, xf.variable.get reads.
         let mut was_cancelled = false;
         let mut preview: Vec<NodePreview> = Vec::new();
         // xf.incremental high-water marks to persist - but only if the WHOLE
         // run succeeds, so a later-stage failure never advances the mark past
         // rows that were never actually delivered. (state file path, json).
         let mut pending_watermarks: Vec<(std::path::PathBuf, JsonValue)> = Vec::new();
+        let mut flow_variables: std::collections::HashMap<String, JsonValue> = std::collections::HashMap::new();
 
         // Fast path: if every stage is pure-SQL with no per-stage
         // hooks, pipe the whole pipeline as one SQL stream into a
@@ -1070,6 +1083,30 @@ impl DuckdbEngine {
                         pipeline_name,
                         &mut pending_watermarks,
                     ),
+                    // ---- v0.9.0 Flow Variables ----
+                    Some(RuntimeSpec::FlowVariableSet(spec)) => {
+                        self.run_flow_variable_set(&db_path, spec, &stage.node_id, &stage.from.as_deref().unwrap_or_default(), &mut flow_variables)
+                    }
+                    Some(RuntimeSpec::FlowVariableGet(spec)) => {
+                        self.run_flow_variable_get(&db_path, spec, &stage.node_id, &flow_variables)
+                    }
+                    // ---- v0.9.0 Control Flow Loops ----
+                    Some(RuntimeSpec::LoopCount(spec)) => {
+                        self.run_loop_count(&db_path, spec, &stage.node_id, &stage.from.as_deref().unwrap_or_default())
+                    }
+                    Some(RuntimeSpec::LoopChunk(spec)) => {
+                        self.run_loop_chunk(&db_path, spec, &stage.node_id, &stage.from.as_deref().unwrap_or_default())
+                    }
+                    // ---- v0.9.0 Conditional Branching ----
+                    Some(RuntimeSpec::IfBranch(spec)) => {
+                        self.run_if_branch(&db_path, spec, &stage.node_id, &stage.from.as_deref().unwrap_or_default())
+                    }
+                    // ---- v0.9.0 Try-Catch ----
+                    Some(RuntimeSpec::TryCatch { .. }) => {
+                        // Try-Catch is handled at the executor level (above).
+                        // If we reach here, the try block succeeded — pass through.
+                        Ok(String::new())
+                    }
                     // Control-flow variants (RunJob / InstallFallback /
                     // Iterate / Foreach / Log / Warn / non-firing Die) already
                     // ran their side effect above, so they fall through here to

@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 385,
+  "componentCount": 391,
   "components": [
     {
       "id": "src.csv",
@@ -23924,6 +23924,114 @@
       }
     },
     {
+      "id": "xf.variable.set",
+      "label": "Set Variable",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "Extract a value from upstream and store it as a named flow variable. Downstream xf.variable.get nodes can read it. The expression is evaluated as a SQL expression against the upstream view.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "xf.variable.set",
+        "kind": "transform",
+        "label": "Set Variable",
+        "description": "Extract a value from upstream and store it as a named flow variable. Downstream xf.variable.get nodes can read it. The expression is evaluated as a SQL expression against the upstream view.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Settings",
+            "fields": [
+              {
+                "key": "notes",
+                "label": "Notes",
+                "kind": "textarea",
+                "rows": 3,
+                "description": "Component-specific configuration not yet modeled - describe the intent here."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "xf.variable.get",
+      "label": "Get Variable",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "Emit a stored flow variable as a single-row table with one column. Use to inject computed values (max dates, counts, config values) into the pipeline.",
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "xf.variable.get",
+        "kind": "transform",
+        "label": "Get Variable",
+        "description": "Emit a stored flow variable as a single-row table with one column. Use to inject computed values (max dates, counts, config values) into the pipeline.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Settings",
+            "fields": [
+              {
+                "key": "notes",
+                "label": "Notes",
+                "kind": "textarea",
+                "rows": 3,
+                "description": "Component-specific configuration not yet modeled - describe the intent here."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "snk.csv",
       "label": "CSV",
       "kind": "sink",
@@ -31997,6 +32105,76 @@
       }
     },
     {
+      "id": "ctl.if",
+      "label": "If / Conditional Branch",
+      "kind": "control",
+      "availability": "available",
+      "summary": "Route rows to true or false output based on a SQL condition. Similar to Switch but simpler - exactly two outputs for binary branching.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "true",
+            "label": "true",
+            "type": "main"
+          },
+          {
+            "id": "false",
+            "label": "false",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ctl.if",
+        "kind": "transform",
+        "label": "If / Conditional Branch",
+        "description": "Route rows to true or false output based on a SQL condition. Similar to Switch but simpler - exactly two outputs for binary branching.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "If / Conditional",
+            "fields": [
+              {
+                "key": "condition",
+                "label": "Condition (SQL)",
+                "kind": "text",
+                "required": true,
+                "description": "SQL boolean expression. Rows matching go to true port, others to false port."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "true",
+              "label": "true",
+              "type": "main"
+            },
+            {
+              "id": "false",
+              "label": "false",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "ctl.iterate",
       "label": "Iterate",
       "kind": "control",
@@ -32119,6 +32297,126 @@
               "id": "iterate",
               "label": "iterate",
               "type": "iterate"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ctl.loop.count",
+      "label": "Count Loop",
+      "kind": "control",
+      "availability": "available",
+      "summary": "Execute the downstream body N times and concatenate results (UNION ALL). The body is the subgraph between this node and the next control node.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ctl.loop.count",
+        "kind": "transform",
+        "label": "Count Loop",
+        "description": "Execute the downstream body N times and concatenate results (UNION ALL). The body is the subgraph between this node and the next control node.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Settings",
+            "fields": [
+              {
+                "key": "notes",
+                "label": "Notes",
+                "kind": "textarea",
+                "rows": 3,
+                "description": "Component-specific configuration not yet modeled - describe the intent here."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ctl.loop.chunk",
+      "label": "Chunk Loop",
+      "kind": "control",
+      "availability": "available",
+      "summary": "Split input data into chunks (by size or count) and process each chunk. Results are concatenated with UNION ALL.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ctl.loop.chunk",
+        "kind": "transform",
+        "label": "Chunk Loop",
+        "description": "Split input data into chunks (by size or count) and process each chunk. Results are concatenated with UNION ALL.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Settings",
+            "fields": [
+              {
+                "key": "notes",
+                "label": "Notes",
+                "kind": "textarea",
+                "rows": 3,
+                "description": "Component-specific configuration not yet modeled - describe the intent here."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
             }
           ]
         }
@@ -33032,6 +33330,76 @@
               "label": "reject",
               "type": "reject",
               "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ctl.try.catch",
+      "label": "Try / Catch Block",
+      "kind": "control",
+      "availability": "available",
+      "summary": "Enhanced error handling: wraps downstream in a try block with an explicit catch pipeline that runs on failure. The catch pipeline receives ${ERROR_MESSAGE}.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "success",
+            "type": "main"
+          },
+          {
+            "id": "catch",
+            "label": "catch",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ctl.try.catch",
+        "kind": "transform",
+        "label": "Try / Catch Block",
+        "description": "Enhanced error handling: wraps downstream in a try block with an explicit catch pipeline that runs on failure. The catch pipeline receives ${ERROR_MESSAGE}.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Settings",
+            "fields": [
+              {
+                "key": "notes",
+                "label": "Notes",
+                "kind": "textarea",
+                "rows": 3,
+                "description": "Component-specific configuration not yet modeled - describe the intent here."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "success",
+              "type": "main"
+            },
+            {
+              "id": "catch",
+              "label": "catch",
+              "type": "main"
             }
           ]
         }

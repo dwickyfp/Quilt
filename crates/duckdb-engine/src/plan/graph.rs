@@ -382,6 +382,9 @@ pub(crate) fn output_table_ref(source_id: &str, source_handle: Option<&str>) -> 
         Some(h) if h.starts_with("case_") || h == "default" => {
             format!("{}__{}", source_id, h)
         }
+        // ctl.if: true/false output ports read from
+        // `<node>__true` / `<node>__false` views.
+        Some(h @ "true") | Some(h @ "false") => format!("{}__{}", source_id, h),
         _ => source_id.to_string(),
     }
 }

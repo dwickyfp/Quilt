@@ -2316,3 +2316,176 @@
             }
         }
     }
+
+    // ── v0.9.0 Control Flow Node Unit Tests ──────────────────────────
+
+    #[test]
+    fn flow_variable_set_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"v","position":{"x":0,"y":0},"data":{"label":"Set","componentId":"xf.variable.set","properties":{"name":"max_val","expression":"col_a + col_b"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"v","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "v").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::FlowVariableSet(spec)) => {
+                assert_eq!(spec.name, "max_val");
+                assert_eq!(spec.value_expr, "col_a + col_b");
+            }
+            other => panic!("expected FlowVariableSet, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn flow_variable_get_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"g","position":{"x":0,"y":0},"data":{"label":"Get","componentId":"xf.variable.get","properties":{"name":"max_val","outputColumn":"total"}}}
+            ],
+            "edges":[]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "g").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::FlowVariableGet(spec)) => {
+                assert_eq!(spec.name, "max_val");
+                assert_eq!(spec.output_column, "total");
+            }
+            other => panic!("expected FlowVariableGet, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn loop_count_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"l","position":{"x":0,"y":0},"data":{"label":"Loop","componentId":"ctl.loop.count","properties":{"iterations":5,"outputMode":"append"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"l","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "l").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::LoopCount(spec)) => {
+                assert_eq!(spec.iterations, 5);
+                assert_eq!(spec.output_mode, "append");
+            }
+            other => panic!("expected LoopCount, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn loop_chunk_with_chunk_size_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"l","position":{"x":0,"y":0},"data":{"label":"Chunk","componentId":"ctl.loop.chunk","properties":{"chunkSize":100}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"l","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "l").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::LoopChunk(spec)) => {
+                assert_eq!(spec.chunk_size, Some(100));
+                assert_eq!(spec.num_chunks, None);
+            }
+            other => panic!("expected LoopChunk, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn loop_chunk_with_num_chunks_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"l","position":{"x":0,"y":0},"data":{"label":"Chunk","componentId":"ctl.loop.chunk","properties":{"numChunks":4}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"l","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "l").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::LoopChunk(spec)) => {
+                assert_eq!(spec.chunk_size, None);
+                assert_eq!(spec.num_chunks, Some(4));
+            }
+            other => panic!("expected LoopChunk, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn if_branch_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"i","position":{"x":0,"y":0},"data":{"label":"If","componentId":"ctl.if","properties":{"condition":"x > 5"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"i","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "i").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::IfBranch(spec)) => {
+                assert_eq!(spec.condition, "x > 5");
+            }
+            other => panic!("expected IfBranch, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn try_catch_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"t","position":{"x":0,"y":0},"data":{"label":"Try","componentId":"ctl.try.catch","properties":{"catchPipelineRef":"catch_pipe"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"t","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "t").unwrap();
+        assert!(stage.runtime.is_some(), "try.catch should have a runtime spec");
+    }
+
+    #[test]
+    fn flow_variable_set_then_get_in_pipeline() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"v","position":{"x":0,"y":0},"data":{"label":"Set","componentId":"xf.variable.set","properties":{"name":"cnt","expression":"col_a"}}},
+                {"id":"g","position":{"x":0,"y":0},"data":{"label":"Get","componentId":"xf.variable.get","properties":{"name":"cnt","outputColumn":"total"}}}
+            ],
+            "edges":[
+                {"id":"e1","source":"s","target":"v","data":{"connectionType":"main"}},
+                {"id":"e2","source":"v","target":"g","data":{"connectionType":"main"}}
+            ]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let set_stage = plan.stages.iter().find(|s| s.node_id == "v").unwrap();
+        let get_stage = plan.stages.iter().find(|s| s.node_id == "g").unwrap();
+        assert!(matches!(set_stage.runtime, Some(RuntimeSpec::FlowVariableSet(_))));
+        assert!(matches!(get_stage.runtime, Some(RuntimeSpec::FlowVariableGet(_))));
+    }
+
+    #[test]
+    fn if_branch_complex_condition_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"i","position":{"x":0,"y":0},"data":{"label":"If","componentId":"ctl.if","properties":{"condition":"x > 5 AND y < 10 OR z IS NOT NULL"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"i","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "i").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::IfBranch(spec)) => {
+                assert_eq!(spec.condition, "x > 5 AND y < 10 OR z IS NOT NULL");
+            }
+            other => panic!("expected IfBranch, got {:?}", other),
+        }
+    }

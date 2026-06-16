@@ -3822,4 +3822,200 @@ impl DuckdbEngine {
             "dl.onnx.predict: this build has no ONNX support. Rebuild quilt-duckdb-engine with --features onnx.".into(),
         ))
     }
+
+    // ── v0.9.0 Flow Variables & Control Flow ──────────────────────────
+
+    /// xf.variable.set: extract a value from upstream and store as flow variable.
+    pub(crate) fn run_flow_variable_set(
+        &self,
+        db: &Path,
+        spec: &plan::FlowVariableSetSpec,
+        node_id: &str,
+        from_view: &str,
+        flow_vars: &mut std::collections::HashMap<String, JsonValue>,
+    ) -> Result<String, EngineError> {
+        // Evaluate value_expr against upstream view
+        let sql = format!(
+            "SELECT ({})::VARCHAR FROM {} LIMIT 1",
+            spec.value_expr,
+            plan::quote_ident(from_view)
+        );
+        let rows = self.run_rows(Some(db), &sql)?;
+        let val = if let Some(row) = rows.first() {
+            row.as_object()
+                .and_then(|o| o.values().next())
+                .cloned()
+                .unwrap_or(JsonValue::Null)
+        } else {
+            JsonValue::Null
+        };
+        flow_vars.insert(spec.name.clone(), val);
+        // Pass through upstream unchanged
+        self.run(
+            Some(db),
+            &format!(
+                "CREATE OR REPLACE VIEW {} AS SELECT * FROM {}",
+                plan::quote_ident(node_id),
+                plan::quote_ident(from_view)
+            ),
+            false,
+        )?;
+        Ok(node_id.to_string())
+    }
+
+    /// xf.variable.get: emit stored flow variable as a single-row table.
+    pub(crate) fn run_flow_variable_get(
+        &self,
+        db: &Path,
+        spec: &plan::FlowVariableGetSpec,
+        node_id: &str,
+        flow_vars: &std::collections::HashMap<String, JsonValue>,
+    ) -> Result<String, EngineError> {
+        let val = flow_vars.get(&spec.name).ok_or_else(|| {
+            EngineError::Config(format!(
+                "xf.variable.get: variable '{}' not set",
+                spec.name
+            ))
+        })?;
+        let literal = match val {
+            JsonValue::String(s) => format!("'{}'", s.replace('\'', "''")),
+            JsonValue::Number(n) => n.to_string(),
+            JsonValue::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
+            JsonValue::Null => "NULL".to_string(),
+            _ => format!("'{}'", val.to_string().replace('\'', "''")),
+        };
+        let col = plan::quote_ident(&spec.output_column);
+        let sql = format!(
+            "CREATE OR REPLACE VIEW {} AS SELECT {} AS {} FROM (SELECT 1)",
+            plan::quote_ident(node_id),
+            literal,
+            col
+        );
+        self.run(Some(db), &sql, false)?;
+        Ok(node_id.to_string())
+    }
+
+    /// ctl.loop.count: execute the downstream body N times, concatenating results.
+    pub(crate) fn run_loop_count(
+        &self,
+        db: &Path,
+        spec: &plan::LoopCountSpec,
+        node_id: &str,
+        from_view: &str,
+    ) -> Result<String, EngineError> {
+        let parts: Vec<String> = (0..spec.iterations)
+            .map(|i| {
+                format!(
+                    "SELECT *, {} AS _iteration FROM {}",
+                    i,
+                    plan::quote_ident(from_view)
+                )
+            })
+            .collect();
+        let union = parts.join(" UNION ALL ");
+        let final_sql = if spec.output_mode == "replace" {
+            format!("SELECT * EXCEPT(_iteration) FROM ({})", union)
+        } else {
+            union
+        };
+        self.run(
+            Some(db),
+            &format!(
+                "CREATE OR REPLACE VIEW {} AS {}",
+                plan::quote_ident(node_id),
+                final_sql
+            ),
+            false,
+        )?;
+        Ok(node_id.to_string())
+    }
+
+    /// ctl.loop.chunk: split input into chunks and process each.
+    pub(crate) fn run_loop_chunk(
+        &self,
+        db: &Path,
+        spec: &plan::LoopChunkSpec,
+        node_id: &str,
+        from_view: &str,
+    ) -> Result<String, EngineError> {
+        let count_rows = self.run_rows(
+            Some(db),
+            &format!("SELECT COUNT(*)::BIGINT AS cnt FROM {}", plan::quote_ident(from_view)),
+        )?;
+        let total: i64 = count_rows
+            .first()
+            .and_then(|r| r.get("cnt"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let chunk_size = if let Some(cs) = spec.chunk_size {
+            cs as i64
+        } else if let Some(nc) = spec.num_chunks {
+            if nc > 0 { (total / nc as i64).max(1) } else { total }
+        } else {
+            return Err(EngineError::Config(
+                "ctl.loop.chunk: either 'chunkSize' or 'numChunks' required".into(),
+            ));
+        };
+        let mut parts = Vec::new();
+        let mut offset = 0i64;
+        let mut idx = 0u64;
+        while offset < total {
+            parts.push(format!(
+                "(SELECT * EXCLUDE(_rn) FROM (SELECT *, ROW_NUMBER() OVER () - 1 AS _rn, {} AS _chunk FROM {}) t WHERE _rn >= {} AND _rn < {})",
+                idx, plan::quote_ident(from_view), offset, offset + chunk_size
+            ));
+            offset += chunk_size;
+            idx += 1;
+        }
+        if parts.is_empty() {
+            parts.push(format!(
+                "SELECT *, 0 AS _chunk FROM {} WHERE FALSE",
+                plan::quote_ident(from_view)
+            ));
+        }
+        self.run(
+            Some(db),
+            &format!(
+                "CREATE OR REPLACE VIEW {} AS {}",
+                plan::quote_ident(node_id),
+                parts.join(" UNION ALL ")
+            ),
+            false,
+        )?;
+        Ok(node_id.to_string())
+    }
+
+    /// ctl.if: conditional branching — creates true/false views.
+    pub(crate) fn run_if_branch(
+        &self,
+        db: &Path,
+        spec: &plan::IfBranchSpec,
+        node_id: &str,
+        from_view: &str,
+    ) -> Result<String, EngineError> {
+        // True branch
+        self.run(
+            Some(db),
+            &format!(
+                "CREATE OR REPLACE VIEW {} AS SELECT * FROM {} WHERE {}",
+                plan::quote_ident(node_id),
+                plan::quote_ident(from_view),
+                spec.condition
+            ),
+            false,
+        )?;
+        // False branch
+        let false_id = format!("{}__false", node_id);
+        self.run(
+            Some(db),
+            &format!(
+                "CREATE OR REPLACE VIEW {} AS SELECT * FROM {} WHERE NOT ({})",
+                plan::quote_ident(&false_id),
+                plan::quote_ident(from_view),
+                spec.condition
+            ),
+            false,
+        )?;
+        Ok(node_id.to_string())
+    }
 }

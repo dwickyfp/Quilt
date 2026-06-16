@@ -487,6 +487,46 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // Flow Variables
+    if (id === 'xf.variable.set') {
+        return { inputs: [MAIN_IN], outputs: [MAIN_OUT] };
+    }
+
+    if (id === 'xf.variable.get') {
+        return { inputs: [], outputs: [MAIN_OUT] };
+    }
+
+    // Loops
+    if (id === 'ctl.loop.count') {
+        return { inputs: [MAIN_IN], outputs: [MAIN_OUT] };
+    }
+
+    if (id === 'ctl.loop.chunk') {
+        return { inputs: [MAIN_IN], outputs: [MAIN_OUT] };
+    }
+
+    // Conditional branching
+    if (id === 'ctl.if') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [
+                { id: 'true', label: 'true', type: 'main' },
+                { id: 'false', label: 'false', type: 'main' },
+            ],
+        };
+    }
+
+    // Try-Catch
+    if (id === 'ctl.try.catch') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [
+                { id: 'main', label: 'success', type: 'main' },
+                { id: 'catch', label: 'catch', type: 'main' },
+            ],
+        };
+    }
+
     // Golden Assert: hard-fails the run on drift; rows pass through unchanged
     // (no reject port - it's an inline regression gate, not a row router).
     if (comp.id === 'qa.golden') {
@@ -3755,6 +3795,64 @@ function synthRoutingControl(comp: ComponentDef): ComponentManifest {
         }
         return base(comp, [{ label: isIterate ? 'Iterate' : 'For each row', fields }], 'upstream');
     }
+
+    // Flow Variables
+    if (id === 'xf.variable.set') {
+        return base(comp, [{
+            label: 'Set Variable',
+            fields: [
+                { key: 'name', label: 'Variable name', kind: 'text', required: true, description: 'Name of the flow variable to store.' },
+                { key: 'expression', label: 'Value expression', kind: 'text', required: true, description: 'SQL expression evaluated against upstream (e.g. column name, MAX(date)).' },
+            ],
+        }], 'upstream');
+    }
+    if (id === 'xf.variable.get') {
+        return base(comp, [{
+            label: 'Get Variable',
+            fields: [
+                { key: 'name', label: 'Variable name', kind: 'text', required: true, description: 'Name of the flow variable to read.' },
+                { key: 'outputColumn', label: 'Output column name', kind: 'text', defaultValue: 'value', description: 'Column name for the emitted value.' },
+            ],
+        }], 'none');
+    }
+    // Loops
+    if (id === 'ctl.loop.count') {
+        return base(comp, [{
+            label: 'Count Loop',
+            fields: [
+                { key: 'iterations', label: 'Iterations', kind: 'integer', defaultValue: 1, required: true, description: 'Number of times to repeat the upstream data.' },
+                { key: 'outputMode', label: 'Output mode', kind: 'select', defaultValue: 'append', options: [{ label: 'Append iteration column', value: 'append' }, { label: 'Replace (drop column)', value: 'replace' }], description: 'Append keeps _iteration column, replace drops it.' },
+            ],
+        }], 'upstream');
+    }
+    if (id === 'ctl.loop.chunk') {
+        return base(comp, [{
+            label: 'Chunk Loop',
+            fields: [
+                { key: 'chunkSize', label: 'Chunk size (rows)', kind: 'integer', description: 'Rows per chunk. Mutually exclusive with numChunks.' },
+                { key: 'numChunks', label: 'Number of chunks', kind: 'integer', description: 'Split into N equal chunks. Mutually exclusive with chunkSize.' },
+            ],
+        }], 'upstream');
+    }
+    // Conditional
+    if (id === 'ctl.if') {
+        return base(comp, [{
+            label: 'If / Conditional',
+            fields: [
+                { key: 'condition', label: 'Condition (SQL)', kind: 'text', required: true, description: 'SQL boolean expression. Rows matching go to true port, others to false port.' },
+            ],
+        }], 'upstream');
+    }
+    // Try-Catch
+    if (id === 'ctl.try.catch') {
+        return base(comp, [{
+            label: 'Try / Catch',
+            fields: [
+                { key: 'catchPipelineRef', label: 'Catch pipeline (optional)', kind: 'text', description: 'Pipeline ref to run on failure. ${ERROR_MESSAGE} is available.' },
+            ],
+        }], 'upstream');
+    }
+
     return synthGeneric(comp, 'upstream');
 }
 

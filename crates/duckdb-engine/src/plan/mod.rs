@@ -178,6 +178,18 @@ pub enum RuntimeSpec {
     ModelWriter(ModelWriterSpec),
     OnnxReader(OnnxReaderSpec),
     OnnxPredict(OnnxPredictSpec),
+    /// xf.variable.set: extract a value and store as a flow variable.
+    FlowVariableSet(FlowVariableSetSpec),
+    /// xf.variable.get: emit stored flow variable as a single-row table.
+    FlowVariableGet(FlowVariableGetSpec),
+    /// ctl.loop.count: run body N times, concatenate results.
+    LoopCount(LoopCountSpec),
+    /// ctl.loop.chunk: split input into chunks, process each.
+    LoopChunk(LoopChunkSpec),
+    /// ctl.if: conditional branching (true/false ports).
+    IfBranch(IfBranchSpec),
+    /// ctl.try.catch: enhanced error handling with catch block.
+    TryCatch { fallback_path: String },
 }
 
 // Connector / transform spec type definitions live in plan/specs.rs and
@@ -608,6 +620,12 @@ fn build_stage(
     let mut model_writer: Option<ModelWriterSpec> = None;
     let mut onnx_reader: Option<OnnxReaderSpec> = None;
     let mut onnx_predict: Option<OnnxPredictSpec> = None;
+    let mut flow_var_set: Option<FlowVariableSetSpec> = None;
+    let mut flow_var_get: Option<FlowVariableGetSpec> = None;
+    let mut loop_count: Option<LoopCountSpec> = None;
+    let mut loop_chunk: Option<LoopChunkSpec> = None;
+    let mut if_branch: Option<IfBranchSpec> = None;
+    let mut try_catch_path: Option<String> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -1479,6 +1497,106 @@ fn build_stage(
         foreach_pipeline_path = Some(path);
         let sql = passthrough_view_sql(&node.id, from_view);
         (sql, StageKind::View, Some(from_view.to_string()))
+    } else if component_id == "xf.variable.set" {
+        // Extract a value from upstream and store as a flow variable.
+        // The executor reads the value and stores it in its flow_variables map.
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let name = string_prop(&props, "name")
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: name required", component_id)))?;
+        let value_expr = string_prop(&props, "expression")
+            .or_else(|| string_prop(&props, "column"))
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| "*".to_string());
+        flow_var_set = Some(FlowVariableSetSpec {
+            name,
+            value_expr: value_expr.clone(),
+        });
+        let sql = passthrough_view_sql(&node.id, from_view);
+        (sql, StageKind::View, Some(from_view.to_string()))
+    } else if component_id == "xf.variable.get" {
+        // Emit stored flow variable as a single-row table.
+        // The executor replaces this placeholder with the actual value.
+        let name = string_prop(&props, "name")
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: name required", component_id)))?;
+        let output_column = string_prop(&props, "outputColumn")
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| "value".to_string());
+        flow_var_get = Some(FlowVariableGetSpec {
+            name,
+            output_column,
+        });
+        (
+            passthrough_placeholder_sql(&node.id, "variable-get"),
+            StageKind::View,
+            None,
+        )
+    } else if component_id == "ctl.loop.count" {
+        // Execute downstream body N times, concatenating results.
+        let iterations = props.get("iterations")
+            .or_else(|| props.get("count"))
+            .and_then(|v| v.as_u64())
+            .filter(|n| *n > 0)
+            .ok_or_else(|| EngineError::Config(format!("{}: iterations (positive integer) required", component_id)))?;
+        let output_mode = string_prop(&props, "outputMode")
+            .unwrap_or_else(|| "append".to_string());
+        loop_count = Some(LoopCountSpec {
+            iterations,
+            output_mode,
+            body_sql: Vec::new(), // filled by executor
+        });
+        let sql = match inputs.main() {
+            Some(from_view) => passthrough_view_sql(&node.id, from_view),
+            None => passthrough_placeholder_sql(&node.id, "loop-count"),
+        };
+        let from = inputs.main().map(|s| s.to_string());
+        (sql, StageKind::View, from)
+    } else if component_id == "ctl.loop.chunk" {
+        // Split input into chunks, process each, concatenate results.
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let chunk_size = props.get("chunkSize").and_then(|v| v.as_u64());
+        let num_chunks = props.get("numChunks").and_then(|v| v.as_u64());
+        if chunk_size.is_none() && num_chunks.is_none() {
+            return Err(EngineError::Config(format!(
+                "{}: either chunkSize or numChunks required", component_id
+            )));
+        }
+        loop_chunk = Some(LoopChunkSpec {
+            chunk_size,
+            num_chunks,
+            from_view: from_view.to_string(),
+        });
+        let sql = passthrough_view_sql(&node.id, from_view);
+        (sql, StageKind::View, Some(from_view.to_string()))
+    } else if component_id == "ctl.if" {
+        // Conditional branching: two output ports (true/false).
+        // Generates two views filtered by the condition.
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let condition = string_prop(&props, "condition")
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: condition required", component_id)))?;
+        if_branch = Some(IfBranchSpec {
+            condition: condition.clone(),
+        });
+        let sql = build_if_views(&node.id, from_view, &condition, consumer_count);
+        (sql, StageKind::View, Some(from_view.to_string()))
+    } else if component_id == "ctl.try.catch" {
+        // Enhanced try/catch: wraps body in error handling with a catch
+        // pipeline that runs on error, then passes upstream through.
+        let path = string_prop(&props, "catchPipelineRef")
+            .or_else(|| string_prop(&props, "catchPath"))
+            .or_else(|| string_prop(&props, "fallbackPipelineRef"))
+            .or_else(|| string_prop(&props, "fallbackPath"))
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: catchPipelineRef required", component_id)))?;
+        try_catch_path = Some(path);
+        let sql = match inputs.main() {
+            Some(from_view) => passthrough_view_sql(&node.id, from_view),
+            None => passthrough_placeholder_sql(&node.id, "try-catch"),
+        };
+        let from = inputs.main().map(|s| s.to_string());
+        (sql, StageKind::View, from)
     } else if component_id == "ctl.try" {
         // Side-effect fallback installer: pass through upstream
         // unchanged; on any subsequent stage failure, the engine
@@ -4017,6 +4135,12 @@ fn build_stage(
         .or_else(|| model_writer.map(RuntimeSpec::ModelWriter))
         .or_else(|| onnx_reader.map(RuntimeSpec::OnnxReader))
         .or_else(|| onnx_predict.map(RuntimeSpec::OnnxPredict))
+        .or_else(|| flow_var_set.map(RuntimeSpec::FlowVariableSet))
+        .or_else(|| flow_var_get.map(RuntimeSpec::FlowVariableGet))
+        .or_else(|| loop_count.map(RuntimeSpec::LoopCount))
+        .or_else(|| loop_chunk.map(RuntimeSpec::LoopChunk))
+        .or_else(|| if_branch.map(RuntimeSpec::IfBranch))
+        .or_else(|| try_catch_path.map(|path| RuntimeSpec::TryCatch { fallback_path: path }))
         ;
     // Free the ATTACH alias so the next batched stage can re-ATTACH it (see
     // attach_alias above). Only stages that embed the ATTACH in their own SQL

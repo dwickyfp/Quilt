@@ -471,6 +471,14 @@ export const PALETTE: Category[] = [
                     xf('assert', 'Assert', 'available', 'Hard-fail the pipeline if any row violates a SQL predicate (defensive ETL check)'),
                 ],
             },
+            {
+                id: 'xf.variables',
+                label: 'Flow Variables',
+                components: [
+                    xf('variable.set', 'Set Variable', 'available', 'Extract a value from upstream and store it as a named flow variable. Downstream xf.variable.get nodes can read it. The expression is evaluated as a SQL expression against the upstream view.'),
+                    xf('variable.get', 'Get Variable', 'available', 'Emit a stored flow variable as a single-row table with one column. Use to inject computed values (max dates, counts, config values) into the pipeline.'),
+                ],
+            },
         ],
     },
     {
@@ -607,8 +615,17 @@ export const PALETTE: Category[] = [
                     ctl('replicate', 'Replicate / Tee', 'available', 'Send the same data to multiple downstream outputs'),
                     ctl('switch', 'Switch / Conditional Split', 'available', 'Route rows to case_1..N outputs by condition; first match wins'),
                     ctl('merge', 'Merge Streams', 'available', 'Concatenate multiple input streams (UNION ALL)'),
+                    ctl('if', 'If / Conditional Branch', 'available', 'Route rows to true or false output based on a SQL condition. Similar to Switch but simpler - exactly two outputs for binary branching.'),
                     ctl('iterate', 'Iterate', 'available', 'Runs a referenced pipeline N times. Sub-pipeline gets ${ITER_INDEX} (0..N-1) substituted into its props before each call. Side-effect model - sub-pipeline output isn\'t composed into the parent (true block-scope iteration needs the DAG refactor in docs/dag-block-refactor.md).'),
                     ctl('foreach', 'For Each', 'available', 'Runs a referenced pipeline once per upstream row. ${ITER_INDEX} + ${ITER_ITEM_<FIELD>} (uppercased) substituted into the sub-pipeline props. Side-effect model.'),
+                ],
+            },
+            {
+                id: 'ctl.loops',
+                label: 'Loops',
+                components: [
+                    ctl('loop.count', 'Count Loop', 'available', 'Execute the downstream body N times and concatenate results (UNION ALL). The body is the subgraph between this node and the next control node.'),
+                    ctl('loop.chunk', 'Chunk Loop', 'available', 'Split input data into chunks (by size or count) and process each chunk. Results are concatenated with UNION ALL.'),
                 ],
             },
             {
@@ -638,6 +655,7 @@ export const PALETTE: Category[] = [
                     ctl('try', 'Try / Catch', 'available', 'Installs a fallback pipeline. If any downstream stage in this execution fails, the fallback runs as a side effect before the original error surfaces - useful for notifications, rollbacks, cleanup. Slice of the DAG-block refactor; true continuation-style try/catch needs the multi-week refactor (see docs/dag-block-refactor.md).'),
                     ctl('retry', 'Retry', 'available', 'Per-stage retry already lives in the Advanced tab (Retry attempts + Retry backoff) on every node - no separate component needed. A DAG-scoped retry block (wrap N stages, retry the whole group) still needs the DAG-block refactor; use ctl.try with a recovery fallback for now.'),
                     ctl('deadletter', 'Dead Letter Queue', 'available', 'Terminal sink for rejected rows - parquet or csv at a configurable path; conventionally wired to an upstream node\'s reject port'),
+                    ctl('try.catch', 'Try / Catch Block', 'available', 'Enhanced error handling: wraps downstream in a try block with an explicit catch pipeline that runs on failure. The catch pipeline receives ${ERROR_MESSAGE}.'),
                 ],
             },
             {

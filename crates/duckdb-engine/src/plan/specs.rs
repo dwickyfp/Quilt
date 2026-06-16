@@ -1554,3 +1554,47 @@ pub struct MlAnomalyIsoForestSpec {
     /// score threshold: top contamination% are flagged as anomalies.
     pub contamination: f64,
 }
+
+/// xf.variable.set: extract a value from upstream and store as a flow variable.
+/// The variable can be read later by xf.variable.get in the same pipeline run.
+#[derive(Debug, Clone)]
+pub struct FlowVariableSetSpec {
+    pub name: String,
+    /// SQL expression to evaluate (e.g. a column name or literal).
+    /// Evaluated against the upstream view.
+    pub value_expr: String,
+}
+
+/// xf.variable.get: emit the stored flow variable as a single-row table.
+#[derive(Debug, Clone)]
+pub struct FlowVariableGetSpec {
+    pub name: String,
+    pub output_column: String,
+}
+
+/// ctl.loop.count: execute the downstream body subgraph N times,
+/// concatenating results with UNION ALL.
+#[derive(Debug, Clone)]
+pub struct LoopCountSpec {
+    pub iterations: u64,
+    /// "append" (UNION ALL) or "replace" (last iteration wins).
+    pub output_mode: String,
+    /// The SQL template for the body stages (pre-compiled).
+    pub body_sql: Vec<(String, String, String)>, // (node_id, sql, kind)
+}
+
+/// ctl.loop.chunk: split input into chunks and process each through
+/// the downstream body, concatenating results.
+#[derive(Debug, Clone)]
+pub struct LoopChunkSpec {
+    pub chunk_size: Option<u64>,
+    pub num_chunks: Option<u64>,
+    pub from_view: String,
+}
+
+/// ctl.if: conditional branching with true/false output ports.
+#[derive(Debug, Clone)]
+pub struct IfBranchSpec {
+    /// SQL WHERE expression for the condition.
+    pub condition: String,
+}
