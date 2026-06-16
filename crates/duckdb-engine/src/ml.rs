@@ -23,6 +23,7 @@ use smartcore::ensemble::random_forest_classifier::{
     RandomForestClassifier, RandomForestClassifierParameters,
 };
 use smartcore::decomposition::pca::{PCA, PCAParameters};
+use smartcore::linalg::basic::arrays::Array;
 use smartcore::linalg::basic::matrix::DenseMatrix;
 use smartcore::linear::linear_regression::{LinearRegression, LinearRegressionParameters};
 use smartcore::linear::logistic_regression::{LogisticRegression, LogisticRegressionParameters};
@@ -41,6 +42,9 @@ use smartcore::ensemble::random_forest_regressor::{
 };
 use smartcore::tree::decision_tree_regressor::{
     DecisionTreeRegressor, DecisionTreeRegressorParameters,};
+use smartcore::svm::svc::{SVC, SVCParameters};
+use smartcore::svm::svr::{SVR, SVRParameters};
+use smartcore::svm::Kernels;
 
 // Gradient-boosted decision trees (pure-Rust, no FFI). gbdt::ValueType is f32.
 use gbdt::config::Config as GbdtConfig;
@@ -130,6 +134,26 @@ enum Model {
         features: Vec<String>,
         model: GBDT,
     },
+    /// Support Vector Classifier with owned model (no borrowed lifetime).
+    Svc {
+        features: Vec<String>,
+        labels: Vec<String>,
+        support_vectors: Vec<Vec<f64>>,
+        sv_labels: Vec<i64>,
+        weights: Vec<f64>,
+        bias: f64,
+        kernel_type: String,
+        kernel_gamma: f64,
+    },
+    /// Support Vector Regressor with owned model (no borrowed lifetime).
+    Svr {
+        features: Vec<String>,
+        support_vectors: Vec<Vec<f64>>,
+        weights: Vec<f64>,
+        bias: f64,
+        kernel_type: String,
+        kernel_gamma: f64,
+    },
 }
 
 impl Model {
@@ -150,7 +174,9 @@ impl Model {
             | Model::Dbscan { features, .. }
             | Model::GaussianNb { features, .. }
             | Model::Xgb { features, .. }
-            | Model::XgbReg { features, .. } => features,
+            | Model::XgbReg { features, .. }
+            | Model::Svc { features, .. }
+            | Model::Svr { features, .. } => features,
         }
     }
 
@@ -172,6 +198,8 @@ impl Model {
             Model::GaussianNb { .. } => "nb.gaussian",
             Model::Xgb { .. } => "xgb",
             Model::XgbReg { .. } => "xgb.reg",
+            Model::Svc { .. } => "svc",
+            Model::Svr { .. } => "svr",
         }
     }
 
@@ -314,6 +342,21 @@ fn label_of(v: Option<&JsonValue>) -> String {
 
 fn fit_failed(e: smartcore::error::Failed) -> EngineError {
     EngineError::Query(format!("ml: model fit failed: {}", e))
+}
+
+/// Apply SVM kernel function (used for owned-model predict since smartcore's
+/// SVC/SVR parameters are #[serde(skip)] and can't round-trip via bincode).
+fn svm_kernel_apply(kernel_type: &str, gamma: f64, x_i: &[f64], x_j: &[f64]) -> f64 {
+    match kernel_type {
+        "linear" => x_i.iter().zip(x_j.iter()).map(|(a, b)| a * b).sum::<f64>(),
+        // RBF: exp(-gamma * ||x_i - x_j||^2)
+        _ => {
+            let sq_dist: f64 = x_i.iter().zip(x_j.iter())
+                .map(|(a, b)| (a - b) * (a - b))
+                .sum();
+            (-gamma * sq_dist).exp()
+        }
+    }
 }
 
 /// Map integer class predictions back to their original string labels.
@@ -545,6 +588,108 @@ impl DuckdbEngine {
                 m.fit(&mut train);
                 Model::XgbReg { features, model: m }
             }
+            "svc" => {
+                // Binary classification. smartcore SVC requires labels -1/+1.
+                let (encoded, labels) = encode_labels(&rows, &spec.target_column);
+                if labels.len() != 2 {
+                    return Err(EngineError::Config(format!(
+                        "ml.learner.svc: binary classification needs exactly 2 classes, found {}",
+                        labels.len()
+                    )));
+                }
+                // Map encoded 0/1 → -1/+1
+                let y: Vec<i64> = encoded.iter().map(|&v| if v == 0 { -1 } else { 1 }).collect();
+                let gamma = if spec.gamma > 0.0 { spec.gamma } else { 1.0 / features.len() as f64 };
+                let params = match spec.kernel.as_str() {
+                    "linear" => SVCParameters::default().with_c(spec.c).with_kernel(Kernels::linear()),
+                    _ => SVCParameters::default().with_c(spec.c).with_kernel(Kernels::rbf().with_gamma(gamma)),
+                };
+                let svc = SVC::fit(&x, &y, &params).map_err(fit_failed)?;
+                // Serialize trained model to JSON, then deserialize to concrete type.
+                // After round-trip, parameters is None (#[serde.skip]), but
+                // instances/w/b are owned and survive.
+                let svc_json = serde_json::to_string(&svc)
+                    .map_err(|e| EngineError::Query(format!("svc json: {}", e)))?;
+                let svc_val: serde_json::Value = serde_json::from_str(&svc_json)
+                    .map_err(|e| EngineError::Query(format!("svc parse: {}", e)))?;
+                // Extract fields from JSON Value
+                let sv: Vec<Vec<f64>> = svc_val.get("instances")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+                let w_vec: Vec<f64> = svc_val.get("w")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+                let b_val: f64 = svc_val.get("b")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                // Recover per-SV labels from training data.
+                // smartcore's w[] = raw alpha (not alpha*y). For the correct decision
+                // function f(x) = b + Σ(α_i · y_i · K(sv_i, x)), we need y_i.
+                // Match each SV back to training data to recover its label.
+                let mut sv_labels: Vec<i64> = Vec::with_capacity(sv.len());
+                let n_train = x.shape().0;
+                for sv_row in &sv {
+                    let mut best_label: i64 = 1;
+                    let mut min_dist = f64::INFINITY;
+                    for ti in 0..n_train {
+                        let mut dist: f64 = 0.0;
+                        let mut exact = true;
+                        for (fi, svv) in sv_row.iter().enumerate() {
+                            let tv: f64 = *x.get((ti, fi));
+                            let diff = tv - svv;
+                            if diff.abs() >= 1e-10 { exact = false; }
+                            dist += diff * diff;
+                        }
+                        if exact { best_label = y[ti]; break; }
+                        if dist < min_dist { min_dist = dist; best_label = y[ti]; }
+                    }
+                    sv_labels.push(best_label);
+                }
+                Model::Svc {
+                    features,
+                    labels,
+                    support_vectors: sv,
+                    sv_labels,
+                    weights: w_vec,
+                    bias: b_val,
+                    kernel_type: spec.kernel.clone(),
+                    kernel_gamma: gamma,
+                }
+            }
+            "svr" => {
+                let y: Vec<f64> = rows.iter()
+                    .map(|r| cell_to_f64(r.get(&spec.target_column)))
+                    .collect();
+                let gamma = if spec.gamma > 0.0 { spec.gamma } else { 1.0 / features.len() as f64 };
+                let params = match spec.kernel.as_str() {
+                    "linear" => SVRParameters::default().with_eps(spec.epsilon).with_c(spec.c).with_kernel(Kernels::linear()),
+                    _ => SVRParameters::default().with_eps(spec.epsilon).with_c(spec.c).with_kernel(Kernels::rbf().with_gamma(gamma)),
+                };
+                let svr = SVR::fit(&x, &y, &params).map_err(fit_failed)?;
+                let svr_json = serde_json::to_string(&svr)
+                    .map_err(|e| EngineError::Query(format!("svr json: {}", e)))?;
+                // Extract fields from JSON Value to avoid accessing private
+                // struct fields on smartcore::svm::svr::SVR.
+                let svr_val: serde_json::Value = serde_json::from_str(&svr_json)
+                    .map_err(|e| EngineError::Query(format!("svr roundtrip: {}", e)))?;
+                let sv: Vec<Vec<f64>> = svr_val.get("instances")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+                let w_vec: Vec<f64> = svr_val.get("w")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())
+                    .unwrap_or_default();
+                let b_val: f64 = svr_val.get("b")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                Model::Svr {
+                    features,
+                    support_vectors: sv,
+                    weights: w_vec,
+                    bias: b_val,
+                    kernel_type: spec.kernel.clone(),
+                    kernel_gamma: gamma,
+                }
+            }
             other => {
                 return Err(EngineError::Config(format!(
                     "ml.learner: unknown algorithm '{}'",
@@ -681,6 +826,37 @@ impl DuckdbEngine {
                     .into_iter()
                     .map(|v| json!(v))
                     .collect()
+            }
+            Model::Svc { support_vectors, weights, bias, labels, kernel_type, kernel_gamma, .. } => {
+                // smartcore's w[] already includes y_i (sign-baked alpha).
+                // Decision function: f(x) = b + sum(w[i] * K(sv[i], x))
+                let n_sv = support_vectors.len();
+                rows.iter().map(|row| {
+                    let xi: Vec<f64> = features.iter()
+                        .map(|f| cell_to_f64(row.get(f)))
+                        .collect();
+                    let mut f = *bias;
+                    for i in 0..n_sv {
+                        let k = svm_kernel_apply(kernel_type, *kernel_gamma, &xi, &support_vectors[i]);
+                        f += weights[i] * k;
+                    }
+                    let cls_idx: usize = if f > 0.0 { 1 } else { 0 };
+                    json!(labels.get(cls_idx).cloned().unwrap_or_else(|| cls_idx.to_string()))
+                }).collect()
+            }
+            Model::Svr { support_vectors, weights, bias, kernel_type, kernel_gamma, .. } => {
+                let n_sv = support_vectors.len();
+                rows.iter().map(|row| {
+                    let xi: Vec<f64> = features.iter()
+                        .map(|f| cell_to_f64(row.get(f)))
+                        .collect();
+                    let mut f = *bias;
+                    for i in 0..n_sv {
+                        let k = svm_kernel_apply(kernel_type, *kernel_gamma, &xi, &support_vectors[i]);
+                        f += weights[i] * k;
+                    }
+                    json!(f)
+                }).collect()
             }
         };
 
@@ -866,6 +1042,10 @@ impl DuckdbEngine {
                 eps: 0.5,
                 min_samples: 5,
                 learning_rate,
+                kernel: "rbf".into(),
+                c: 1.0,
+                epsilon: 0.1,
+                gamma: 0.0,
             };
             self.run_ml_learner(db, &learner_spec)?;
 

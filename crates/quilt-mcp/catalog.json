@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 374,
+  "componentCount": 376,
   "components": [
     {
       "id": "src.csv",
@@ -43552,6 +43552,200 @@
                 "label": "Learning rate (shrinkage)",
                 "kind": "number",
                 "defaultValue": 0.1
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.svc",
+      "label": "Support Vector Classifier",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a support vector machine classifier (binary). Props: targetColumn, featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.svc",
+        "kind": "ml",
+        "label": "Support Vector Classifier",
+        "description": "Train a support vector machine classifier (binary). Props: targetColumn, featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "kernel",
+                "label": "Kernel",
+                "kind": "select",
+                "defaultValue": "rbf",
+                "options": [
+                  {
+                    "label": "RBF",
+                    "value": "rbf"
+                  },
+                  {
+                    "label": "Linear",
+                    "value": "linear"
+                  }
+                ]
+              },
+              {
+                "key": "c",
+                "label": "C (regularization)",
+                "kind": "number",
+                "defaultValue": 1
+              },
+              {
+                "key": "gamma",
+                "label": "Gamma (kernel coeff)",
+                "kind": "number",
+                "defaultValue": 0
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "model",
+              "label": "model",
+              "type": "model"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.learner.svr",
+      "label": "Support Vector Regressor",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Train a support vector machine regressor (numeric target). Props: targetColumn (numeric), featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), epsilon (margin width, default 0.1), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "model",
+            "label": "model",
+            "type": "model"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.learner.svr",
+        "kind": "ml",
+        "label": "Support Vector Regressor",
+        "description": "Train a support vector machine regressor (numeric target). Props: targetColumn (numeric), featureColumns, kernel (linear|rbf, default rbf), c (regularization, default 1.0), epsilon (margin width, default 0.1), gamma (kernel coeff, default 0 = auto). Outputs a model on the model port.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Training",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "The column the model learns to predict."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "description": "Predictor columns. Leave empty to use all other numeric columns."
+              },
+              {
+                "key": "kernel",
+                "label": "Kernel",
+                "kind": "select",
+                "defaultValue": "rbf",
+                "options": [
+                  {
+                    "label": "RBF",
+                    "value": "rbf"
+                  },
+                  {
+                    "label": "Linear",
+                    "value": "linear"
+                  }
+                ]
+              },
+              {
+                "key": "c",
+                "label": "C (regularization)",
+                "kind": "number",
+                "defaultValue": 1
+              },
+              {
+                "key": "epsilon",
+                "label": "Epsilon (margin width)",
+                "kind": "number",
+                "defaultValue": 0.1
+              },
+              {
+                "key": "gamma",
+                "label": "Gamma (kernel coeff)",
+                "kind": "number",
+                "defaultValue": 0
               }
             ]
           }

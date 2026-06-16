@@ -3093,6 +3093,10 @@ fn build_stage(
             eps: props.get("eps").and_then(|v| v.as_f64()).unwrap_or(0.5),
             min_samples: props.get("minSamples").and_then(|v| v.as_u64()).unwrap_or(5) as usize,
             learning_rate: props.get("learningRate").and_then(|v| v.as_f64()).unwrap_or(0.1),
+            kernel: string_prop(&props, "kernel").filter(|s| !s.is_empty()).unwrap_or_else(|| "rbf".into()),
+            c: props.get("c").and_then(|v| v.as_f64()).unwrap_or(1.0),
+            epsilon: props.get("epsilon").and_then(|v| v.as_f64()).unwrap_or(0.1),
+            gamma: props.get("gamma").and_then(|v| v.as_f64()).unwrap_or(0.0),
         });
         (String::new(), StageKind::View, None)
     } else if component_id == "ml.predict" {

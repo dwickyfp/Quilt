@@ -5029,6 +5029,38 @@ function synthMl(comp: ComponentDef): ComponentManifest {
                 },
             );
         }
+        if (id === 'ml.learner.svc' || id === 'ml.learner.svr') {
+            fields.push({
+                key: 'kernel',
+                label: 'Kernel',
+                kind: 'select',
+                defaultValue: 'rbf',
+                options: [
+                    { label: 'RBF', value: 'rbf' },
+                    { label: 'Linear', value: 'linear' },
+                ],
+            });
+            fields.push({
+                key: 'c',
+                label: 'C (regularization)',
+                kind: 'number',
+                defaultValue: 1.0,
+            });
+            if (id === 'ml.learner.svr') {
+                fields.push({
+                    key: 'epsilon',
+                    label: 'Epsilon (margin width)',
+                    kind: 'number',
+                    defaultValue: 0.1,
+                });
+            }
+            fields.push({
+                key: 'gamma',
+                label: 'Gamma (kernel coeff)',
+                kind: 'number',
+                defaultValue: 0,
+            });
+        }
         return base(comp, [{ label: 'Training', fields }], 'upstream');
     }
 

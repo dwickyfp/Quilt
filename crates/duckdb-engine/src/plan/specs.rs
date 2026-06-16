@@ -1257,6 +1257,14 @@ pub struct MlLearnerSpec {
     pub min_samples: usize,
     /// Boosting learning rate / shrinkage (gbdt xgb / xgb.reg).
     pub learning_rate: f64,
+    /// SVM kernel type: "linear" or "rbf" (default "rbf").
+    pub kernel: String,
+    /// SVM regularization parameter C (default 1.0).
+    pub c: f64,
+    /// SVR epsilon-tube width (default 0.1).
+    pub epsilon: f64,
+    /// RBF kernel gamma (default 0 = auto = 1/n_features).
+    pub gamma: f64,
 }
 
 /// ml.predict: apply a model trained by an upstream Learner (located via
