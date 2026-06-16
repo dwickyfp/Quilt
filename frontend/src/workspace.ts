@@ -189,6 +189,40 @@ export async function pickWorkspaceDirectory(): Promise<string | null> {
     }
 }
 
+/**
+ * Create the minimal v2 scaffold files in an empty directory so
+ * loadWorkspace treats it as a valid workspace. Called automatically
+ * by loadWorkspace when both v2 and v1 loads fail.
+ */
+async function scaffoldEmptyWorkspace(dirPath: string): Promise<void> {
+    const { exists, writeTextFile, mkdir } = await fs();
+
+    // Create subdirectories
+    for (const sub of [PIPELINES_DIR, CONNECTIONS_DIR, CONTEXTS_DIR, ROUTINES_DIR]) {
+        const d = joinPath(dirPath, sub);
+        if (!(await exists(d))) {
+            try { await mkdir(d); } catch { /* may already exist */ }
+        }
+    }
+
+    const folderName = dirPath.split(/[/\\]/).filter(Boolean).pop() ?? 'Workspace';
+
+    await writeTextFile(
+        joinPath(dirPath, METADATA_FILE),
+        JSON.stringify({ version: 2, jobs: [], activeJobId: '' }, null, 2),
+    );
+    await writeTextFile(
+        joinPath(dirPath, REPOSITORY_FILE),
+        JSON.stringify([
+            { id: 'root', name: folderName, type: 'project' },
+            { id: 'pipelines', name: 'Pipelines', type: 'folder', parentId: 'root' },
+            { id: 'connections', name: 'Connections', type: 'folder', parentId: 'root' },
+            { id: 'contexts', name: 'Contexts', type: 'folder', parentId: 'root' },
+            { id: 'routines', name: 'Routines', type: 'folder', parentId: 'root' },
+        ], null, 2),
+    );
+}
+
 type FsLib = typeof import('@tauri-apps/plugin-fs');
 
 async function fs(): Promise<FsLib> {
@@ -264,8 +298,9 @@ async function readDirEntries(path: string): Promise<string[]> {
 /**
  * Load the workspace from disk. Reads the v2 multi-file layout if it
  * exists; otherwise tries to migrate a v1 workspace.json on the fly.
- * Returns `null` only if there's nothing to load (fresh workspace) or
- * we're running in browser mode.
+ * If neither exists (empty directory), scaffolds a fresh workspace
+ * in-place and returns an empty state so the hydration effect always
+ * has data to merge.
  */
 export async function loadWorkspace(path: string): Promise<WorkspaceState | null> {
     if (!isTauri()) return null;
@@ -274,7 +309,9 @@ export async function loadWorkspace(path: string): Promise<WorkspaceState | null
         if (v2) return v2;
         const v1 = await loadAndMigrateV1(path);
         if (v1) return v1;
-        return null;
+        // Empty directory — scaffold a fresh workspace so it loads cleanly.
+        await scaffoldEmptyWorkspace(path);
+        return { version: 2, repo: [], pipelineData: {}, jobs: [], activeJobId: '' };
     } catch (err) {
         console.error('Failed to load workspace', err);
         return null;
