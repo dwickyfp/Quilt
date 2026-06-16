@@ -4,7 +4,7 @@
 
 <h3>Pipelines you can see — ETL, statistics, machine learning, and deep learning on one canvas.</h3>
 
-<p><b>Quilt</b> is an open-source desktop studio for visual data work: <b>ETL / ELT plus statistics, machine learning, and deep learning</b>, all on one canvas. Drag a pipeline together, or just describe what you need in plain English to <b>Qunnie</b> — the built-in AI assistant — and execute at native speed through DuckDB. 290+ connectors, 136 transforms, in-engine statistics and 32 ML nodes, ONNX deep-learning inference, 10 inline charts, and a built-in scheduler. Ships as a ~65&nbsp;MB single-file desktop app.</p>
+<p><b>Quilt</b> is an open-source desktop studio for visual data work: <b>ETL / ELT plus statistics, machine learning, and deep learning</b>, all on one canvas. Drag a pipeline together, or just describe what you need in plain English to <b>Qunnie</b> — the built-in AI assistant — and execute at native speed through DuckDB. 290+ connectors, 136 transforms, in-engine statistics and 36 ML nodes, ONNX deep-learning inference, 10 inline charts, and a built-in scheduler. Ships as a ~65&nbsp;MB single-file desktop app.</p>
 
 <p>
 <img alt="status" src="https://img.shields.io/badge/status-beta-6366F1"/>
@@ -110,7 +110,7 @@ Quilt is more than an ETL tool. The same canvas that moves and reshapes data als
 
 1. **An AI assistant that ships in the box.** Describe the pipeline you want in English; Qunnie writes the JSON and drops it onto the canvas, no API key required.
 2. **290+ connectors at install time.** Files, lakehouses, SQL databases, warehouses, NoSQL, vector DBs, streaming brokers, SaaS REST/GraphQL APIs, even FTP and IMAP - working today, not coming-soon.
-3. **Data science on the same graph.** Statistics (summary, correlation, t-test / ANOVA / chi-square), 32 ML nodes (learners, cross-validation, feature selection, PCA, one-hot, scoring, forecasting, anomaly detection), ONNX deep-learning inference, and 10 inline charts all live in the palette next to the ETL nodes.
+3. **Data science on the same graph.** Statistics (summary, correlation, t-test / ANOVA / chi-square), 36 ML nodes (learners, cross-validation, feature selection, PCA, one-hot, scoring, forecasting, anomaly detection), ONNX deep-learning inference, and 10 inline charts all live in the palette next to the ETL nodes.
 
 <div align="center">
 <img src="docs/assets/flow.svg" alt="Sources flow through 136 transforms into files, databases, object storage, vector stores, and AI" width="100%"/>
@@ -195,7 +195,7 @@ Because the assistant can now propose edits, it ships with layered guardrails:
 |---|---|
 | **Visual, never opaque** | The canvas compiles to SQL you can read, and every node has a live preview tab. No black box. |
 | **AI in the box** | A built-in assistant you point at OpenAI, Claude, or any OpenAI-compatible endpoint - no separate app, it lives in the canvas sidebar. |
-| **More than ETL** | Descriptive statistics, hypothesis tests, 32 ML nodes (train / cross-validate / select features / PCA / one-hot / score / forecast / anomaly detection), and ONNX deep-learning inference run on the same canvas — no Python runtime. |
+| **More than ETL** | Descriptive statistics, hypothesis tests, 36 ML nodes (train / cross-validate / select features / PCA / one-hot / score / forecast / anomaly detection), and ONNX deep-learning inference run on the same canvas — no Python runtime. |
 | **Single-file binary, no bundled DB** | ~65 MB app (it embeds the headless runner + MCP server). DuckDB downloads on first launch with a guided step. AI engine is opt-in. |
 | **Native speed** | Execution runs through DuckDB: vectorized, columnar, local. A clean-and-export job that crawls in a spreadsheet finishes in milliseconds. |
 | **Git-friendly by design** | Pipelines, connections, contexts, and routines persist as plain files in a folder you pick. Diff them, branch them, review them. |
@@ -354,7 +354,7 @@ Validators split their input: passing rows continue on the main port, failures r
 | **Die / Fail** | Stop the run with a message: always, only when the input has rows, or only when empty (`ctl.die`) |
 | **Schedule** | Cron / interval / file-watch triggers via the orchestration crate |
 
-### Machine learning (32 available)
+### Machine learning (36 available)
 
 Train, apply, and evaluate classic ML models directly on the canvas - in-engine, no Python runtime. Learners emit a model on a dedicated **model** port; wire it into a Predictor (and feed a held-out set into a Scorer) to close the loop. Cross-validation, feature selection, and the preprocessing transforms (PCA, one-hot) run as their own nodes on the same graph.
 
@@ -363,7 +363,8 @@ Train, apply, and evaluate classic ML models directly on the canvas - in-engine,
 | **Preparation** | Partition (train / test split: `random` or `stratified`, seeded for reproducibility), One-Hot Encoder (append a 0/1 indicator column per category, with an optional `maxCategories` cap that folds rare values into `_other`), PCA (fit + transform in one node — appends `pc1..pcN` principal components) |
 | **Learners (train)** | Linear Regression, Ridge, Lasso, ElasticNet, Logistic Regression, Gaussian Naive Bayes, Decision Tree (classifier + regressor), Random Forest (classifier + regressor), k-NN (classifier + regressor), **Gradient Boosting** (classifier + regressor, pure-Rust GBDT), **Gradient Boosting Multi-class** (OvR wrapper), **SVM** (SVC classifier + SVR regressor, linear + RBF kernel), **SVC Multi-class** (OvR wrapper), **MLP Neural Network** (2-layer perceptron, SGD backprop), k-Means + DBSCAN (unsupervised clustering) |
 | **Apply & evaluate** | Predictor (append a prediction column from a trained model), Scorer (accuracy / precision / recall + confusion matrix for classification; RMSE / MAE / R² for regression), **Cross-Validator** (automated k-fold CV for any learner — emits per-fold scores plus mean + std), **Feature Selector** (greedy forward selection driven by k-fold CV), **Feature Importance** (split-based importance for tree models, coefficient magnitude for linear), **Grid Search** (exhaustive hyperparameter tuning over JSON param grid) |
-| **Forecasting** | **ARIMA Forecaster** (time series forecasting with ARIMA(p,d,q): auto-regressive + differencing + moving average, OLS estimation, multi-step forecast with 95% confidence intervals) |
+| **Forecasting** | **ARIMA Forecaster** (time series forecasting with ARIMA(p,d,q): auto-regressive + differencing + moving average, OLS estimation, multi-step forecast with 95% confidence intervals), **ETS Forecaster** (exponential smoothing: SES / Holt linear / Holt-Winters with additive seasonal, multi-step forecast + CI), **Auto-ARIMA** (automatic (p,d,q) selection via AIC grid search over user-defined ranges), **Time Series Decomposition** (classical additive/multiplicative decomposition: trend via centered MA, seasonal averaging, residual) |
+| **Outlier detection** | **IQR / Z-score Outlier** (flag outliers per numeric column: IQR method with 1.5× bounds or Z-score with configurable threshold; adds `{col}_outlier` 0/1 columns) |
 | **Anomaly detection** | **Isolation Forest** (ensemble of random isolation trees; anomaly scoring via path-length, contamination-based threshold for is_anomaly flag) |
 | **Export** | Model Writer (classic ML → portable JSON params + features + labels; ONNX → copies the `.onnx` file) |
 

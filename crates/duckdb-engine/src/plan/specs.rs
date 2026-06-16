@@ -1486,6 +1486,57 @@ pub struct OnnxPredictSpec {
     pub output_column: String,
 }
 
+/// ml.forecast.ets: Exponential Smoothing (ETS) time series forecasting.
+/// Supports SES (simple), Holt's linear (trend), and Holt-Winters (trend+seasonal).
+#[derive(Debug, Clone)]
+pub struct MlForecastEtsSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub target_column: String,
+    pub alpha: f64,
+    pub beta: f64,
+    pub gamma: f64,
+    pub seasonal_period: usize,
+    pub steps: usize,
+    pub trend: bool,
+}
+
+/// ml.forecast.auto.arima: Auto-ARIMA with AIC-based parameter selection.
+/// Grid-searches over (p,d,q) combinations and picks the best by AIC.
+#[derive(Debug, Clone)]
+pub struct MlForecastAutoArimaSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub target_column: String,
+    pub max_p: usize,
+    pub max_d: usize,
+    pub max_q: usize,
+    pub steps: usize,
+}
+
+/// ml.timeseries.decompose: Classical time series decomposition (additive
+/// or multiplicative). Extracts trend, seasonal, and residual components
+/// via centered moving average.
+#[derive(Debug, Clone)]
+pub struct MlTimeseriesDecomposeSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub target_column: String,
+    pub period: usize,
+    pub model: String,
+}
+
+/// xf.stat.outlier: Outlier detection via IQR or Z-score method.
+/// Adds {col}_outlier (0/1) flag columns for each specified numeric column.
+#[derive(Debug, Clone)]
+pub struct XfStatOutlierSpec {
+    pub node_id: String,
+    pub from_view: String,
+    pub columns: Vec<String>,
+    pub method: String,
+    pub threshold: f64,
+}
+
 /// ml.anomaly.isolation_forest: train an isolation forest and score each row
 /// with an anomaly score. A standalone transform node (train + score in one
 /// step); no separate predict node needed.

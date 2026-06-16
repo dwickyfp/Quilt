@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 381,
+  "componentCount": 385,
   "components": [
     {
       "id": "src.csv",
@@ -20407,6 +20407,77 @@
               "optional": true
             }
           ]
+        }
+      }
+    },
+    {
+      "id": "xf.stat.outlier",
+      "label": "Outlier Detection",
+      "kind": "transform",
+      "availability": "available",
+      "summary": "Flag outliers in numeric columns using IQR or Z-score method. Props: columns (numeric columns to check; empty = all numeric), method (iqr|zscore, default iqr), threshold (Z-score threshold, default 3.0). Outputs: original data + {col}_outlier (0/1) flag columns.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "xf.stat.outlier",
+        "kind": "transform",
+        "label": "Outlier Detection",
+        "description": "Flag outliers in numeric columns using IQR or Z-score method. Props: columns (numeric columns to check; empty = all numeric), method (iqr|zscore, default iqr), threshold (Z-score threshold, default 3.0). Outputs: original data + {col}_outlier (0/1) flag columns.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Outlier Detection",
+            "fields": [
+              {
+                "key": "columns",
+                "label": "Columns",
+                "kind": "columns",
+                "description": "Numeric columns to check for outliers. Leave empty to check all numeric columns."
+              },
+              {
+                "key": "method",
+                "label": "Method",
+                "kind": "select",
+                "options": [
+                  {
+                    "label": "IQR",
+                    "value": "iqr"
+                  },
+                  {
+                    "label": "Z-Score",
+                    "value": "zscore"
+                  }
+                ],
+                "defaultValue": "iqr",
+                "description": "IQR uses Q1-1.5*IQR / Q3+1.5*IQR bounds. Z-score flags |z| > threshold."
+              },
+              {
+                "key": "threshold",
+                "label": "Z-score threshold",
+                "kind": "number",
+                "defaultValue": 3,
+                "description": "Z-score threshold (only used when method is zscore)."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
         }
       }
     },
@@ -44105,6 +44176,244 @@
         "description": "Time series forecasting using ARIMA(p,d,q) model. Props: targetColumn (numeric time series), p (AR order, default 1), d (differencing order, default 1), q (MA order, default 0), steps (forecast horizon, default 10). Outputs: original data + fitted values + forecast + 95% confidence intervals. Supports AR, MA, and combined ARMA models with differencing for trend removal.",
         "schemaSource": "upstream",
         "sections": [],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "ml.forecast.ets",
+      "label": "ETS Exponential Smoothing",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Exponential smoothing forecasting: SES (simple), Holt (trend), or Holt-Winters (trend+seasonal). Props: targetColumn, alpha (level smoothing, default 0.3), beta (trend smoothing, default 0.1), gamma (seasonal smoothing, default 0.1), seasonalPeriod (0=no seasonal), steps (forecast horizon, default 10), trend (boolean, default true). Outputs: original data + fitted + forecast + 95% CI.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "ml.forecast.ets",
+        "kind": "ml",
+        "label": "ETS Exponential Smoothing",
+        "description": "Exponential smoothing forecasting: SES (simple), Holt (trend), or Holt-Winters (trend+seasonal). Props: targetColumn, alpha (level smoothing, default 0.3), beta (trend smoothing, default 0.1), gamma (seasonal smoothing, default 0.1), seasonalPeriod (0=no seasonal), steps (forecast horizon, default 10), trend (boolean, default true). Outputs: original data + fitted + forecast + 95% CI.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "ETS Exponential Smoothing",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "Numeric time series column to forecast."
+              },
+              {
+                "key": "alpha",
+                "label": "Alpha (level)",
+                "kind": "number",
+                "defaultValue": 0.3,
+                "description": "Level smoothing parameter (0.001–0.999)."
+              },
+              {
+                "key": "beta",
+                "label": "Beta (trend)",
+                "kind": "number",
+                "defaultValue": 0.1,
+                "description": "Trend smoothing parameter (0.001–0.999)."
+              },
+              {
+                "key": "gamma",
+                "label": "Gamma (seasonal)",
+                "kind": "number",
+                "defaultValue": 0.1,
+                "description": "Seasonal smoothing parameter (0.001–0.999)."
+              },
+              {
+                "key": "seasonalPeriod",
+                "label": "Seasonal period",
+                "kind": "integer",
+                "defaultValue": 0,
+                "description": "Seasonal period (0 = no seasonal, >=2 for Holt-Winters)."
+              },
+              {
+                "key": "steps",
+                "label": "Forecast steps",
+                "kind": "integer",
+                "defaultValue": 10,
+                "description": "Number of steps to forecast ahead."
+              },
+              {
+                "key": "trend",
+                "label": "Enable trend",
+                "kind": "bool",
+                "defaultValue": true,
+                "description": "Include trend component (Holt / Holt-Winters)."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "ml.forecast.auto.arima",
+      "label": "Auto-ARIMA",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Automatic ARIMA model selection via grid search over (p,d,q) with AIC minimization. Props: targetColumn, maxP (default 5), maxD (default 2), maxQ (default 5), steps (forecast horizon, default 10). Outputs: best model forecast + fitted values + 95% CI.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "ml.forecast.auto.arima",
+        "kind": "ml",
+        "label": "Auto-ARIMA",
+        "description": "Automatic ARIMA model selection via grid search over (p,d,q) with AIC minimization. Props: targetColumn, maxP (default 5), maxD (default 2), maxQ (default 5), steps (forecast horizon, default 10). Outputs: best model forecast + fitted values + 95% CI.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Auto-ARIMA",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "Numeric time series column to forecast."
+              },
+              {
+                "key": "maxP",
+                "label": "Max AR order (p)",
+                "kind": "integer",
+                "defaultValue": 5,
+                "description": "Maximum autoregressive order to search."
+              },
+              {
+                "key": "maxD",
+                "label": "Max differencing (d)",
+                "kind": "integer",
+                "defaultValue": 2,
+                "description": "Maximum differencing order to search."
+              },
+              {
+                "key": "maxQ",
+                "label": "Max MA order (q)",
+                "kind": "integer",
+                "defaultValue": 5,
+                "description": "Maximum moving average order to search."
+              },
+              {
+                "key": "steps",
+                "label": "Forecast steps",
+                "kind": "integer",
+                "defaultValue": 10,
+                "description": "Number of steps to forecast ahead."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "ml.timeseries.decompose",
+      "label": "Time Series Decompose",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Classical time series decomposition (additive or multiplicative). Props: targetColumn, period (seasonal period, required >=2), model (additive|multiplicative, default additive). Outputs: original data + trend + seasonal + residual columns.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "ml.timeseries.decompose",
+        "kind": "ml",
+        "label": "Time Series Decompose",
+        "description": "Classical time series decomposition (additive or multiplicative). Props: targetColumn, period (seasonal period, required >=2), model (additive|multiplicative, default additive). Outputs: original data + trend + seasonal + residual columns.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Time Series Decomposition",
+            "fields": [
+              {
+                "key": "targetColumn",
+                "label": "Target column",
+                "kind": "column",
+                "required": true,
+                "description": "Numeric time series column to decompose."
+              },
+              {
+                "key": "period",
+                "label": "Period",
+                "kind": "integer",
+                "required": true,
+                "description": "Seasonal period (>=2)."
+              },
+              {
+                "key": "model",
+                "label": "Model",
+                "kind": "select",
+                "defaultValue": "additive",
+                "options": [
+                  {
+                    "label": "Additive",
+                    "value": "additive"
+                  },
+                  {
+                    "label": "Multiplicative",
+                    "value": "multiplicative"
+                  }
+                ],
+                "description": "Decomposition model type."
+              }
+            ]
+          }
+        ],
         "ports": {
           "inputs": [
             {

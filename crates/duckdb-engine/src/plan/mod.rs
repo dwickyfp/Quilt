@@ -169,6 +169,10 @@ pub enum RuntimeSpec {
     MlPca(MlPcaSpec),
     MlOneHot(MlOneHotSpec),
     MlForecastArima(MlForecastArimaSpec),
+    MlForecastEts(MlForecastEtsSpec),
+    MlForecastAutoArima(MlForecastAutoArimaSpec),
+    MlTimeseriesDecompose(MlTimeseriesDecomposeSpec),
+    XfStatOutlier(XfStatOutlierSpec),
     MlAnomalyIsoForest(MlAnomalyIsoForestSpec),
     StatTest(StatTestSpec),
     ModelWriter(ModelWriterSpec),
@@ -595,6 +599,10 @@ fn build_stage(
     let mut ml_pca: Option<MlPcaSpec> = None;
     let mut ml_onehot: Option<MlOneHotSpec> = None;
     let mut ml_forecast_arima: Option<MlForecastArimaSpec> = None;
+    let mut ml_forecast_ets: Option<MlForecastEtsSpec> = None;
+    let mut ml_forecast_auto_arima: Option<MlForecastAutoArimaSpec> = None;
+    let mut ml_timeseries_decompose: Option<MlTimeseriesDecomposeSpec> = None;
+    let mut xf_stat_outlier: Option<XfStatOutlierSpec> = None;
     let mut ml_anomaly_iso_forest: Option<MlAnomalyIsoForestSpec> = None;
     let mut stat_test: Option<StatTestSpec> = None;
     let mut model_writer: Option<ModelWriterSpec> = None;
@@ -3307,6 +3315,76 @@ fn build_stage(
             steps: props.get("steps").and_then(|v| v.as_u64()).unwrap_or(10).max(1) as usize,
         });
         (String::new(), StageKind::View, None)
+    } else if component_id == "ml.forecast.ets" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let target_column = string_prop(&props, "targetColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: targetColumn required", component_id)))?;
+        ml_forecast_ets = Some(MlForecastEtsSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            target_column,
+            alpha: props.get("alpha").and_then(|v| v.as_f64()).unwrap_or(0.3),
+            beta: props.get("beta").and_then(|v| v.as_f64()).unwrap_or(0.1),
+            gamma: props.get("gamma").and_then(|v| v.as_f64()).unwrap_or(0.1),
+            seasonal_period: props.get("seasonalPeriod").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
+            steps: props.get("steps").and_then(|v| v.as_u64()).unwrap_or(10).max(1) as usize,
+            trend: props.get("trend").and_then(|v| v.as_bool()).unwrap_or(true),
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "ml.forecast.auto.arima" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let target_column = string_prop(&props, "targetColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: targetColumn required", component_id)))?;
+        ml_forecast_auto_arima = Some(MlForecastAutoArimaSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            target_column,
+            max_p: props.get("maxP").and_then(|v| v.as_u64()).unwrap_or(5) as usize,
+            max_d: props.get("maxD").and_then(|v| v.as_u64()).unwrap_or(2) as usize,
+            max_q: props.get("maxQ").and_then(|v| v.as_u64()).unwrap_or(5) as usize,
+            steps: props.get("steps").and_then(|v| v.as_u64()).unwrap_or(10).max(1) as usize,
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "ml.timeseries.decompose" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        let target_column = string_prop(&props, "targetColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: targetColumn required", component_id)))?;
+        let period = props.get("period").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        if period < 2 {
+            return Err(EngineError::Config(format!(
+                "{}: period must be >= 2",
+                component_id
+            )));
+        }
+        ml_timeseries_decompose = Some(MlTimeseriesDecomposeSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            target_column,
+            period,
+            model: string_prop(&props, "model").unwrap_or_else(|| "additive".into()),
+        });
+        (String::new(), StageKind::View, None)
+    } else if component_id == "xf.stat.outlier" {
+        let from_view = inputs
+            .main()
+            .ok_or_else(|| EngineError::Config(format!("{}: upstream input required", component_id)))?;
+        xf_stat_outlier = Some(XfStatOutlierSpec {
+            node_id: node.id.clone(),
+            from_view: from_view.to_string(),
+            columns: columns_list(&props, "columns"),
+            method: string_prop(&props, "method").unwrap_or_else(|| "iqr".into()),
+            threshold: props.get("threshold").and_then(|v| v.as_f64()).unwrap_or(3.0),
+        });
+        (String::new(), StageKind::View, None)
     } else if component_id == "ml.anomaly.isolation_forest" {
         let from_view = inputs
             .main()
@@ -3930,6 +4008,10 @@ fn build_stage(
         .or_else(|| ml_pca.map(RuntimeSpec::MlPca))
         .or_else(|| ml_onehot.map(RuntimeSpec::MlOneHot))
         .or_else(|| ml_forecast_arima.map(RuntimeSpec::MlForecastArima))
+        .or_else(|| ml_forecast_ets.map(RuntimeSpec::MlForecastEts))
+        .or_else(|| ml_forecast_auto_arima.map(RuntimeSpec::MlForecastAutoArima))
+        .or_else(|| ml_timeseries_decompose.map(RuntimeSpec::MlTimeseriesDecompose))
+        .or_else(|| xf_stat_outlier.map(RuntimeSpec::XfStatOutlier))
         .or_else(|| ml_anomaly_iso_forest.map(RuntimeSpec::MlAnomalyIsoForest))
         .or_else(|| stat_test.map(RuntimeSpec::StatTest))
         .or_else(|| model_writer.map(RuntimeSpec::ModelWriter))

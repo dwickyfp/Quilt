@@ -575,6 +575,38 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // ETS Exponential Smoothing - data in, forecast out (no model port).
+    if (id === 'ml.forecast.ets') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [],
+        };
+    }
+
+    // Auto-ARIMA - data in, forecast out (no model port).
+    if (id === 'ml.forecast.auto.arima') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [],
+        };
+    }
+
+    // Time Series Decompose - data in, augmented data out.
+    if (id === 'ml.timeseries.decompose') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [],
+        };
+    }
+
+    // Outlier Detection - data in, augmented data out.
+    if (id === 'xf.stat.outlier') {
+        return {
+            inputs: [MAIN_IN],
+            outputs: [],
+        };
+    }
+
     // Predictor - data in + model in, predictions out.
     if (id === 'ml.predict' || id === 'dl.onnx.predict') {
         return {
@@ -3384,6 +3416,18 @@ function synthNumericTransform(comp: ComponentDef): ComponentManifest {
             },
         ], 'upstream');
     }
+    if (comp.id === 'xf.stat.outlier') {
+        return base(comp, [
+            {
+                label: 'Outlier Detection',
+                fields: [
+                    { key: 'columns', label: 'Columns', kind: 'columns', description: 'Numeric columns to check for outliers. Leave empty to check all numeric columns.' },
+                    { key: 'method', label: 'Method', kind: 'select', options: [{ label: 'IQR', value: 'iqr' }, { label: 'Z-Score', value: 'zscore' }], defaultValue: 'iqr', description: 'IQR uses Q1-1.5*IQR / Q3+1.5*IQR bounds. Z-score flags |z| > threshold.' },
+                    { key: 'threshold', label: 'Z-score threshold', kind: 'number', defaultValue: 3.0, description: 'Z-score threshold (only used when method is zscore).' },
+                ],
+            },
+        ], 'upstream');
+    }
     if (comp.id === 'xf.num.bucketize') {
         return base(comp, [
             {
@@ -5418,6 +5462,51 @@ function synthMl(comp: ComponentDef): ComponentManifest {
                         defaultValue: false,
                         description: 'Remove the original feature columns from the output.',
                     },
+                ],
+            },
+        ], 'upstream');
+    }
+
+    if (id === 'ml.forecast.ets') {
+        return base(comp, [
+            {
+                label: 'ETS Exponential Smoothing',
+                fields: [
+                    { key: 'targetColumn', label: 'Target column', kind: 'column', required: true, description: 'Numeric time series column to forecast.' },
+                    { key: 'alpha', label: 'Alpha (level)', kind: 'number', defaultValue: 0.3, description: 'Level smoothing parameter (0.001–0.999).' },
+                    { key: 'beta', label: 'Beta (trend)', kind: 'number', defaultValue: 0.1, description: 'Trend smoothing parameter (0.001–0.999).' },
+                    { key: 'gamma', label: 'Gamma (seasonal)', kind: 'number', defaultValue: 0.1, description: 'Seasonal smoothing parameter (0.001–0.999).' },
+                    { key: 'seasonalPeriod', label: 'Seasonal period', kind: 'integer', defaultValue: 0, description: 'Seasonal period (0 = no seasonal, >=2 for Holt-Winters).' },
+                    { key: 'steps', label: 'Forecast steps', kind: 'integer', defaultValue: 10, description: 'Number of steps to forecast ahead.' },
+                    { key: 'trend', label: 'Enable trend', kind: 'bool', defaultValue: true, description: 'Include trend component (Holt / Holt-Winters).' },
+                ],
+            },
+        ], 'upstream');
+    }
+
+    if (id === 'ml.forecast.auto.arima') {
+        return base(comp, [
+            {
+                label: 'Auto-ARIMA',
+                fields: [
+                    { key: 'targetColumn', label: 'Target column', kind: 'column', required: true, description: 'Numeric time series column to forecast.' },
+                    { key: 'maxP', label: 'Max AR order (p)', kind: 'integer', defaultValue: 5, description: 'Maximum autoregressive order to search.' },
+                    { key: 'maxD', label: 'Max differencing (d)', kind: 'integer', defaultValue: 2, description: 'Maximum differencing order to search.' },
+                    { key: 'maxQ', label: 'Max MA order (q)', kind: 'integer', defaultValue: 5, description: 'Maximum moving average order to search.' },
+                    { key: 'steps', label: 'Forecast steps', kind: 'integer', defaultValue: 10, description: 'Number of steps to forecast ahead.' },
+                ],
+            },
+        ], 'upstream');
+    }
+
+    if (id === 'ml.timeseries.decompose') {
+        return base(comp, [
+            {
+                label: 'Time Series Decomposition',
+                fields: [
+                    { key: 'targetColumn', label: 'Target column', kind: 'column', required: true, description: 'Numeric time series column to decompose.' },
+                    { key: 'period', label: 'Period', kind: 'integer', required: true, description: 'Seasonal period (>=2).' },
+                    { key: 'model', label: 'Model', kind: 'select', defaultValue: 'additive', options: [{ label: 'Additive', value: 'additive' }, { label: 'Multiplicative', value: 'multiplicative' }], description: 'Decomposition model type.' },
                 ],
             },
         ], 'upstream');
