@@ -1189,12 +1189,19 @@ gh release edit vX.Y.Z --draft=false --latest
 
 ---
 
-## Roadmap
+## Roadmap — v1.0.0
 
-| Version | Theme | Goals |
-|---------|-------|-------|
-| **v1.0.0** | **Data Science Platform** | Python scripting node (`xf.script.python`), Text Mining (tokenization, TF-IDF, sentiment, NER), Association Rules (Apriori/FP-Growth), more chart types (heatmap, sunburst, parallel coordinates, ROC curve), interactive widgets (slider, dropdown, file upload) for data apps, PDF/HTML report generation |
-| **v1.1.0** | **Enterprise & Advanced** | Streaming execution (chunk-based processing for large datasets), XAI / SHAP values for model interpretability, REST API deployment (deploy pipelines as API endpoints), Git version control integration for pipelines, components / reusable subgraph sharing |
+- [ ] Python scripting node (`xf.script.python`)
+- [ ] Text Mining (tokenization, TF-IDF, sentiment, NER)
+- [ ] Association Rules (Apriori / FP-Growth)
+- [ ] More chart types (heatmap, sunburst, parallel coordinates, ROC curve)
+- [ ] Interactive widgets (slider, dropdown, file upload) for data apps
+- [ ] PDF / HTML report generation
+- [ ] Streaming execution (chunk-based processing for large datasets)
+- [ ] XAI / SHAP values for model interpretability
+- [ ] REST API deployment (deploy pipelines as API endpoints)
+- [ ] Git version control integration for pipelines
+- [ ] Components / reusable subgraph sharing
 
 ---
 
