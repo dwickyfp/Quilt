@@ -5708,6 +5708,18 @@ function synthMl(comp: ComponentDef): ComponentManifest {
         }], 'upstream');
     }
 
+    // ─── SHAP / XAI ─────────────────────────────────────────────────
+    if (id === 'ml.explain.shap') {
+        return base(comp, [{
+            label: 'SHAP Explainer',
+            fields: [
+                { key: 'modelNode', label: 'Model node ID', kind: 'text', required: true, description: 'Node ID of the trained model to explain (e.g. the Learner node).' },
+                { key: 'featureColumns', label: 'Feature columns', kind: 'columns', required: true, description: 'Feature columns (must match model training features).' },
+                { key: 'backgroundSamples', label: 'Background samples', kind: 'integer', defaultValue: 100, description: 'Number of background samples for SHAP (more = more accurate, slower).' },
+            ],
+        }], 'upstream');
+    }
+
     if (id === 'dl.onnx.reader') {
         return base(comp, [
             {

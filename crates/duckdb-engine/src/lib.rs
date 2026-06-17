@@ -1122,6 +1122,10 @@ impl DuckdbEngine {
                     Some(RuntimeSpec::CodePython(spec)) => {
                         self.run_code_python(&db_path, spec, &stage.node_id)
                     }
+                    // ---- v1.0.0 SHAP ----
+                    Some(RuntimeSpec::Shap(spec)) => {
+                        self.run_shap(&db_path, spec, &stage.node_id, &stage.from.as_deref().unwrap_or_default())
+                    }
                     // Control-flow variants (RunJob / InstallFallback /
                     // Iterate / Foreach / Log / Warn / non-firing Die) already
                     // ran their side effect above, so they fall through here to

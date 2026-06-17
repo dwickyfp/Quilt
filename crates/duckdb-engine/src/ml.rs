@@ -4312,6 +4312,262 @@ print(f"{{len(result)}} rows written")
 
         Ok(format!("code.python: {}", stdout.trim()))
     }
+
+    // ─── v1.0.0 SHAP Explainer ──────────────────────────────────────
+
+    /// ml.explain.shap: SHAP (SHapley Additive exPlanations) for model interpretability.
+    /// For linear models: exact LinearExplainer (SHAP_i = coef_i * (x_i - mean_i)).
+    /// For tree/ensemble models: permutation-based SHAP approximation.
+    /// Output: original data + shap_{feature} columns for each feature.
+    pub(crate) fn run_shap(
+        &self,
+        db: &Path,
+        spec: &plan::ShapSpec,
+        node_id: &str,
+        from_view: &str,
+    ) -> Result<String, EngineError> {
+        // Load the trained model
+        let model = self.load_model(db, &spec.model_node_id)?;
+
+        // Read all rows from upstream
+        let rows = self.run_rows(Some(db), &format!(
+            "SELECT * FROM {}", plan::quote_ident(from_view)
+        ))?;
+
+        // Extract feature values as f64 matrix
+        let n_rows = rows.len();
+        let n_features = spec.feature_columns.len();
+        let mut x_data: Vec<Vec<f64>> = Vec::with_capacity(n_rows);
+        for row in &rows {
+            let mut feat_vals: Vec<f64> = Vec::with_capacity(n_features);
+            for col in &spec.feature_columns {
+                let val = row.get(col)
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
+                feat_vals.push(val);
+            }
+            x_data.push(feat_vals);
+        }
+
+        // Compute feature means (for LinearExplainer background)
+        let mut feature_means = vec![0.0f64; n_features];
+        for row_data in &x_data {
+            for (j, &val) in row_data.iter().enumerate() {
+                feature_means[j] += val;
+            }
+        }
+        for m in &mut feature_means {
+            *m /= n_rows.max(1) as f64;
+        }
+
+        // Compute SHAP values based on model type
+        // Step 1: Try to extract linear model coefficients (exact LinearExplainer)
+        // We inline extraction to avoid &dyn Any lifetime issues with model.coefficients().
+        let linear_coef: Option<Vec<f64>> = match &model {
+            Model::LinReg { model, .. } => {
+                let c = model.coefficients();
+                Some(extract_coef_from_matrix(&c, n_features))
+            }
+            Model::Ridge { model, .. } => {
+                let c = model.coefficients();
+                Some(extract_coef_from_matrix(&c, n_features))
+            }
+            Model::Lasso { model, .. } => {
+                let c = model.coefficients();
+                Some(extract_coef_from_matrix(&c, n_features))
+            }
+            Model::ElasticNet { model, .. } => {
+                let c = model.coefficients();
+                Some(extract_coef_from_matrix(&c, n_features))
+            }
+            Model::LogReg { model, .. } => {
+                let c = model.coefficients();
+                Some(extract_coef_from_matrix(&c, n_features))
+            }
+            _ => None,
+        };
+
+        let shap_values: Vec<Vec<f64>> = if let Some(ref coef_1d) = linear_coef {
+            // ─── Linear models: exact LinearExplainer ───
+            // SHAP_i = coef_i * (x_i - mean_feature_i)
+            x_data.iter().map(|row| {
+                coef_1d.iter().enumerate().map(|(j, &c)| {
+                    c * (row[j] - feature_means[j])
+                }).collect()
+            }).collect()
+        } else {
+            // ─── Tree/ensemble models: permutation-based SHAP ───
+            // For each feature, compute marginal contribution by replacing
+            // feature values with background samples and measuring prediction change.
+            let bg_samples = spec.background_samples.min(n_rows);
+            let mut rng = rand::thread_rng();
+
+            // Sample background indices
+            use rand::seq::SliceRandom;
+            let mut indices: Vec<usize> = (0..n_rows).collect();
+            indices.shuffle(&mut rng);
+            let bg_indices: Vec<usize> = indices.into_iter().take(bg_samples).collect();
+
+            // Compute all predictions upfront
+            let full_preds = predict_with_model(&model, &x_data)?;
+
+            let mut all_shap = vec![vec![0.0f64; n_features]; n_rows];
+            for (i, row) in x_data.iter().enumerate() {
+                for j in 0..n_features {
+                    let mut marginal_sum = 0.0f64;
+                    let mut count = 0usize;
+
+                    for &bg_idx in &bg_indices {
+                        let mut without_j = row.clone();
+                        without_j[j] = x_data[bg_idx][j];
+                        let pred_without = predict_with_model(&model, &[without_j])?;
+                        marginal_sum += full_preds[i] - pred_without[0];
+                        count += 1;
+                    }
+
+                    all_shap[i][j] = if count > 0 {
+                        marginal_sum / count as f64
+                    } else {
+                        0.0
+                    };
+                }
+            }
+            all_shap
+        };
+
+        // Build output: original columns + shap_{feature} columns
+        let mut results: Vec<JsonValue> = Vec::with_capacity(n_rows);
+        for (i, row) in rows.iter().enumerate() {
+            let mut obj = row.as_object().cloned().unwrap_or_default();
+            for (j, col) in spec.feature_columns.iter().enumerate() {
+                let shap_key = format!("shap_{}", col);
+                let val = shap_values[i][j];
+                obj.insert(shap_key, JsonValue::Number(
+                    serde_json::Number::from_f64(
+                        (val * 1_000_000.0).round() / 1_000_000.0
+                    ).unwrap_or(serde_json::Number::from(0))
+                ));
+            }
+            results.push(JsonValue::Object(obj));
+        }
+
+        materialize_jsonobjects_as_table(&self.bin, db, node_id, &results)?;
+        Ok(format!("ml.explain.shap: {} rows, {} features -> {}", n_rows, n_features, node_id))
+    }
+}
+
+// ─── SHAP helpers ───────────────────────────────────────────────────
+
+/// Extract 1D coefficient vector from smartcore's coefficient matrix.
+/// smartcore stores coefficients as (n_classes x n_features) or (n_features x 1).
+fn extract_coef_from_matrix(coef: &DenseMatrix<f64>, n_features: usize) -> Vec<f64> {
+    let (_nrows, ncols) = coef.shape();
+    if ncols > 1 {
+        (0..n_features).map(|i| *coef.get((0, i))).collect()
+    } else {
+        (0..n_features).map(|i| *coef.get((i, 0))).collect()
+    }
+}
+
+/// Predict with any Model variant, returning Vec<f64> predictions.
+fn predict_with_model(model: &Model, x: &[Vec<f64>]) -> Result<Vec<f64>, EngineError> {
+    use smartcore::linalg::basic::matrix::DenseMatrix;
+    let n = x.len();
+    let m = x.first().map(|r| r.len()).unwrap_or(0);
+    let flat: Vec<f64> = x.iter().flat_map(|r| r.iter().copied()).collect();
+    let dm = DenseMatrix::from_2d_vec(&x.iter().map(|r| r.to_vec()).collect::<Vec<_>>());
+
+    match model {
+        Model::LinReg { model, .. } => {
+            Ok(model.predict(&dm).map_err(|e| EngineError::Query(format!("shap predict: {}", e)))?)
+        }
+        Model::Ridge { model, .. } => {
+            Ok(model.predict(&dm).map_err(|e| EngineError::Query(format!("shap predict: {}", e)))?)
+        }
+        Model::Lasso { model, .. } => {
+            Ok(model.predict(&dm).map_err(|e| EngineError::Query(format!("shap predict: {}", e)))?)
+        }
+        Model::ElasticNet { model, .. } => {
+            Ok(model.predict(&dm).map_err(|e| EngineError::Query(format!("shap predict: {}", e)))?)
+        }
+        Model::LogReg { model, .. } => {
+            let preds = model.predict(&dm).map_err(|e| EngineError::Query(format!("shap predict: {}", e)))?;
+            Ok(preds.into_iter().map(|p| p as f64).collect())
+        }
+        Model::Tree { model, .. } => {
+            let preds = model.predict(&dm).map_err(|e| EngineError::Query(format!("shap predict: {}", e)))?;
+            Ok(preds.into_iter().map(|p| p as f64).collect())
+        }
+        Model::Forest { model, .. } => {
+            let preds = model.predict(&dm).map_err(|e| EngineError::Query(format!("shap predict: {}", e)))?;
+            Ok(preds.into_iter().map(|p| p as f64).collect())
+        }
+        Model::TreeReg { model, .. } => {
+            Ok(model.predict(&dm).map_err(|e| EngineError::Query(format!("shap predict: {}", e)))?)
+        }
+        Model::ForestReg { model, .. } => {
+            Ok(model.predict(&dm).map_err(|e| EngineError::Query(format!("shap predict: {}", e)))?)
+        }
+        Model::Xgb { model, .. } => {
+            let test_data: GbdtDataVec = x.iter().map(|row| {
+                let feat: Vec<f32> = row.iter().map(|v| *v as f32).collect();
+                GbdtData::new_test_data(feat, None)
+            }).collect();
+            Ok(model.predict(&test_data).into_iter().map(|v| v as f64).collect())
+        }
+        Model::XgbReg { model, .. } => {
+            let test_data: GbdtDataVec = x.iter().map(|row| {
+                let feat: Vec<f32> = row.iter().map(|v| *v as f32).collect();
+                GbdtData::new_test_data(feat, None)
+            }).collect();
+            Ok(model.predict(&test_data).into_iter().map(|v| v as f64).collect())
+        }
+        Model::Svr { features, support_vectors, weights, bias, kernel_type, kernel_gamma } => {
+            Ok(x.iter().map(|row| {
+                let mut pred = *bias;
+                for (sv, &w) in support_vectors.iter().zip(weights.iter()) {
+                    let k = match kernel_type.as_str() {
+                        "rbf" => {
+                            let dist: f64 = sv.iter().zip(row.iter()).map(|(a, b)| (a - b).powi(2)).sum();
+                            (-kernel_gamma * dist).exp()
+                        }
+                        _ => sv.iter().zip(row.iter()).map(|(a, b)| a * b).sum::<f64>(),
+                    };
+                    pred += w * k;
+                }
+                pred
+            }).collect())
+        }
+        Model::Svc { features, labels, classifiers } => {
+            // OvR: predict class with highest decision value
+            Ok(x.iter().map(|row| {
+                let mut best_score = f64::NEG_INFINITY;
+                let mut best_class = 0i64;
+                for (idx, clf) in classifiers.iter().enumerate() {
+                    let mut score = clf.bias;
+                    for (sv, &w) in clf.support_vectors.iter().zip(clf.weights.iter()) {
+                        let k = match clf.kernel_type.as_str() {
+                            "rbf" => {
+                                let dist: f64 = sv.iter().zip(row.iter()).map(|(a, b)| (a - b).powi(2)).sum();
+                                (-clf.kernel_gamma * dist).exp()
+                            }
+                            _ => sv.iter().zip(row.iter()).map(|(a, b)| a * b).sum::<f64>(),
+                        };
+                        score += w * k;
+                    }
+                    if score > best_score {
+                        best_score = score;
+                        best_class = idx as i64;
+                    }
+                }
+                best_class as f64
+            }).collect())
+        }
+        _ => {
+            // Unsupported model type: return zeros
+            Ok(vec![0.0; n])
+        }
+    }
 }
 
 // ─── VADER Sentiment (pure Rust implementation) ─────────────────────

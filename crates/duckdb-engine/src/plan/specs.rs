@@ -1643,3 +1643,14 @@ pub struct CodePythonSpec {
     /// From view for the upstream data.
     pub from_view: String,
 }
+
+/// ml.explain.shap: SHAP (SHapley Additive exPlanations) for model interpretability.
+#[derive(Debug, Clone)]
+pub struct ShapSpec {
+    /// Node ID of the trained model to explain.
+    pub model_node_id: String,
+    /// Feature columns (must match model training features).
+    pub feature_columns: Vec<String>,
+    /// Number of background samples for KernelSHAP (default 100).
+    pub background_samples: usize,
+}

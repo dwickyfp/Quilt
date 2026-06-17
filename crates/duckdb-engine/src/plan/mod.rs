@@ -198,6 +198,8 @@ pub enum RuntimeSpec {
     TmAssociation(TmAssociationSpec),
     /// code.python: run Python script via subprocess + Parquet IPC.
     CodePython(CodePythonSpec),
+    /// ml.explain.shap: SHAP explanations for model predictions.
+    Shap(ShapSpec),
 }
 
 // Connector / transform spec type definitions live in plan/specs.rs and
@@ -638,6 +640,7 @@ fn build_stage(
     let mut tm_langdetect: Option<TmLangdetectSpec> = None;
     let mut tm_association: Option<TmAssociationSpec> = None;
     let mut code_python: Option<CodePythonSpec> = None;
+    let mut shap: Option<ShapSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -3953,6 +3956,25 @@ fn build_stage(
         });
         let sql = passthrough_view_sql(&node.id, from_view);
         (sql, StageKind::View, Some(from_view.to_string()))
+    } else if component_id == "ml.explain.shap" {
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let model_node_id = string_prop(&props, "modelNode")
+            .or_else(|| string_prop(&props, "modelNodeId"))
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: modelNode (node ID of trained model) required", component_id)))?;
+        let feature_columns = columns_list(&props, "featureColumns");
+        if feature_columns.is_empty() {
+            return Err(EngineError::Config(format!(
+                "{}: featureColumns required (must match model training features)", component_id
+            )));
+        }
+        shap = Some(ShapSpec {
+            model_node_id,
+            feature_columns,
+            background_samples: props.get("backgroundSamples").and_then(|v| v.as_u64()).unwrap_or(100) as usize,
+        });
+        let sql = passthrough_view_sql(&node.id, from_view);
+        (sql, StageKind::View, Some(from_view.to_string()))
     } else {
         // the body so CSV/TSV sources can switch to the tolerant pass/reject
         // split when (and only when) the reject port is wired (issue #15).
@@ -4212,6 +4234,7 @@ fn build_stage(
         .or_else(|| tm_langdetect.map(RuntimeSpec::TmLangdetect))
         .or_else(|| tm_association.map(RuntimeSpec::TmAssociation))
         .or_else(|| code_python.map(RuntimeSpec::CodePython))
+        .or_else(|| shap.map(RuntimeSpec::Shap))
         ;
     // Free the ATTACH alias so the next batched stage can re-ATTACH it (see
     // attach_alias above). Only stages that embed the ATTACH in their own SQL

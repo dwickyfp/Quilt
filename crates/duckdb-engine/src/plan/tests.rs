@@ -2663,3 +2663,26 @@
             other => panic!("expected CodePython, got {:?}", other),
         }
     }
+
+    // ─── v1.0.0 SHAP test ───────────────────────────────────────────
+
+    #[test]
+    fn shap_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"sh","position":{"x":0,"y":0},"data":{"label":"SHAP","componentId":"ml.explain.shap","properties":{"modelNode":"learner","featureColumns":["f1","f2"],"backgroundSamples":50}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"sh","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "sh").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::Shap(spec)) => {
+                assert_eq!(spec.model_node_id, "learner");
+                assert_eq!(spec.feature_columns, vec!["f1", "f2"]);
+                assert_eq!(spec.background_samples, 50);
+            }
+            other => panic!("expected Shap, got {:?}", other),
+        }
+    }

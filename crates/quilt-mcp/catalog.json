@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 398,
+  "componentCount": 399,
   "components": [
     {
       "id": "src.csv",
@@ -46146,6 +46146,92 @@
                 "monospace": true,
                 "required": true,
                 "placeholder": "def process(row):\n    return row"
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ml.explain.shap",
+      "label": "SHAP Explainer",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "SHAP (SHapley Additive exPlanations) for model interpretability. Props: modelNode (required — node ID of trained model), featureColumns (required), backgroundSamples (default 100). For linear models: exact LinearExplainer. For tree/ensemble: permutation-based SHAP. Output: original data + shap_{feature} columns.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "ml.explain.shap",
+        "kind": "ml",
+        "label": "SHAP Explainer",
+        "description": "SHAP (SHapley Additive exPlanations) for model interpretability. Props: modelNode (required — node ID of trained model), featureColumns (required), backgroundSamples (default 100). For linear models: exact LinearExplainer. For tree/ensemble: permutation-based SHAP. Output: original data + shap_{feature} columns.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "SHAP Explainer",
+            "fields": [
+              {
+                "key": "modelNode",
+                "label": "Model node ID",
+                "kind": "text",
+                "required": true,
+                "description": "Node ID of the trained model to explain (e.g. the Learner node)."
+              },
+              {
+                "key": "featureColumns",
+                "label": "Feature columns",
+                "kind": "columns",
+                "required": true,
+                "description": "Feature columns (must match model training features)."
+              },
+              {
+                "key": "backgroundSamples",
+                "label": "Background samples",
+                "kind": "integer",
+                "defaultValue": 100,
+                "description": "Number of background samples for SHAP (more = more accurate, slower)."
               }
             ]
           }
