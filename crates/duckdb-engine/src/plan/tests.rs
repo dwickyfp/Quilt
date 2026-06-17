@@ -2597,3 +2597,69 @@
         }
     }
 
+
+    // ─── v1.0.0 Association Rules + Python tests ────────────────────
+
+    #[test]
+    fn tm_apriori_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"ap","position":{"x":0,"y":0},"data":{"label":"Apriori","componentId":"tm.apriori","properties":{"transactionColumn":"txn_id","itemColumn":"item","minSupport":0.2,"minConfidence":0.6}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"ap","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "ap").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::TmAssociation(spec)) => {
+                assert_eq!(spec.transaction_column, "txn_id");
+                assert_eq!(spec.item_column, "item");
+                assert!((spec.min_support - 0.2).abs() < 0.001);
+                assert!((spec.min_confidence - 0.6).abs() < 0.001);
+                assert_eq!(spec.algorithm, "apriori");
+            }
+            other => panic!("expected TmAssociation, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn tm_fpgrowth_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"fp","position":{"x":0,"y":0},"data":{"label":"FP-Growth","componentId":"tm.fpgrowth","properties":{"transactionColumn":"txn_id","itemColumn":"item"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"fp","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "fp").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::TmAssociation(spec)) => {
+                assert_eq!(spec.algorithm, "fpgrowth");
+                assert!((spec.min_support - 0.1).abs() < 0.001);
+                assert!((spec.min_confidence - 0.5).abs() < 0.001);
+            }
+            other => panic!("expected TmAssociation, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn code_python_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"py","position":{"x":0,"y":0},"data":{"label":"Python","componentId":"code.python","properties":{"code":"result = df.head(10)"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"py","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "py").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::CodePython(spec)) => {
+                assert_eq!(spec.code, "result = df.head(10)");
+                assert_eq!(spec.from_view, "s");
+            }
+            other => panic!("expected CodePython, got {:?}", other),
+        }
+    }

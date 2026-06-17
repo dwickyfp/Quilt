@@ -898,6 +898,9 @@ export const PALETTE: Category[] = [
                     ml('tm.tfidf', 'TF-IDF', 'available', 'Compute TF-IDF scores for tokenized text. Expects upstream with one row per token. Props: tokenColumn (default token), docColumn (required — document ID). Output: doc_id, token, tf, idf, tfidf (sorted by tfidf desc).'),
                     ml('tm.sentiment', 'Sentiment Analyzer', 'available', 'VADER sentiment analysis on a text column. Props: textColumn (required), outputColumn (default sentiment_score). Output: all original columns + sentiment_score in [-1.0, 1.0]. Pure Rust, no external dependencies. Handles negation (not good → negative).'),
                     ml('tm.langdetect', 'Language Detector', 'available', 'Detect language of text using trigram model. Props: textColumn (required), outputLangColumn (default lang), outputConfColumn (default lang_confidence). Output: all original columns + ISO 639-1 language code + confidence (0.0-1.0). Supports 70+ languages.'),
+                    ml('tm.apriori', 'Apriori Rules', 'available', 'Association rule mining via Apriori algorithm. Props: transactionColumn (required — transaction ID), itemColumn (required — item name), minSupport (default 0.1), minConfidence (default 0.5), maxLength (default 3). Output: antecedent, consequent, support, confidence, lift.'),
+                    ml('tm.fpgrowth', 'FP-Growth Rules', 'available', 'Association rule mining via FP-Growth algorithm. Same props as Apriori. More memory-efficient for large datasets. Props: transactionColumn, itemColumn, minSupport (default 0.1), minConfidence (default 0.5), maxLength (default 3).'),
+                    ml('code.python', 'Python Script', 'available', 'Run custom Python code on the data. Input: `df` (pandas DataFrame). Must define `result` (output DataFrame). Props: code (required — Python script body). Requires pandas + pyarrow installed.'),
                 ],
             },
             {

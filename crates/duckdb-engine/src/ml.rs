@@ -4079,6 +4079,239 @@ impl DuckdbEngine {
         materialize_jsonobjects_as_table(&self.bin, db, node_id, &results)?;
         Ok(format!("tm.langdetect: {} rows -> {}", results.len(), node_id))
     }
+
+    // ─── v1.0.0 Association Rules ────────────────────────────────────
+
+    /// tm.apriori / tm.fpgrowth: Association rule mining.
+    /// Reads upstream rows, groups items by transaction, finds frequent itemsets,
+    /// and generates association rules.
+    pub(crate) fn run_tm_association(
+        &self,
+        db: &Path,
+        spec: &plan::TmAssociationSpec,
+        node_id: &str,
+        from_view: &str,
+    ) -> Result<String, EngineError> {
+        let rows = self.run_rows(Some(db), &format!("SELECT * FROM {}", plan::quote_ident(from_view)))?;
+
+        // Build transaction baskets: txn_id -> Vec<item>
+        use std::collections::HashMap;
+        let mut baskets: HashMap<String, Vec<String>> = HashMap::new();
+        for row in &rows {
+            if let Some(obj) = row.as_object() {
+                let txn_id = obj.get(&spec.transaction_column)
+                    .map(|v| match v {
+                        JsonValue::String(s) => s.clone(),
+                        other => other.to_string(),
+                    })
+                    .unwrap_or_default();
+                let item = obj.get(&spec.item_column)
+                    .map(|v| match v {
+                        JsonValue::String(s) => s.clone(),
+                        other => other.to_string(),
+                    })
+                    .unwrap_or_default();
+                baskets.entry(txn_id).or_default().push(item);
+            }
+        }
+
+        let txn_count = baskets.len() as f64;
+        if txn_count == 0.0 {
+            materialize_jsonobjects_as_table(&self.bin, db, node_id, &[])?;
+            return Ok(format!("tm.association: 0 transactions -> {}", node_id));
+        }
+
+        // Count item frequencies
+        let mut item_counts: HashMap<String, usize> = HashMap::new();
+        for basket in baskets.values() {
+            let unique: std::collections::HashSet<&String> = basket.iter().collect();
+            for item in unique {
+                *item_counts.entry(item.clone()).or_insert(0) += 1;
+            }
+        }
+
+        // Filter frequent 1-itemsets
+        let min_count = (spec.min_support * txn_count).ceil() as usize;
+        let frequent_1: Vec<String> = item_counts.iter()
+            .filter(|(_, &count)| count >= min_count)
+            .map(|(item, _)| item.clone())
+            .collect();
+
+        // Generate frequent itemsets up to max_length
+        let mut frequent_itemsets: Vec<(Vec<String>, usize)> = Vec::new();
+        for item in &frequent_1 {
+            let count = item_counts[item];
+            frequent_itemsets.push((vec![item.clone()], count));
+        }
+
+        // Generate 2+ itemsets via self-join (simplified Apriori)
+        let mut current_level: Vec<Vec<String>> = frequent_1.iter().map(|i| vec![i.clone()]).collect();
+        for k in 2..=spec.max_length {
+            let mut next_level: Vec<Vec<String>> = Vec::new();
+            for i in 0..current_level.len() {
+                for j in (i + 1)..current_level.len() {
+                    // Join if first k-2 items match
+                    if k > 2 && current_level[i][..k - 2] != current_level[j][..k - 2] {
+                        continue;
+                    }
+                    let mut candidate = current_level[i].clone();
+                    candidate.push(current_level[j][k - 2].clone());
+                    candidate.sort();
+
+                    // Count support
+                    let count = baskets.values()
+                        .filter(|basket| {
+                            let unique: std::collections::HashSet<&String> = basket.iter().collect();
+                            candidate.iter().all(|item| unique.contains(item))
+                        })
+                        .count();
+
+                    if count >= min_count {
+                        frequent_itemsets.push((candidate.clone(), count));
+                        next_level.push(candidate);
+                    }
+                }
+            }
+            if next_level.is_empty() { break; }
+            current_level = next_level;
+        }
+
+        // Generate association rules
+        let mut rules: Vec<JsonValue> = Vec::new();
+        for (itemset, support_count) in &frequent_itemsets {
+            if itemset.len() < 2 { continue; }
+            let support = *support_count as f64 / txn_count;
+
+            // Generate all non-empty proper subsets as antecedents
+            let n = itemset.len();
+            for mask in 1..(1u32 << n) - 1 {
+                let mut antecedent: Vec<String> = Vec::new();
+                let mut consequent: Vec<String> = Vec::new();
+                for (idx, item) in itemset.iter().enumerate() {
+                    if (mask >> idx) & 1 == 1 {
+                        antecedent.push(item.clone());
+                    } else {
+                        consequent.push(item.clone());
+                    }
+                }
+
+                // Count antecedent support
+                let ant_count = baskets.values()
+                    .filter(|basket| {
+                        let unique: std::collections::HashSet<&String> = basket.iter().collect();
+                        antecedent.iter().all(|item| unique.contains(item))
+                    })
+                    .count();
+
+                if ant_count == 0 { continue; }
+                let confidence = *support_count as f64 / ant_count as f64;
+                let lift = confidence / (consequent.len() as f64 / txn_count);
+
+                if confidence >= spec.min_confidence {
+                    let mut rule = serde_json::Map::new();
+                    rule.insert("antecedent".to_string(), JsonValue::String(antecedent.join(", ")));
+                    rule.insert("consequent".to_string(), JsonValue::String(consequent.join(", ")));
+                    rule.insert("support".to_string(), JsonValue::Number(
+                        serde_json::Number::from_f64((support * 10000.0).round() / 10000.0).unwrap()
+                    ));
+                    rule.insert("confidence".to_string(), JsonValue::Number(
+                        serde_json::Number::from_f64((confidence * 10000.0).round() / 10000.0).unwrap()
+                    ));
+                    rule.insert("lift".to_string(), JsonValue::Number(
+                        serde_json::Number::from_f64((lift * 10000.0).round() / 10000.0).unwrap()
+                    ));
+                    rules.push(JsonValue::Object(rule));
+                }
+            }
+        }
+
+        // Sort by confidence descending
+        rules.sort_by(|a, b| {
+            let ca = a.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let cb = b.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            cb.partial_cmp(&ca).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        materialize_jsonobjects_as_table(&self.bin, db, node_id, &rules)?;
+        Ok(format!("tm.{}: {} transactions -> {} rules -> {}", spec.algorithm, txn_count as usize, rules.len(), node_id))
+    }
+
+    // ─── v1.0.0 Python Scripting ─────────────────────────────────────
+
+    /// code.python: Run a Python script via subprocess with Parquet IPC.
+    /// Reads upstream data as Parquet, runs Python script, reads result back.
+    pub(crate) fn run_code_python(
+        &self,
+        db: &Path,
+        spec: &plan::CodePythonSpec,
+        node_id: &str,
+    ) -> Result<String, EngineError> {
+        use std::process::Command;
+        use std::fs;
+
+        let work_dir = db.parent().unwrap_or(Path::new("/tmp"));
+        let input_path = work_dir.join(format!("{}_input.parquet", node_id));
+        let output_path = work_dir.join(format!("{}_output.parquet", node_id));
+
+        // Export upstream data to Parquet
+        let from_view = &spec.from_view;
+        self.run(Some(db), &format!(
+            "COPY (SELECT * FROM {}) TO '{}' (FORMAT PARQUET)",
+            plan::quote_ident(from_view),
+            input_path.display()
+        ), false)?;
+
+        // Write Python script
+        let script = format!(
+            r#"import pandas as pd
+import sys
+df = pd.read_parquet('{}')
+{}
+if 'result' not in dir():
+    print("ERROR: code.python script must define 'result' variable", file=sys.stderr)
+    sys.exit(1)
+result.to_parquet('{}', index=False)
+print(f"{{len(result)}} rows written")
+"#,
+            input_path.display(),
+            spec.code,
+            output_path.display()
+        );
+        let script_path = work_dir.join(format!("{}_script.py", node_id));
+        fs::write(&script_path, script).map_err(|e| EngineError::Config(format!("code.python: failed to write script: {}", e)))?;
+
+        // Execute Python
+        let output = Command::new("python3")
+            .arg(&script_path)
+            .output()
+            .map_err(|e| EngineError::Config(format!("code.python: failed to run python3: {}. Is Python 3 installed?", e)))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Cleanup
+            let _ = fs::remove_file(&input_path);
+            let _ = fs::remove_file(&output_path);
+            let _ = fs::remove_file(&script_path);
+            return Err(EngineError::Config(format!("code.python: script failed:\n{}\n{}", stdout, stderr)));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+
+        // Import result back into DuckDB
+        self.run(Some(db), &format!(
+            "CREATE OR REPLACE VIEW {} AS SELECT * FROM read_parquet('{}')",
+            plan::quote_ident(node_id),
+            output_path.display()
+        ), false)?;
+
+        // Cleanup temp files
+        let _ = fs::remove_file(&input_path);
+        let _ = fs::remove_file(&output_path);
+        let _ = fs::remove_file(&script_path);
+
+        Ok(format!("code.python: {}", stdout.trim()))
+    }
 }
 
 // ─── VADER Sentiment (pure Rust implementation) ─────────────────────

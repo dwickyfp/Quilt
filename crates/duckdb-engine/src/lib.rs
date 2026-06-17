@@ -1114,6 +1114,14 @@ impl DuckdbEngine {
                     Some(RuntimeSpec::TmLangdetect(spec)) => {
                         self.run_tm_langdetect(&db_path, spec, &stage.node_id, &stage.from.as_deref().unwrap_or_default())
                     }
+                    // ---- v1.0.0 Association Rules ----
+                    Some(RuntimeSpec::TmAssociation(spec)) => {
+                        self.run_tm_association(&db_path, spec, &stage.node_id, &stage.from.as_deref().unwrap_or_default())
+                    }
+                    // ---- v1.0.0 Python Scripting ----
+                    Some(RuntimeSpec::CodePython(spec)) => {
+                        self.run_code_python(&db_path, spec, &stage.node_id)
+                    }
                     // Control-flow variants (RunJob / InstallFallback /
                     // Iterate / Foreach / Log / Warn / non-firing Die) already
                     // ran their side effect above, so they fall through here to

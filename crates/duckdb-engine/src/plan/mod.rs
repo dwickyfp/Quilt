@@ -194,6 +194,10 @@ pub enum RuntimeSpec {
     TmSentiment(TmSentimentSpec),
     /// tm.langdetect: language detection on a text column.
     TmLangdetect(TmLangdetectSpec),
+    /// tm.apriori / tm.fpgrowth: association rule mining.
+    TmAssociation(TmAssociationSpec),
+    /// code.python: run Python script via subprocess + Parquet IPC.
+    CodePython(CodePythonSpec),
 }
 
 // Connector / transform spec type definitions live in plan/specs.rs and
@@ -632,6 +636,8 @@ fn build_stage(
     let mut try_catch_path: Option<String> = None;
     let mut tm_sentiment: Option<TmSentimentSpec> = None;
     let mut tm_langdetect: Option<TmLangdetectSpec> = None;
+    let mut tm_association: Option<TmAssociationSpec> = None;
+    let mut code_python: Option<CodePythonSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -3918,6 +3924,35 @@ fn build_stage(
         });
         let sql = passthrough_view_sql(&node.id, from_view);
         (sql, StageKind::View, Some(from_view.to_string()))
+    } else if component_id == "tm.apriori" || component_id == "tm.fpgrowth" {
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let transaction_column = string_prop(&props, "transactionColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: transactionColumn required", component_id)))?;
+        let item_column = string_prop(&props, "itemColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: itemColumn required", component_id)))?;
+        tm_association = Some(TmAssociationSpec {
+            transaction_column,
+            item_column,
+            min_support: props.get("minSupport").and_then(|v| v.as_f64()).unwrap_or(0.1),
+            min_confidence: props.get("minConfidence").and_then(|v| v.as_f64()).unwrap_or(0.5),
+            max_length: props.get("maxLength").and_then(|v| v.as_u64()).unwrap_or(3) as usize,
+            algorithm: if component_id == "tm.fpgrowth" { "fpgrowth".to_string() } else { "apriori".to_string() },
+        });
+        let sql = passthrough_view_sql(&node.id, from_view);
+        (sql, StageKind::View, Some(from_view.to_string()))
+    } else if component_id == "code.python" {
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let code = string_prop(&props, "code")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: code (Python script) required", component_id)))?;
+        code_python = Some(CodePythonSpec {
+            code,
+            from_view: from_view.to_string(),
+        });
+        let sql = passthrough_view_sql(&node.id, from_view);
+        (sql, StageKind::View, Some(from_view.to_string()))
     } else {
         // the body so CSV/TSV sources can switch to the tolerant pass/reject
         // split when (and only when) the reject port is wired (issue #15).
@@ -4175,6 +4210,8 @@ fn build_stage(
         .or_else(|| try_catch_path.map(|path| RuntimeSpec::TryCatch { fallback_path: path }))
         .or_else(|| tm_sentiment.map(RuntimeSpec::TmSentiment))
         .or_else(|| tm_langdetect.map(RuntimeSpec::TmLangdetect))
+        .or_else(|| tm_association.map(RuntimeSpec::TmAssociation))
+        .or_else(|| code_python.map(RuntimeSpec::CodePython))
         ;
     // Free the ATTACH alias so the next batched stage can re-ATTACH it (see
     // attach_alias above). Only stages that embed the ATTACH in their own SQL

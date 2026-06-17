@@ -1616,3 +1616,30 @@ pub struct TmLangdetectSpec {
     /// Output column name for confidence score (default: "lang_confidence").
     pub output_conf_column: String,
 }
+
+/// tm.apriori / tm.fpgrowth: association rule mining.
+#[derive(Debug, Clone)]
+pub struct TmAssociationSpec {
+    /// Column containing transaction IDs (grouping column).
+    pub transaction_column: String,
+    /// Column containing items (item column).
+    pub item_column: String,
+    /// Minimum support threshold (0.0-1.0, default 0.1).
+    pub min_support: f64,
+    /// Minimum confidence threshold (0.0-1.0, default 0.5).
+    pub min_confidence: f64,
+    /// Maximum itemset length (default 3).
+    pub max_length: usize,
+    /// Which algorithm: "apriori" or "fpgrowth".
+    pub algorithm: String,
+}
+
+/// code.python: run a Python script that transforms data via Parquet IPC.
+#[derive(Debug, Clone)]
+pub struct CodePythonSpec {
+    /// Python code to execute. Receives input as `df` (pandas DataFrame).
+    /// Must produce `result` as output DataFrame.
+    pub code: String,
+    /// From view for the upstream data.
+    pub from_view: String,
+}

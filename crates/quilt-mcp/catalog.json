@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 395,
+  "componentCount": 398,
   "components": [
     {
       "id": "src.csv",
@@ -45835,6 +45835,317 @@
                 "kind": "text",
                 "defaultValue": "lang_confidence",
                 "description": "Name for the confidence score column."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tm.apriori",
+      "label": "Apriori Rules",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Association rule mining via Apriori algorithm. Props: transactionColumn (required — transaction ID), itemColumn (required — item name), minSupport (default 0.1), minConfidence (default 0.5), maxLength (default 3). Output: antecedent, consequent, support, confidence, lift.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "tm.apriori",
+        "kind": "ml",
+        "label": "Apriori Rules",
+        "description": "Association rule mining via Apriori algorithm. Props: transactionColumn (required — transaction ID), itemColumn (required — item name), minSupport (default 0.1), minConfidence (default 0.5), maxLength (default 3). Output: antecedent, consequent, support, confidence, lift.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Apriori Association Rules",
+            "fields": [
+              {
+                "key": "transactionColumn",
+                "label": "Transaction ID column",
+                "kind": "column",
+                "required": true,
+                "description": "Column grouping items into transactions."
+              },
+              {
+                "key": "itemColumn",
+                "label": "Item column",
+                "kind": "column",
+                "required": true,
+                "description": "Column containing item names."
+              },
+              {
+                "key": "minSupport",
+                "label": "Min support",
+                "kind": "number",
+                "defaultValue": 0.1,
+                "description": "Minimum support threshold (0.0-1.0)."
+              },
+              {
+                "key": "minConfidence",
+                "label": "Min confidence",
+                "kind": "number",
+                "defaultValue": 0.5,
+                "description": "Minimum confidence threshold (0.0-1.0)."
+              },
+              {
+                "key": "maxLength",
+                "label": "Max itemset length",
+                "kind": "integer",
+                "defaultValue": 3,
+                "description": "Maximum number of items in an itemset."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tm.fpgrowth",
+      "label": "FP-Growth Rules",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Association rule mining via FP-Growth algorithm. Same props as Apriori. More memory-efficient for large datasets. Props: transactionColumn, itemColumn, minSupport (default 0.1), minConfidence (default 0.5), maxLength (default 3).",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "tm.fpgrowth",
+        "kind": "ml",
+        "label": "FP-Growth Rules",
+        "description": "Association rule mining via FP-Growth algorithm. Same props as Apriori. More memory-efficient for large datasets. Props: transactionColumn, itemColumn, minSupport (default 0.1), minConfidence (default 0.5), maxLength (default 3).",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "FP-Growth Association Rules",
+            "fields": [
+              {
+                "key": "transactionColumn",
+                "label": "Transaction ID column",
+                "kind": "column",
+                "required": true,
+                "description": "Column grouping items into transactions."
+              },
+              {
+                "key": "itemColumn",
+                "label": "Item column",
+                "kind": "column",
+                "required": true,
+                "description": "Column containing item names."
+              },
+              {
+                "key": "minSupport",
+                "label": "Min support",
+                "kind": "number",
+                "defaultValue": 0.1,
+                "description": "Minimum support threshold (0.0-1.0)."
+              },
+              {
+                "key": "minConfidence",
+                "label": "Min confidence",
+                "kind": "number",
+                "defaultValue": 0.5,
+                "description": "Minimum confidence threshold (0.0-1.0)."
+              },
+              {
+                "key": "maxLength",
+                "label": "Max itemset length",
+                "kind": "integer",
+                "defaultValue": 3,
+                "description": "Maximum number of items in an itemset."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "code.python",
+      "label": "Python Script",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Run custom Python code on the data. Input: `df` (pandas DataFrame). Must define `result` (output DataFrame). Props: code (required — Python script body). Requires pandas + pyarrow installed.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "code.python",
+        "kind": "transform",
+        "label": "Python UDF",
+        "description": "Runs custom code via Python UDF.",
+        "schemaSource": "declared",
+        "sections": [
+          {
+            "label": "Code",
+            "fields": [
+              {
+                "key": "routineRef",
+                "label": "Use saved routine (optional)",
+                "kind": "routine-ref",
+                "accepts": [
+                  "python"
+                ],
+                "description": "Pick a saved routine, or write inline below."
+              },
+              {
+                "key": "language",
+                "label": "Language",
+                "kind": "select",
+                "defaultValue": "python",
+                "options": [
+                  {
+                    "label": "Python",
+                    "value": "python"
+                  },
+                  {
+                    "label": "Rust",
+                    "value": "rust"
+                  },
+                  {
+                    "label": "JavaScript",
+                    "value": "javascript"
+                  },
+                  {
+                    "label": "Bash",
+                    "value": "bash"
+                  },
+                  {
+                    "label": "WASM",
+                    "value": "wasm"
+                  }
+                ]
+              },
+              {
+                "key": "code",
+                "label": "Source",
+                "kind": "textarea",
+                "rows": 12,
+                "monospace": true,
+                "required": true,
+                "placeholder": "def process(row):\n    return row"
               }
             ]
           }

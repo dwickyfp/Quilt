@@ -5683,6 +5683,31 @@ function synthMl(comp: ComponentDef): ComponentManifest {
         }], 'upstream');
     }
 
+    // ─── Association Rules ──────────────────────────────────────────
+    if (id === 'tm.apriori' || id === 'tm.fpgrowth') {
+        const algoLabel = id === 'tm.apriori' ? 'Apriori' : 'FP-Growth';
+        return base(comp, [{
+            label: `${algoLabel} Association Rules`,
+            fields: [
+                { key: 'transactionColumn', label: 'Transaction ID column', kind: 'column', required: true, description: 'Column grouping items into transactions.' },
+                { key: 'itemColumn', label: 'Item column', kind: 'column', required: true, description: 'Column containing item names.' },
+                { key: 'minSupport', label: 'Min support', kind: 'number', defaultValue: 0.1, description: 'Minimum support threshold (0.0-1.0).' },
+                { key: 'minConfidence', label: 'Min confidence', kind: 'number', defaultValue: 0.5, description: 'Minimum confidence threshold (0.0-1.0).' },
+                { key: 'maxLength', label: 'Max itemset length', kind: 'integer', defaultValue: 3, description: 'Maximum number of items in an itemset.' },
+            ],
+        }], 'upstream');
+    }
+
+    // ─── Python Scripting ───────────────────────────────────────────
+    if (id === 'code.python') {
+        return base(comp, [{
+            label: 'Python Script',
+            fields: [
+                { key: 'code', label: 'Python code', kind: 'textarea', required: true, description: 'Python code to execute. Input: `df` (pandas DataFrame). Must define `result` as output DataFrame.' },
+            ],
+        }], 'upstream');
+    }
+
     if (id === 'dl.onnx.reader') {
         return base(comp, [
             {
