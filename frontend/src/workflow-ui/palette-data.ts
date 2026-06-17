@@ -728,6 +728,8 @@ export const PALETTE: Category[] = [
                     viz('roc', 'ROC Curve', 'available', 'Plot true-positive vs false-positive rate over a continuous score column (x=score, y=label, series=positive-class value, default "1")'),
                     viz('pr', 'Precision-Recall Curve', 'available', 'Plot precision vs recall over a continuous score column (x=score, y=label, series=positive-class value, default "1")'),
                     viz('splom', 'Scatter Matrix', 'available', 'Pairwise scatter plots of 2+ numeric columns in an N x N grid (SPLOM); optional series column colors the points'),
+                    viz('sunburst', 'Sunburst', 'available', 'Hierarchical proportional visualization — 2+ category columns form nested rings, measure column drives slice size. Props: x (categories, comma-separated), y (measure), agg (default sum)'),
+                    viz('parallel', 'Parallel Coordinates', 'available', 'Compare multiple numeric dimensions simultaneously — each column becomes a vertical axis, rows are polylines. Props: columns (numeric columns), series (optional color group)'),
                 ],
             },
         ],

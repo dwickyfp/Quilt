@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 399,
+  "componentCount": 401,
   "components": [
     {
       "id": "src.csv",
@@ -35449,6 +35449,155 @@
                 "kind": "columns",
                 "required": true,
                 "description": "Numeric columns; each pair becomes one scatter cell in the N x N grid."
+              },
+              {
+                "key": "series",
+                "label": "Series (optional color)",
+                "kind": "column"
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.sunburst",
+      "label": "Sunburst",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Hierarchical proportional visualization — 2+ category columns form nested rings, measure column drives slice size. Props: x (categories, comma-separated), y (measure), agg (default sum)",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.sunburst",
+        "kind": "viz",
+        "label": "Sunburst",
+        "description": "Hierarchical proportional visualization — 2+ category columns form nested rings, measure column drives slice size. Props: x (categories, comma-separated), y (measure), agg (default sum)",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "x",
+                "label": "Categories (hierarchy)",
+                "kind": "text",
+                "required": true,
+                "description": "Comma-separated category columns from outer to inner ring (e.g. region,category)"
+              },
+              {
+                "key": "y",
+                "label": "Value (measure)",
+                "kind": "column",
+                "required": true
+              },
+              {
+                "key": "agg",
+                "label": "Aggregation",
+                "kind": "select",
+                "defaultValue": "sum",
+                "options": [
+                  {
+                    "label": "SUM",
+                    "value": "sum"
+                  },
+                  {
+                    "label": "AVG",
+                    "value": "avg"
+                  },
+                  {
+                    "label": "COUNT",
+                    "value": "count"
+                  },
+                  {
+                    "label": "MIN",
+                    "value": "min"
+                  },
+                  {
+                    "label": "MAX",
+                    "value": "max"
+                  }
+                ]
+              },
+              {
+                "key": "limit",
+                "label": "Row limit",
+                "kind": "integer",
+                "defaultValue": 1000,
+                "description": "Maximum number of aggregated rows to plot."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": []
+        }
+      }
+    },
+    {
+      "id": "viz.parallel",
+      "label": "Parallel Coordinates",
+      "kind": "viz",
+      "availability": "available",
+      "summary": "Compare multiple numeric dimensions simultaneously — each column becomes a vertical axis, rows are polylines. Props: columns (numeric columns), series (optional color group)",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": []
+      },
+      "manifest": {
+        "id": "viz.parallel",
+        "kind": "viz",
+        "label": "Parallel Coordinates",
+        "description": "Compare multiple numeric dimensions simultaneously — each column becomes a vertical axis, rows are polylines. Props: columns (numeric columns), series (optional color group)",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Chart",
+            "fields": [
+              {
+                "key": "columns",
+                "label": "Columns (2+)",
+                "kind": "columns",
+                "required": true,
+                "description": "Numeric columns; each becomes a vertical axis."
               },
               {
                 "key": "series",

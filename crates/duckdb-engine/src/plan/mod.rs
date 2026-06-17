@@ -3648,7 +3648,7 @@ fn build_stage(
         let suffix = component_id.strip_prefix("viz.").unwrap_or("");
         let chart = if suffix.is_empty() { spec.chart.trim() } else { suffix };
         let x = spec.x.trim();
-        if x.is_empty() && chart != "splom" {
+        if x.is_empty() && chart != "splom" && chart != "parallel" && chart != "sunburst" {
             return Err(EngineError::Config(format!(
                 "{}: x (dimension column) required",
                 component_id
@@ -3852,6 +3852,64 @@ fn build_stage(
                 from = qfrom,
                 n = limit
             )
+        } else if chart == "sunburst" {
+            // Sunburst: hierarchical GROUP BY with rollup.
+            // x = comma-separated category columns (e.g. "region,category")
+            // y = measure column, agg = aggregation function
+            // Output: {name, value, parent, depth}
+            let cats: Vec<&str> = spec.x.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+            if cats.is_empty() {
+                return Err(EngineError::Config(format!("{}: sunburst needs at least 1 category column in x", component_id)));
+            }
+            let y = spec.y.as_deref().map(str::trim).filter(|s| !s.is_empty())
+                .ok_or_else(|| EngineError::Config(format!("{}: y (measure) required for sunburst", component_id)))?;
+            let qy = quote_ident(y);
+            let agg = spec.agg.as_deref().unwrap_or("sum");
+            let safe_agg = match agg.to_lowercase().as_str() { "sum"|"avg"|"count"|"min"|"max" => agg, _ => "sum" };
+            // Build hierarchical query: for each depth level, aggregate
+            let mut union_parts: Vec<String> = Vec::new();
+            for depth in 0..cats.len() {
+                let group_cols: Vec<String> = cats[..=depth].iter().map(|c| quote_ident(c)).collect();
+                let name_col = quote_ident(cats[depth]);
+                let parent_col = if depth > 0 { quote_ident(cats[depth - 1]) } else { "NULL".to_string() };
+                let select_cols: Vec<String> = group_cols.iter().map(|g| format!("\"{}\"", g.trim_matches('"'))).collect();
+                let sql = format!(
+                    "SELECT {name} AS \"name\", {agg_fn}({y}) AS \"value\", {parent} AS \"parent\", {depth} AS \"depth\" FROM {from} GROUP BY {grp} ORDER BY \"value\" DESC LIMIT {n}",
+                    name = name_col,
+                    agg_fn = safe_agg,
+                    y = qy,
+                    parent = if depth > 0 { format!("\"{}\"", cats[depth-1]) } else { "CAST(NULL AS VARCHAR)".to_string() },
+                    depth = depth,
+                    from = qfrom,
+                    grp = select_cols.join(", "),
+                    n = limit
+                );
+                union_parts.push(sql);
+            }
+            // Also add root level (total)
+            union_parts.insert(0, format!(
+                "SELECT 'Total' AS \"name\", {agg_fn}({y}) AS \"value\", CAST(NULL AS VARCHAR) AS \"parent\", -1 AS \"depth\" FROM {from} LIMIT 1",
+                agg_fn = safe_agg, y = qy, from = qfrom
+            ));
+            union_parts.join(" UNION ALL ")
+        } else if chart == "parallel" {
+            // Parallel coordinates: project raw numeric columns.
+            // columns = list of numeric columns, series = optional group
+            let cols = spec.columns.as_ref()
+                .map(|c| c.iter().map(|s| s.trim()).filter(|s| !s.is_empty()).collect::<Vec<_>>())
+                .unwrap_or_default();
+            if cols.is_empty() {
+                return Err(EngineError::Config(format!("{}: parallel needs at least 1 column", component_id)));
+            }
+            let series = spec.series.as_deref().map(str::trim).filter(|s| !s.is_empty());
+            let mut select_cols: Vec<String> = cols.iter().map(|c| {
+                let q = quote_ident(c);
+                format!("{} AS {}", q, q)
+            }).collect();
+            if let Some(s) = series {
+                select_cols.push(format!("{} AS \"series\"", quote_ident(s)));
+            }
+            format!("SELECT {} FROM {} LIMIT {}", select_cols.join(", "), qfrom, limit)
         } else {
             // bar / line / scatter need a measure column.
             let y = spec

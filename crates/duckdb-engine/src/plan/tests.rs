@@ -2686,3 +2686,33 @@
             other => panic!("expected Shap, got {:?}", other),
         }
     }
+
+    // ─── v1.0.0 More Charts tests ───────────────────────────────────
+
+    #[test]
+    fn viz_sunburst_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"sb","position":{"x":0,"y":0},"data":{"label":"sunburst","componentId":"viz.sunburst","properties":{"chart":"sunburst","x":"region,category","y":"amount","agg":"sum"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"sb","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "sb").unwrap();
+        assert!(stage.sql.contains("UNION ALL"), "sunburst should use UNION ALL for hierarchical levels");
+    }
+
+    #[test]
+    fn viz_parallel_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"par","position":{"x":0,"y":0},"data":{"label":"parallel","componentId":"viz.parallel","properties":{"chart":"parallel","columns":["amount","quantity"],"series":"region"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"par","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "par").unwrap();
+        assert!(stage.sql.contains("\"series\""), "parallel should include series column");
+    }

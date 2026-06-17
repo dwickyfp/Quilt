@@ -403,8 +403,78 @@ export function buildVizOption(rows: VizRow[], chart: string): VizOption {
             return buildRoc(rows, chart);
         case 'splom':
             return buildSplom(rows);
+        case 'sunburst':
+            return buildSunburst(rows);
+        case 'parallel':
+            return buildParallel(rows);
         default:
             // bar / line / histogram
             return buildCategorical(rows, chart);
     }
+}
+
+// ─── Sunburst ──────────────────────────────────────────────────────
+
+function buildSunburst(rows: VizRow[]): VizOption {
+    // Rows: { name, value, parent, depth }
+    // Build tree structure for ECharts sunburst
+    const data = rows
+        .filter(r => r.depth === -1) // root
+        .map(r => ({
+            name: String(r.name ?? 'Total'),
+            value: Number(r.value ?? 0),
+            children: buildSunburstChildren(rows, String(r.name ?? 'Total')),
+        }));
+    // If no root, use all top-level items
+    const treeData = data.length > 0 ? data : rows.filter(r => r.depth === 0).map(r => ({
+        name: String(r.name ?? ''),
+        value: Number(r.value ?? 0),
+        children: buildSunburstChildren(rows, String(r.name ?? '')),
+    }));
+    return {
+        tooltip: { trigger: 'item', formatter: '{b}: {c}' },
+        series: [{ type: 'sunburst', data: treeData, radius: ['10%', '90%'], sort: undefined, emphasis: { focus: 'ancestor' } }],
+    };
+}
+
+function buildSunburstChildren(rows: VizRow[], parentName: string): any[] {
+    return rows
+        .filter(r => r.parent === parentName && r.depth !== -1)
+        .map(r => ({
+            name: String(r.name ?? ''),
+            value: Number(r.value ?? 0),
+            children: buildSunburstChildren(rows, String(r.name ?? '')),
+        }));
+}
+
+// ─── Parallel Coordinates ──────────────────────────────────────────
+
+function buildParallel(rows: VizRow[]): VizOption {
+    if (rows.length === 0) return { series: [] };
+    // Columns = all keys except 'series'
+    const cols = Object.keys(rows[0]).filter(k => k !== 'series');
+    // Parallel axis definitions
+    const parallelAxis = cols.map(col => ({ name: col, dim: cols.indexOf(col) }));
+    // Group by series if present
+    const hasSeries = 'series' in rows[0];
+    let series: any[];
+    if (hasSeries) {
+        const groups = new Map<string, number[][]>();
+        for (const r of rows) {
+            const key = String(r.series ?? '');
+            if (!groups.has(key)) groups.set(key, []);
+            groups.set(key, [...(groups.get(key) ?? []), cols.map(c => Number(r[c] ?? 0))]);
+        }
+        series = [...groups.entries()].map(([name, data]) => ({
+            name, type: 'parallel', data,
+        }));
+    } else {
+        series = [{ type: 'parallel', data: rows.map(r => cols.map(c => Number(r[c] ?? 0))) }];
+    }
+    return {
+        parallelAxis,
+        parallel: { left: 60, right: 80 },
+        tooltip: { trigger: 'item' },
+        series,
+    };
 }

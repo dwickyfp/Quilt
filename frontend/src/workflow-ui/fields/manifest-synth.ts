@@ -4925,6 +4925,19 @@ function synthViz(comp: ComponentDef): ComponentManifest {
             { key: 'columns', label: 'Columns (2+)', kind: 'columns', required: true, description: 'Numeric columns; each pair becomes one scatter cell in the N x N grid.' },
             { key: 'series', label: 'Series (optional color)', kind: 'column' },
         ];
+    } else if (comp.id === 'viz.sunburst') {
+        // Sunburst: hierarchical categories + measure.
+        fields = [
+            { key: 'x', label: 'Categories (hierarchy)', kind: 'text', required: true, description: 'Comma-separated category columns from outer to inner ring (e.g. region,category)' },
+            { key: 'y', label: 'Value (measure)', kind: 'column', required: true },
+            aggField,
+        ];
+    } else if (comp.id === 'viz.parallel') {
+        // Parallel coordinates: multiple numeric columns.
+        fields = [
+            { key: 'columns', label: 'Columns (2+)', kind: 'columns', required: true, description: 'Numeric columns; each becomes a vertical axis.' },
+            { key: 'series', label: 'Series (optional color)', kind: 'column' },
+        ];
     } else {
         // bar / line / scatter: dimension + measure + agg + optional series.
         fields = [
