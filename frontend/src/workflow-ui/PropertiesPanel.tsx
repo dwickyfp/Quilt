@@ -72,6 +72,8 @@ const KIND_COLOR: Record<string, string> = {
     ml: '#a855f7',
 };
 
+type SavedComponentRef = { id: string; label: string; definition?: { params?: { key: string; node: string; prop: string }[] } };
+
 type Props = {
     selected: Node<QuiltNodeData> | null;
     allNodes: Node<QuiltNodeData>[];
@@ -81,6 +83,7 @@ type Props = {
     onUpdate: (id: string, patch: Partial<QuiltNodeData>) => void;
     onOpenMapper?: (nodeId: string) => void;
     focusNameRequest?: number;
+    savedComponents?: SavedComponentRef[];
 };
 
 export default function PropertiesPanel({
@@ -92,6 +95,7 @@ export default function PropertiesPanel({
     onUpdate,
     onOpenMapper,
     focusNameRequest,
+    savedComponents,
 }: Props) {
     const { t } = useTranslation();
     const [tab, setTab] = useState<TabId>('basic');
@@ -343,6 +347,32 @@ export default function PropertiesPanel({
                                     {t('properties.openVisualMapper')}
                                 </button>
                             ) : null}
+                            {/* Component instance param overrides */}
+                            {data.componentId?.startsWith('cmp.') && savedComponents ? (() => {
+                                const compId = data.componentId.slice(4);
+                                const sc = savedComponents.find(c => c.id === compId);
+                                const params = sc?.definition?.params ?? [];
+                                if (params.length === 0) return null;
+                                return (
+                                    <div className="form-section">
+                                        <div className="form-section-label">Component Parameters</div>
+                                        {params.map(p => (
+                                            <div key={p.key} style={{ marginBottom: 4 }}>
+                                                <label style={{ fontSize: '0.75rem', color: '#888' }}>
+                                                    {p.key} → {p.node}.{p.prop}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={props[`_param_${p.key}`] !== undefined ? String(props[`_param_${p.key}`]) : ''}
+                                                    placeholder="(use default)"
+                                                    onChange={e => setProperty(`_param_${p.key}`, e.target.value)}
+                                                    style={{ width: '100%', padding: '4px 6px', fontSize: '0.8rem', border: '1px solid #444', borderRadius: 4, background: '#1a1a2e', color: '#e0e0e0' }}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })() : null}
                             {manifest ? (
                                 manifest.sections.map(section => (
                                     <div className="form-section" key={section.label}>

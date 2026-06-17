@@ -2032,6 +2032,7 @@ export default function App() {
                     onUpdate={handleUpdateNode}
                     onOpenMapper={handleOpenMapper}
                     focusNameRequest={renameRequest}
+                    savedComponents={savedComponents}
                 />
             </main>
 

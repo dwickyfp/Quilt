@@ -69,7 +69,19 @@ export function expandComponents(
     const portOf = new Map<string, { inPort?: string; inHandle?: string; outPort?: string }>();
     for (const inst of instances) {
         const comp = defById.get(inst.data.componentId!)!;
-        const paramValues = inst.data.properties ?? {};
+        // Extract _param_ prefixed overrides from instance properties.
+        // These are set by the PropertiesPanel component-param UI.
+        // Also support direct param keys for backward compatibility.
+        const rawProps = inst.data.properties ?? {};
+        const paramValues: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(rawProps)) {
+            if (k.startsWith('_param_')) {
+                paramValues[k.slice(7)] = v; // strip '_param_' prefix
+            } else {
+                // Direct key — may match a param key (backward compat)
+                paramValues[k] = v;
+            }
+        }
         const expanded = instantiateComponent(comp.def, inst.id, paramValues);
 
         for (const n of expanded.nodes) {

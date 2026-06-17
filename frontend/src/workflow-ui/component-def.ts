@@ -62,7 +62,24 @@ export function extractComponent(
             outputs.push({ node: e.source });
         }
     }
-    return { nodes: bodyNodes, edges: bodyEdges, inputs, outputs, params: [] };
+    // Auto-detect parameters: expose all non-empty properties of inner nodes
+    // as potential component parameters. Each property becomes a param keyed by
+    // `nodeId.propName` so instances can override individual values.
+    const params: ComponentParam[] = [];
+    for (const node of bodyNodes) {
+        const props = node.data.properties ?? {};
+        for (const [prop, val] of Object.entries(props)) {
+            // Skip empty/null values and internal properties
+            if (val === undefined || val === null || val === '') continue;
+            params.push({
+                key: `${node.id}.${prop}`,
+                node: node.id,
+                prop,
+            });
+        }
+    }
+
+    return { nodes: bodyNodes, edges: bodyEdges, inputs, outputs, params };
 }
 
 const NS = '__';
