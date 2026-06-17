@@ -1199,8 +1199,6 @@ gh release edit vX.Y.Z --draft=false --latest
 - [ ] PDF / HTML report generation
 - [ ] Streaming execution (chunk-based processing for large datasets)
 - [ ] XAI / SHAP values for model interpretability
-- [ ] REST API deployment (deploy pipelines as API endpoints)
-- [ ] Git version control integration for pipelines
 - [ ] Components / reusable subgraph sharing
 
 ---
