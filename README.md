@@ -505,7 +505,7 @@ Quilt ships a thin shell and installs its engines on first launch.
 
 | Engine | Role | Status |
 |---|---|---|
-| **DuckDB** | Default execution engine: analytics, file formats, cloud reads, SQL pushdown. Tracking **v1.5.3** (latest stable). | Working |
+| **DuckDB** | Default execution engine: analytics, file formats, cloud reads, SQL pushdown. Tracking **v1.5.4** (latest stable). | Working |
 
 The **Qunnie AI assistant** is not an installed engine - it talks to whatever OpenAI-compatible endpoint you configure in **Settings -> AI** (OpenAI, Claude, or a self-hosted server), so there is no model download.
 

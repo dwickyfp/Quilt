@@ -3038,7 +3038,7 @@ pub(crate) fn build_csv_source(props: &JsonValue, declared: Option<&[quilt_metad
     // "Schema mismatch ... expected N columns" error. `types` accepts a
     // partial map, binds by NAME, and errors only when a declared name is
     // genuinely absent from the file (the correct, loud failure).
-    // DuckDB 1.5.3 verified: types={'amt':'VARCHAR'} over a 3-col CSV keeps
+    // DuckDB 1.5.4 verified: types={'amt':'VARCHAR'} over a 3-col CSV keeps
     // id=BIGINT (auto) + amt=VARCHAR (forced); a bogus name errors clearly.
     //
     // Per-column multi-format workaround (issue #10): DuckDB has only a
