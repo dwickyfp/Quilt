@@ -3886,7 +3886,7 @@ fn build_stage(
                 let _parent_col = if depth > 0 { quote_ident(cats[depth - 1]) } else { "NULL".to_string() };
                 let select_cols: Vec<String> = group_cols.iter().map(|g| format!("\"{}\"", g.trim_matches('"'))).collect();
                 let sql = format!(
-                    "SELECT {name} AS \"name\", {agg_fn}({y}) AS \"value\", {parent} AS \"parent\", {depth} AS \"depth\" FROM {from} GROUP BY {grp} ORDER BY \"value\" DESC LIMIT {n}",
+                    "(SELECT {name} AS \"name\", {agg_fn}({y}) AS \"value\", {parent} AS \"parent\", {depth} AS \"depth\" FROM {from} GROUP BY {grp} ORDER BY \"value\" DESC LIMIT {n})",
                     name = name_col,
                     agg_fn = safe_agg,
                     y = qy,
@@ -3900,7 +3900,7 @@ fn build_stage(
             }
             // Also add root level (total)
             union_parts.insert(0, format!(
-                "SELECT 'Total' AS \"name\", {agg_fn}({y}) AS \"value\", CAST(NULL AS VARCHAR) AS \"parent\", -1 AS \"depth\" FROM {from} LIMIT 1",
+                "(SELECT 'Total' AS \"name\", {agg_fn}({y}) AS \"value\", CAST(NULL AS VARCHAR) AS \"parent\", -1 AS \"depth\" FROM {from} LIMIT 1)",
                 agg_fn = safe_agg, y = qy, from = qfrom
             ));
             union_parts.join(" UNION ALL ")

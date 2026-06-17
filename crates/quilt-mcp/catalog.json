@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 401,
+  "componentCount": 405,
   "components": [
     {
       "id": "src.csv",
@@ -35623,6 +35623,278 @@
             }
           ],
           "outputs": []
+        }
+      }
+    },
+    {
+      "id": "widget.slider",
+      "label": "Slider",
+      "kind": "widget",
+      "availability": "available",
+      "summary": "Numeric slider — emit a single-row table with a configurable value. Props: min, max, step, defaultValue, outputColumn",
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "widget.slider",
+        "kind": "transform",
+        "label": "Slider",
+        "description": "Numeric slider — emit a single-row table with a configurable value. Props: min, max, step, defaultValue, outputColumn",
+        "schemaSource": "none",
+        "sections": [
+          {
+            "label": "Widget Settings",
+            "fields": [
+              {
+                "key": "min",
+                "label": "Min Value",
+                "kind": "number",
+                "defaultValue": 0
+              },
+              {
+                "key": "max",
+                "label": "Max Value",
+                "kind": "number",
+                "defaultValue": 100
+              },
+              {
+                "key": "step",
+                "label": "Step",
+                "kind": "number",
+                "defaultValue": 1
+              },
+              {
+                "key": "defaultValue",
+                "label": "Default Value",
+                "kind": "number",
+                "defaultValue": 50
+              },
+              {
+                "key": "outputColumn",
+                "label": "Output Column Name",
+                "kind": "text",
+                "defaultValue": "value"
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "widget.dropdown",
+      "label": "Dropdown",
+      "kind": "widget",
+      "availability": "available",
+      "summary": "Dropdown selector — emit a single-row table with a selected option. Props: options, defaultValue, outputColumn",
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "widget.dropdown",
+        "kind": "transform",
+        "label": "Dropdown",
+        "description": "Dropdown selector — emit a single-row table with a selected option. Props: options, defaultValue, outputColumn",
+        "schemaSource": "none",
+        "sections": [
+          {
+            "label": "Widget Settings",
+            "fields": [
+              {
+                "key": "options",
+                "label": "Options (JSON array)",
+                "kind": "textarea",
+                "defaultValue": "[\"Option A\",\"Option B\",\"Option C\"]"
+              },
+              {
+                "key": "defaultValue",
+                "label": "Default Selection",
+                "kind": "text",
+                "defaultValue": "Option A"
+              },
+              {
+                "key": "outputColumn",
+                "label": "Output Column Name",
+                "kind": "text",
+                "defaultValue": "selected"
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "widget.fileupload",
+      "label": "File Upload",
+      "kind": "widget",
+      "availability": "available",
+      "summary": "Read an uploaded file (CSV/Parquet/JSON) as a table. Props: filePath, accept, outputColumn",
+      "ports": {
+        "inputs": [],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "widget.fileupload",
+        "kind": "transform",
+        "label": "File Upload",
+        "description": "Read an uploaded file (CSV/Parquet/JSON) as a table. Props: filePath, accept, outputColumn",
+        "schemaSource": "none",
+        "sections": [
+          {
+            "label": "Widget Settings",
+            "fields": [
+              {
+                "key": "filePath",
+                "label": "File Path",
+                "kind": "file-path",
+                "required": true
+              },
+              {
+                "key": "accept",
+                "label": "Accepted Types",
+                "kind": "text",
+                "defaultValue": ".csv,.parquet,.json"
+              },
+              {
+                "key": "outputColumn",
+                "label": "Output Column Name",
+                "kind": "text",
+                "defaultValue": "data"
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "report.generate",
+      "label": "HTML Report",
+      "kind": "report",
+      "availability": "available",
+      "summary": "Render pipeline data as an HTML report with template. Props: template, format, outputPath, title",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ]
+      },
+      "manifest": {
+        "id": "report.generate",
+        "kind": "transform",
+        "label": "HTML Report",
+        "description": "Render pipeline data as an HTML report with template. Props: template, format, outputPath, title",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Report Settings",
+            "fields": [
+              {
+                "key": "title",
+                "label": "Report Title",
+                "kind": "text",
+                "defaultValue": "Report"
+              },
+              {
+                "key": "template",
+                "label": "HTML Template (use {{table}}, {{title}}, {{rows}})",
+                "kind": "textarea",
+                "defaultValue": "<html><head><title>{{title}}</title></head><body><h1>{{title}}</h1><p>{{rows}} rows</p>{{table}}</body></html>"
+              },
+              {
+                "key": "format",
+                "label": "Output Format",
+                "kind": "select",
+                "options": [
+                  {
+                    "value": "html",
+                    "label": "HTML"
+                  }
+                ],
+                "defaultValue": "html"
+              },
+              {
+                "key": "outputPath",
+                "label": "Output File Path",
+                "kind": "file-path",
+                "required": true
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ]
         }
       }
     },
