@@ -1195,11 +1195,11 @@ gh release edit vX.Y.Z --draft=false --latest
 - [x] Text Mining (tokenization, TF-IDF, sentiment, NER)
 - [x] Association Rules (Apriori / FP-Growth)
 - [x] More chart types (heatmap, sunburst, parallel coordinates, ROC curve)
-- [ ] Interactive widgets (slider, dropdown, file upload) for data apps
-- [ ] PDF / HTML report generation
-- [ ] Streaming execution (chunk-based processing for large datasets)
+- [x] Interactive widgets (slider, dropdown, file upload) for data apps
+- [x] PDF / HTML report generation
+- [x] Streaming execution (chunk-based processing for large datasets)
 - [x] XAI / SHAP values for model interpretability
-- [ ] Components / reusable subgraph sharing
+- [x] Components / reusable subgraph sharing
 
 ---
 
