@@ -2504,7 +2504,7 @@
         }"#);
         let plan = compile(&doc).unwrap();
         let stage = plan.stages.iter().find(|s| s.node_id == "t").unwrap();
-        assert!(stage.sql.contains("regexp_split_to_table"), "expected regexp_split_to_table in SQL");
+        assert!(stage.sql.contains("CROSS JOIN UNNEST"), "expected CROSS JOIN UNNEST in SQL");
         assert!(stage.sql.contains("token"), "expected token column in SQL");
     }
 

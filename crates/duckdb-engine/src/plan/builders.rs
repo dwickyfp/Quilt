@@ -266,15 +266,24 @@ fn build_tm_tokenize(inputs: &NodeInputs, props: &JsonValue) -> Result<String, S
     let delimiter = string_prop(props, "delimiter").unwrap_or_else(|| r"\s+".to_string());
 
     let token_expr = if lowercase {
-        format!("LOWER(UNNEST(regexp_split_to_table({}, '{}')))", quote_ident(&text_col), delimiter)
+        format!("LOWER(t.val)")
     } else {
-        format!("UNNEST(regexp_split_to_table({}, '{}'))", quote_ident(&text_col), delimiter)
+        "t.val".to_string()
+    };
+
+    // Use regexp_split_to_array + UNNEST for regex delimiter support
+    // string_split only supports single-char delimiters
+    let split_fn = if delimiter.len() == 1 {
+        format!("string_split(s.{}, '{}')", quote_ident(&text_col), delimiter)
+    } else {
+        format!("regexp_split_to_array(s.{}, '{}')", quote_ident(&text_col), delimiter)
     };
 
     let mut sql = format!(
-        "SELECT *, {} AS token FROM {}",
+        "SELECT s.*, {} AS token FROM {} s CROSS JOIN UNNEST({}) AS t(val)",
         token_expr,
-        quote_ident(upstream)
+        quote_ident(upstream),
+        split_fn,
     );
 
     // Filter by minimum length
