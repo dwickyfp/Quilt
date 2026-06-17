@@ -1228,7 +1228,57 @@ gh release edit vX.Y.Z --draft=false --latest
 
 ---
 
-## Roadmap — v1.0.0
+## Roadmap — v2.0.0
+
+Gap analysis against KNIME Analytics Platform (v5.10). Items below are features KNIME has that Quilt does not yet implement, plus enhancements to close the competitive gap. Ordered by impact.
+
+### Deep Learning (Critical)
+
+| # | Feature | Nodes | Description | KNIME Equivalent |
+|---|---------|-------|-------------|-----------------|
+| 1 | **Keras Visual Network Builder** | `dl.keras.input`, `dl.keras.dense`, `dl.keras.conv2d`, `dl.keras.lstm`, `dl.keras.gru`, `dl.keras.dropout`, `dl.keras.batch_norm`, `dl.keras.maxpool2d`, `dl.keras.flatten`, `dl.keras.activation` | Visual no-code neural network architecture: wire layer nodes together to build CNN, LSTM, GRU, Transformer architectures without writing code | 60+ Keras layer nodes |
+| 2 | **Keras Network Learner** | `dl.keras.train` | Train a Keras neural network on canvas data. Configurable: epochs, batch size, optimizer (Adam/SGD/RMSprop), loss function, learning rate, validation split. Progress bar per epoch | `Keras Network Learner` |
+| 3 | **Keras Network Executor** | `dl.keras.predict` | Apply a trained Keras model to new data for inference. Supports batch prediction with confidence scores per class | `Keras Network Executor` |
+| 4 | **Keras Network Writer/Reader** | `dl.keras.write`, `dl.keras.read` | Save trained Keras models to `.h5`/`.keras` format and load them back. Enables model persistence and sharing across workflows | `Keras Network Writer/Reader` |
+| 5 | **Transfer Learning** | `dl.keras.freeze` | Freeze specified layers of a pre-trained model (VGG16, ResNet, etc.) and fine-tune only the top layers. Essential for image classification with small datasets | `Freeze Layers` |
+| 6 | **TensorFlow 2 Integration** | `dl.tf2.read`, `dl.tf2.execute`, `dl.tf2.train` | Read, modify, execute, and train TensorFlow 2 SavedModels via the TF2 Python API. GPU acceleration via CUDA/cuDNN | TF2 Integration extension |
+| 7 | **DL Python Scripting** | `dl.python.script` | Custom Keras/TF/PyTorch code within the workflow via Python scripting nodes. Access to model internals for advanced users | `DL Python Scripting` |
+
+### Machine Learning Enhancements
+
+| # | Feature | Nodes | Description | KNIME Equivalent |
+|---|---------|-------|-------------|-----------------|
+| 8 | **XGBoost Integration** | `ml.xgboost.classifier`, `ml.xgboost.regressor` | Native XGBoost training with GPU support. Tree-based gradient boosting — often outperforms Random Forest and custom GBDT | `XGBoost Integration` |
+| 9 | **H2O AutoML** | `ml.h2o.automl`, `ml.h2o.deeplearning` | H2O AutoML: automatically trains and ranks multiple algorithms (GBM, DRF, XGBoost, Deep Learning, Stacked Ensemble). Best model auto-selected | `H2O Integration` |
+| 10 | **Active Learning** | `ml.active_learning.query`, `ml.active_learning.label` | Interactive labeling workflow: model queries the most uncertain samples, user labels them, model retrains. Reduces labeling effort by 60-80% | `KNIME Active Learning` |
+| 11 | **LIBSVM Integration** | `ml.libsvm.svc`, `ml.libsvm.svr` | LIBSVM — the original SVM implementation with all kernel types (RBF, polynomial, sigmoid, precomputed). More configurable than current SVM | `KNIME LIBSVM Integration` |
+| 12 | **Scikit-learn Nodes** | `ml.sklearn.*` | Dedicated sklearn-compatible nodes: LogisticRegression, RandomForest, KMeans, DBSCAN, GridSearchCV, Pipeline — familiar API for Python data scientists | `Nodes for Scikit-Learn` |
+
+### Domain-Specific Extensions
+
+| # | Feature | Nodes | Description | KNIME Equivalent |
+|---|---------|-------|-------------|-----------------|
+| 13 | **Image Processing** | `img.read`, `img.resize`, `img.crop`, `img.segment`, `img.viewer` | Read images (PNG, JPEG, TIFF), resize/crop for preprocessing, segment regions of interest, display inline. Foundation for computer vision workflows | `KNIME Image Processing` (Icy, OpenCV) |
+| 14 | **Vision Transformers** | `dl.vit.classify`, `dl.vit.embed` | Pre-trained Vision Transformer (ViT) models for image classification and feature extraction. State-of-the-art accuracy on image tasks | `Vision Transformers Extension` (2025) |
+| 15 | **Network/Graph Mining** | `net.create`, `net.analyze`, `net.community`, `net.visualize` | Create, analyze, and visualize attributed graphs (social networks, co-authorship, supply chains). Community detection, centrality measures, path analysis | `KNIME Network Mining` |
+| 16 | **Process Mining** | `pm.event_log`, `pm.discover`, `pm.conformance` | Event log analysis: discover process models from event data, check conformance, identify bottlenecks. Essential for operations/audit teams | `Process Mining Extension` |
+
+### NLP & Text Enhancements
+
+| # | Feature | Nodes | Description | KNIME Equivalent |
+|---|---------|-------|-------------|-----------------|
+| 17 | **Advanced NER** | `tm.ner.spacy`, `tm.ner.regex` | Named Entity Recognition: extract people, organizations, locations, dates from text. spaCy-based or regex patterns | `KNIME Textprocessing` |
+| 18 | **Document Processing** | `tm.doc.pdf`, `tm.doc.docx`, `tm.doc.pubmed` | Load documents from PDF, DOCX, PubMed XML. Convert to tokenized documents for NLP pipeline | `KNIME Textprocessing` (PDF, Docx readers) |
+| 19 | **Word2Vec / Embeddings** | `tm.word2vec`, `tm.doc2vec` | Train Word2Vec/Doc2Vec models on corpus, compute document embeddings for similarity search and clustering | Word2Vec (deprecated in KNIME 5.3, but still useful) |
+
+### Infrastructure & Collaboration
+
+| # | Feature | Nodes | Description | KNIME Equivalent |
+|---|---------|-------|-------------|-----------------|
+| 20 | **Component Hub** | Cloud-based marketplace | Publish, discover, and install reusable components from a community hub. Version-controlled, dependency-managed | `KNIME Hub` |
+| 21 | **Weak Supervision** | `ws.labeling_function`, `ws.snorkel` | Programmatic labeling: define heuristic labeling functions, combine them with Snorkel-style label models. No manual labeling for 80% of cases | `KNIME Weak Supervision` |
+
+### Completed (v1.0.0)
 
 - [x] Python scripting node (`xf.script.python`)
 - [x] Text Mining (tokenization, TF-IDF, sentiment, NER)
