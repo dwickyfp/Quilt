@@ -3871,7 +3871,7 @@ fn build_stage(
             for depth in 0..cats.len() {
                 let group_cols: Vec<String> = cats[..=depth].iter().map(|c| quote_ident(c)).collect();
                 let name_col = quote_ident(cats[depth]);
-                let parent_col = if depth > 0 { quote_ident(cats[depth - 1]) } else { "NULL".to_string() };
+                let _parent_col = if depth > 0 { quote_ident(cats[depth - 1]) } else { "NULL".to_string() };
                 let select_cols: Vec<String> = group_cols.iter().map(|g| format!("\"{}\"", g.trim_matches('"'))).collect();
                 let sql = format!(
                     "SELECT {name} AS \"name\", {agg_fn}({y}) AS \"value\", {parent} AS \"parent\", {depth} AS \"depth\" FROM {from} GROUP BY {grp} ORDER BY \"value\" DESC LIMIT {n}",

@@ -463,7 +463,7 @@ fn isolation_c(n: usize) -> f64 {
 /// Compute the path length of point `x` in a single isolation tree.
 fn isolation_path_length(x: &[f64], tree: &IsoTree, max_depth: usize) -> f64 {
     // Start at root
-    let mut depth = 0usize;
+    let depth = 0usize;
     if x[tree.feature] < tree.threshold {
         isolation_path_walk(x, &tree.left, depth + 1, max_depth)
     } else {
@@ -554,8 +554,8 @@ fn build_isolation_node(
         return IsoTreeNode::Leaf { size: data.len() };
     }
     // Update mins/maxs for children
-    let (mut lmins, mut lmaxs) = (mins.to_vec(), maxs.to_vec());
-    let (mut rmins, mut rmaxs) = (mins.to_vec(), maxs.to_vec());
+    let (lmins, mut lmaxs) = (mins.to_vec(), maxs.to_vec());
+    let (mut rmins, rmaxs) = (mins.to_vec(), maxs.to_vec());
     lmaxs[feat] = lmaxs[feat].min(threshold);
     rmins[feat] = rmins[feat].max(threshold);
     let left = Box::new(build_isolation_node(&left_data, rng_seed, depth + 1, max_depth, n_features, &lmins, &lmaxs));
@@ -734,10 +734,9 @@ fn undifference(diffed: &[f64], original: &[f64], d: usize) -> Vec<f64> {
     // For d-th order differencing, the first d values of the original series
     // are lost. We recover them from the original, then cumulative-sum.
     // Simple approach: collect the "seed" values that precede the diffed range.
-    let mut seeds: Vec<f64> = Vec::new();
     // Compute the (d-1)-th order differenced series to find the seed for level d.
     let mut level = original.to_vec();
-    for d_i in (1..d).rev() {
+    for _d_i in (1..d).rev() {
         // diff once more to go down levels
         let mut diff = Vec::with_capacity(level.len().saturating_sub(1));
         for i in 1..level.len() {
@@ -749,7 +748,7 @@ fn undifference(diffed: &[f64], original: &[f64], d: usize) -> Vec<f64> {
     // The first value of level is the seed for undifferencing level d.
     // But actually we need ALL d seed values from the original.
     // Simpler: just collect original[0..d] as seeds.
-    seeds = original[..d.min(original.len())].to_vec();
+    let seeds = original[..d.min(original.len())].to_vec();
 
     let mut result = diffed.to_vec();
     for d_i in (0..d).rev() {
@@ -3490,7 +3489,7 @@ impl DuckdbEngine {
             .iter()
             .map(|r| cell_to_f64(r.get(&spec.target_column)))
             .collect();
-        let n_orig = original.len();
+        let _n_orig = original.len();
 
         // Grid search: try each (p, d, q).
         let mut best_aic = f64::INFINITY;
@@ -3523,7 +3522,7 @@ impl DuckdbEngine {
                     let max_iter = if q > 0 { 30 } else { 1 };
                     let mut ar_c = vec![0.0f64; p];
                     let mut ma_c = vec![0.0f64; q];
-                    let mut intercept = 0.0f64;
+                    let mut _intercept = 0.0f64;
 
                     for _iter in 0..max_iter {
                         let mut x_data: Vec<Vec<f64>> = Vec::with_capacity(n_design);
@@ -3550,10 +3549,10 @@ impl DuckdbEngine {
                         if q > 0 {
                             let delta: f64 = ar_c.iter().zip(new_ar.iter()).map(|(a,b)|(a-b).powi(2)).sum::<f64>()
                                 + ma_c.iter().zip(new_ma.iter()).map(|(a,b)|(a-b).powi(2)).sum::<f64>();
-                            ar_c = new_ar; ma_c = new_ma; intercept = new_int;
+                            ar_c = new_ar; ma_c = new_ma; _intercept = new_int;
                             if delta < 1e-10 { break; }
                         } else {
-                            ar_c = new_ar; ma_c = new_ma; intercept = new_int;
+                            ar_c = new_ar; ma_c = new_ma; _intercept = new_int;
                         }
                     }
 
@@ -3585,7 +3584,7 @@ impl DuckdbEngine {
             q: best_q,
             steps: spec.steps,
         };
-        let mut result = self.run_ml_forecast_arima(db, &best_spec)?;
+        let result = self.run_ml_forecast_arima(db, &best_spec)?;
 
         // Augment: load the materialized table and add best_params row.
         // Instead, we modify the output by re-running the same logic but
@@ -4473,8 +4472,8 @@ fn extract_coef_from_matrix(coef: &DenseMatrix<f64>, n_features: usize) -> Vec<f
 fn predict_with_model(model: &Model, x: &[Vec<f64>]) -> Result<Vec<f64>, EngineError> {
     use smartcore::linalg::basic::matrix::DenseMatrix;
     let n = x.len();
-    let m = x.first().map(|r| r.len()).unwrap_or(0);
-    let flat: Vec<f64> = x.iter().flat_map(|r| r.iter().copied()).collect();
+    let _m = x.first().map(|r| r.len()).unwrap_or(0);
+    let _flat: Vec<f64> = x.iter().flat_map(|r| r.iter().copied()).collect();
     let dm = DenseMatrix::from_2d_vec(&x.iter().map(|r| r.to_vec()).collect::<Vec<_>>());
 
     match model {
@@ -4522,7 +4521,7 @@ fn predict_with_model(model: &Model, x: &[Vec<f64>]) -> Result<Vec<f64>, EngineE
             }).collect();
             Ok(model.predict(&test_data).into_iter().map(|v| v as f64).collect())
         }
-        Model::Svr { features, support_vectors, weights, bias, kernel_type, kernel_gamma } => {
+        Model::Svr { features: _, support_vectors, weights, bias, kernel_type, kernel_gamma } => {
             Ok(x.iter().map(|row| {
                 let mut pred = *bias;
                 for (sv, &w) in support_vectors.iter().zip(weights.iter()) {
@@ -4538,7 +4537,7 @@ fn predict_with_model(model: &Model, x: &[Vec<f64>]) -> Result<Vec<f64>, EngineE
                 pred
             }).collect())
         }
-        Model::Svc { features, labels, classifiers } => {
+        Model::Svc { features: _, labels: _, classifiers } => {
             // OvR: predict class with highest decision value
             Ok(x.iter().map(|row| {
                 let mut best_score = f64::NEG_INFINITY;

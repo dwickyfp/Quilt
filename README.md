@@ -1191,14 +1191,14 @@ gh release edit vX.Y.Z --draft=false --latest
 
 ## Roadmap — v1.0.0
 
-- [ ] Python scripting node (`xf.script.python`)
-- [ ] Text Mining (tokenization, TF-IDF, sentiment, NER)
-- [ ] Association Rules (Apriori / FP-Growth)
-- [ ] More chart types (heatmap, sunburst, parallel coordinates, ROC curve)
+- [x] Python scripting node (`xf.script.python`)
+- [x] Text Mining (tokenization, TF-IDF, sentiment, NER)
+- [x] Association Rules (Apriori / FP-Growth)
+- [x] More chart types (heatmap, sunburst, parallel coordinates, ROC curve)
 - [ ] Interactive widgets (slider, dropdown, file upload) for data apps
 - [ ] PDF / HTML report generation
 - [ ] Streaming execution (chunk-based processing for large datasets)
-- [ ] XAI / SHAP values for model interpretability
+- [x] XAI / SHAP values for model interpretability
 - [ ] Components / reusable subgraph sharing
 
 ---
