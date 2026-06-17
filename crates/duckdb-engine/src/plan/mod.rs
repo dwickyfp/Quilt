@@ -297,6 +297,37 @@ pub fn compile(pipeline: &PipelineDoc) -> Result<CompiledPipeline, EngineError> 
 
     let mut order_edges: Vec<&PipelineEdge> = data_edges.clone();
     order_edges.extend(model_edges.iter().copied());
+
+    // Implicit dependencies: nodes like ml.explain.shap reference a model node
+    // via props (modelNode) without an explicit edge. We need to ensure the
+    // model node runs first by adding a synthetic ordering edge.
+    let mut synthetic_edges: Vec<PipelineEdge> = Vec::new();
+    for node in &pipeline.nodes {
+        if let Some(cid) = node.data.component_id.as_deref() {
+            if cid == "ml.explain.shap" {
+                if let Some(props) = &node.data.properties {
+                    if let Some(model_id) = props.get("modelNode")
+                        .or_else(|| props.get("modelNodeId"))
+                        .and_then(|v| v.as_str())
+                    {
+                        synthetic_edges.push(PipelineEdge {
+                            id: format!("__dep_{}_{}", model_id, node.id),
+                            source: model_id.to_string(),
+                            target: node.id.clone(),
+                            source_handle: None,
+                            target_handle: None,
+                            edge_type: Some("model".into()),
+                            data: None,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    for edge in &synthetic_edges {
+        order_edges.push(edge);
+    }
+
     let order = topological_sort(&pipeline.nodes, &order_edges)?;
 
     // Build inputs map: node_id -> port_id -> Vec<source_node_id>
