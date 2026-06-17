@@ -2716,3 +2716,100 @@
         let stage = plan.stages.iter().find(|s| s.node_id == "par").unwrap();
         assert!(stage.sql.contains("\"series\""), "parallel should include series column");
     }
+
+    #[test]
+    fn widget_slider_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"sl","position":{"x":0,"y":0},"data":{"label":"slider","componentId":"widget.slider","properties":{"min":0,"max":100,"step":1,"defaultValue":42,"outputColumn":"myval"}}}
+            ],
+            "edges":[]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "sl").unwrap();
+        assert!(stage.sql.contains("42"), "slider SQL should contain default value 42");
+        assert!(stage.sql.contains("\"myval\""), "slider SQL should contain output column");
+        assert!(stage.runtime.is_some(), "slider should have a RuntimeSpec");
+    }
+
+    #[test]
+    fn widget_dropdown_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"dd","position":{"x":0,"y":0},"data":{"label":"dropdown","componentId":"widget.dropdown","properties":{"options":["A","B","C"],"defaultValue":"B","outputColumn":"choice"}}}
+            ],
+            "edges":[]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "dd").unwrap();
+        assert!(stage.sql.contains("'B'"), "dropdown SQL should contain default value 'B'");
+        assert!(stage.sql.contains("\"choice\""), "dropdown SQL should contain output column");
+        assert!(stage.runtime.is_some(), "dropdown should have a RuntimeSpec");
+    }
+
+    #[test]
+    fn widget_dropdown_requires_options() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"dd","position":{"x":0,"y":0},"data":{"label":"dropdown","componentId":"widget.dropdown","properties":{"outputColumn":"choice"}}}
+            ],
+            "edges":[]
+        }"#);
+        let result = compile(&doc);
+        assert!(result.is_err(), "dropdown without options should fail");
+        assert!(result.unwrap_err().to_string().contains("options"), "error should mention options");
+    }
+
+    #[test]
+    fn widget_fileupload_requires_file_path() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"fu","position":{"x":0,"y":0},"data":{"label":"upload","componentId":"widget.fileupload","properties":{"accept":".csv"}}}
+            ],
+            "edges":[]
+        }"#);
+        let result = compile(&doc);
+        assert!(result.is_err(), "fileupload without filePath should fail");
+        assert!(result.unwrap_err().to_string().contains("filePath"), "error should mention filePath");
+    }
+
+    #[test]
+    fn report_generate_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"rpt","position":{"x":0,"y":0},"data":{"label":"report","componentId":"report.generate","properties":{"template":"<html>{{title}}: {{table}}</html>","format":"html","outputPath":"/tmp/report.html","title":"Sales Report"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"rpt","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "rpt").unwrap();
+        assert!(stage.sql.contains("SELECT"), "report should pass through upstream data");
+        assert!(stage.runtime.is_some(), "report should have a RuntimeSpec");
+    }
+
+    #[test]
+    fn report_generate_requires_template() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"rpt","position":{"x":0,"y":0},"data":{"label":"report","componentId":"report.generate","properties":{"format":"html","outputPath":"/tmp/report.html"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"rpt","data":{"connectionType":"main"}}]
+        }"#);
+        let result = compile(&doc);
+        assert!(result.is_err(), "report without template should fail");
+        assert!(result.unwrap_err().to_string().contains("template"), "error should mention template");
+    }
+
+    #[test]
+    fn report_generate_requires_input() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"rpt","position":{"x":0,"y":0},"data":{"label":"report","componentId":"report.generate","properties":{"template":"<html></html>","outputPath":"/tmp/report.html"}}}
+            ],
+            "edges":[]
+        }"#);
+        let result = compile(&doc);
+        assert!(result.is_err(), "report without input should fail");
+    }

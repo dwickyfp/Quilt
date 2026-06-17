@@ -196,6 +196,10 @@ function paletteKindToFlowType(kind: PaletteKind): string {
             return 'ml';
         case 'viz':
             return 'viz';
+        case 'widget':
+            return 'widget';
+        case 'report':
+            return 'report';
         case 'transform':
         case 'control':
         case 'quality':

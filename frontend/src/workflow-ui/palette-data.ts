@@ -1,6 +1,6 @@
 export type Availability = 'available' | 'planned' | 'preview';
 
-export type NodeKind = 'source' | 'transform' | 'sink' | 'control' | 'quality' | 'custom' | 'ml' | 'viz';
+export type NodeKind = 'source' | 'transform' | 'sink' | 'control' | 'quality' | 'custom' | 'ml' | 'viz' | 'widget' | 'report';
 
 export type ComponentDef = {
     id: string;
@@ -84,6 +84,20 @@ const viz = (id: string, label: string, availability: Availability, summary?: st
     id: 'viz.' + id,
     label,
     kind: 'viz',
+    availability,
+    summary,
+});
+const widget = (id: string, label: string, availability: Availability, summary?: string): ComponentDef => ({
+    id: 'widget.' + id,
+    label,
+    kind: 'widget',
+    availability,
+    summary,
+});
+const report = (id: string, label: string, availability: Availability, summary?: string): ComponentDef => ({
+    id: 'report.' + id,
+    label,
+    kind: 'report',
     availability,
     summary,
 });
@@ -730,6 +744,38 @@ export const PALETTE: Category[] = [
                     viz('splom', 'Scatter Matrix', 'available', 'Pairwise scatter plots of 2+ numeric columns in an N x N grid (SPLOM); optional series column colors the points'),
                     viz('sunburst', 'Sunburst', 'available', 'Hierarchical proportional visualization — 2+ category columns form nested rings, measure column drives slice size. Props: x (categories, comma-separated), y (measure), agg (default sum)'),
                     viz('parallel', 'Parallel Coordinates', 'available', 'Compare multiple numeric dimensions simultaneously — each column becomes a vertical axis, rows are polylines. Props: columns (numeric columns), series (optional color group)'),
+                ],
+            },
+        ],
+    },
+    {
+        id: 'widgets',
+        label: 'Widgets',
+        icon: '🎛',
+        accent: '#f5a623',
+        groups: [
+            {
+                id: 'widget.inputs',
+                label: 'Input Controls',
+                components: [
+                    widget('slider', 'Slider', 'available', 'Numeric slider — emit a single-row table with a configurable value. Props: min, max, step, defaultValue, outputColumn'),
+                    widget('dropdown', 'Dropdown', 'available', 'Dropdown selector — emit a single-row table with a selected option. Props: options, defaultValue, outputColumn'),
+                    widget('fileupload', 'File Upload', 'available', 'Read an uploaded file (CSV/Parquet/JSON) as a table. Props: filePath, accept, outputColumn'),
+                ],
+            },
+        ],
+    },
+    {
+        id: 'reporting',
+        label: 'Reports',
+        icon: '📄',
+        accent: '#17a2b8',
+        groups: [
+            {
+                id: 'report.generate',
+                label: 'Report Generation',
+                components: [
+                    report('generate', 'HTML Report', 'available', 'Render pipeline data as an HTML report with template. Props: template, format, outputPath, title'),
                 ],
             },
         ],

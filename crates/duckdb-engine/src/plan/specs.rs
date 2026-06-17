@@ -1654,3 +1654,39 @@ pub struct ShapSpec {
     /// Number of background samples for KernelSHAP (default 100).
     pub background_samples: usize,
 }
+
+/// widget.slider: emit a single-row table with a configurable numeric value.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WidgetSliderSpec {
+    pub min: f64,
+    pub max: f64,
+    pub step: f64,
+    pub default_value: f64,
+    pub output_column: String,
+}
+
+/// widget.dropdown: emit a single-row table with a selected value from options.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WidgetDropdownSpec {
+    pub options: Vec<String>,
+    pub default_value: String,
+    pub output_column: String,
+}
+
+/// widget.fileupload: read an uploaded file as a DataFrame.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WidgetFileUploadSpec {
+    pub file_path: String,
+    pub accept: String,
+    pub output_column: String,
+}
+
+/// report.generate: render pipeline data as HTML report.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReportGenerateSpec {
+    pub template: String,
+    pub format: String,
+    pub output_path: String,
+    pub title: String,
+    pub from_view: String,
+}

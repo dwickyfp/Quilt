@@ -4453,6 +4453,124 @@ print(f"{{len(result)}} rows written")
         materialize_jsonobjects_as_table(&self.bin, db, node_id, &results)?;
         Ok(format!("ml.explain.shap: {} rows, {} features -> {}", n_rows, n_features, node_id))
     }
+
+    // ─── v1.0.0 Widget Handlers ─────────────────────────────────────
+
+    /// widget.slider: emit a single-row table with the configured default value.
+    pub(crate) fn run_widget_slider(
+        &self,
+        db: &Path,
+        spec: &plan::WidgetSliderSpec,
+        node_id: &str,
+    ) -> Result<String, EngineError> {
+        let col = plan::quote_ident(&spec.output_column);
+        self.run(Some(db), &format!(
+            "CREATE OR REPLACE VIEW {} AS SELECT CAST({} AS DOUBLE) AS {}",
+            plan::quote_ident(node_id), spec.default_value, col
+        ), false)?;
+        Ok(format!("widget.slider: {}={} (range {}..{})", spec.output_column, spec.default_value, spec.min, spec.max))
+    }
+
+    /// widget.dropdown: emit a single-row table with the selected option.
+    pub(crate) fn run_widget_dropdown(
+        &self,
+        db: &Path,
+        spec: &plan::WidgetDropdownSpec,
+        node_id: &str,
+    ) -> Result<String, EngineError> {
+        let col = plan::quote_ident(&spec.output_column);
+        let escaped = spec.default_value.replace('\'', "''");
+        self.run(Some(db), &format!(
+            "CREATE OR REPLACE VIEW {} AS SELECT '{}' AS {}",
+            plan::quote_ident(node_id), escaped, col
+        ), false)?;
+        Ok(format!("widget.dropdown: {}='{}' ({} options)", spec.output_column, spec.default_value, spec.options.len()))
+    }
+
+    /// widget.fileupload: read a file (CSV/Parquet) into a view.
+    pub(crate) fn run_widget_fileupload(
+        &self,
+        db: &Path,
+        spec: &plan::WidgetFileUploadSpec,
+        node_id: &str,
+    ) -> Result<String, EngineError> {
+        let path = Path::new(&spec.file_path);
+        if !path.exists() {
+            return Err(EngineError::Config(format!("widget.fileupload: file not found: {}", spec.file_path)));
+        }
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        let read_fn = match ext {
+            "parquet" | "pq" => format!("read_parquet('{}')", spec.file_path.replace('\'', "''")),
+            "json" | "jsonl" => format!("read_json_auto('{}')", spec.file_path.replace('\'', "''")),
+            _ => format!("read_csv_auto('{}')", spec.file_path.replace('\'', "''")),
+        };
+        self.run(Some(db), &format!(
+            "CREATE OR REPLACE VIEW {} AS SELECT * FROM {}",
+            plan::quote_ident(node_id), read_fn
+        ), false)?;
+        Ok(format!("widget.fileupload: loaded {}", spec.file_path))
+    }
+
+    /// report.generate: render pipeline data as an HTML report.
+    pub(crate) fn run_report_generate(
+        &self,
+        db: &Path,
+        spec: &plan::ReportGenerateSpec,
+        node_id: &str,
+    ) -> Result<String, EngineError> {
+        // Read data from upstream view
+        let rows = self.run_rows(Some(db), &format!(
+            "SELECT * FROM {}", plan::quote_ident(&spec.from_view)
+        ))?;
+
+        // Build HTML table from data
+        let mut table_html = String::from("<table border='1' cellpadding='4' cellspacing='0'>\n");
+        if let Some(first_obj) = rows.first().and_then(|r| r.as_object()) {
+            // Header
+            table_html.push_str("<tr>");
+            for key in first_obj.keys() {
+                table_html.push_str(&format!("<th style='background:#f0f0f0'>{}</th>", key));
+            }
+            table_html.push_str("</tr>\n");
+            // Rows
+            for row in &rows {
+                table_html.push_str("<tr>");
+                if let Some(obj) = row.as_object() {
+                    for key in first_obj.keys() {
+                        let val = obj.get(key).map(|v| {
+                            if v.is_string() { v.as_str().unwrap_or("").to_string() }
+                            else { v.to_string() }
+                        }).unwrap_or_default();
+                        table_html.push_str(&format!("<td>{}</td>", val));
+                    }
+                }
+                table_html.push_str("</tr>\n");
+            }
+        }
+        table_html.push_str("</table>");
+
+        // Apply template (simple {{table}} and {{title}} substitution)
+        let html = spec.template
+            .replace("{{table}}", &table_html)
+            .replace("{{title}}", &spec.title)
+            .replace("{{rows}}", &rows.len().to_string());
+
+        // Write output file
+        let output = Path::new(&spec.output_path);
+        if let Some(parent) = output.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        std::fs::write(output, &html)
+            .map_err(|e| EngineError::Config(format!("report.generate: failed to write {}: {}", spec.output_path, e)))?;
+
+        // Also pass through data as a view for downstream nodes
+        self.run(Some(db), &format!(
+            "CREATE OR REPLACE VIEW {} AS SELECT * FROM {}",
+            plan::quote_ident(node_id), plan::quote_ident(&spec.from_view)
+        ), false)?;
+
+        Ok(format!("report.generate: {} rows -> {} ({})", rows.len(), spec.output_path, spec.format))
+    }
 }
 
 // ─── SHAP helpers ───────────────────────────────────────────────────

@@ -26,6 +26,8 @@ import {
     Gauge,
     Cpu,
     FileDown,
+    SlidersHorizontal,
+    FileText,
 } from 'lucide-react';
 import { BRAND_ICONS, type BrandIcon } from './brand-icons.generated';
 import type { NodeKind } from './palette-data';
@@ -88,6 +90,8 @@ const KIND_FALLBACK: Record<NodeKind, ComponentType<IconProps>> = {
     custom: Code2,
     ml: Brain,
     viz: BarChart3,
+    widget: SlidersHorizontal,
+    report: FileText,
 };
 
 type Props = { componentId: string; kind: NodeKind; size?: number; className?: string };

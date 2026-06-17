@@ -1126,6 +1126,20 @@ impl DuckdbEngine {
                     Some(RuntimeSpec::Shap(spec)) => {
                         self.run_shap(&db_path, spec, &stage.node_id, &stage.from.as_deref().unwrap_or_default())
                     }
+                    // ---- v1.0.0 Widgets ----
+                    Some(RuntimeSpec::WidgetSlider(spec)) => {
+                        self.run_widget_slider(&db_path, spec, &stage.node_id)
+                    }
+                    Some(RuntimeSpec::WidgetDropdown(spec)) => {
+                        self.run_widget_dropdown(&db_path, spec, &stage.node_id)
+                    }
+                    Some(RuntimeSpec::WidgetFileUpload(spec)) => {
+                        self.run_widget_fileupload(&db_path, spec, &stage.node_id)
+                    }
+                    // ---- v1.0.0 Report ----
+                    Some(RuntimeSpec::ReportGenerate(spec)) => {
+                        self.run_report_generate(&db_path, spec, &stage.node_id)
+                    }
                     // Control-flow variants (RunJob / InstallFallback /
                     // Iterate / Foreach / Log / Warn / non-firing Die) already
                     // ran their side effect above, so they fall through here to

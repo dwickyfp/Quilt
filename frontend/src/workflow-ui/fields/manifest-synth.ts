@@ -728,6 +728,16 @@ export function portsForComponent(comp: ComponentDef): NodePorts {
         };
     }
 
+    // Widgets: source-like nodes with no data input
+    if (id.startsWith('widget.slider') || id.startsWith('widget.dropdown') || id.startsWith('widget.fileupload')) {
+        return { inputs: [], outputs: [MAIN_OUT] };
+    }
+
+    // Report: sink-like node that takes input and renders
+    if (id.startsWith('report.')) {
+        return { inputs: [MAIN_IN], outputs: [MAIN_OUT] };
+    }
+
     // Default transform / control / quality / custom: main in, main out, optional reject
     return {
         inputs: [MAIN_IN],
@@ -5834,6 +5844,51 @@ function synthMl(comp: ComponentDef): ComponentManifest {
     return base(comp, [], 'upstream');
 }
 
+function synthWidget(comp: ComponentDef): ComponentManifest {
+    const id = comp.id;
+    let fields: Field[];
+    if (id === 'widget.slider') {
+        fields = [
+            { key: 'min', label: 'Min Value', kind: 'number', defaultValue: 0 },
+            { key: 'max', label: 'Max Value', kind: 'number', defaultValue: 100 },
+            { key: 'step', label: 'Step', kind: 'number', defaultValue: 1 },
+            { key: 'defaultValue', label: 'Default Value', kind: 'number', defaultValue: 50 },
+            { key: 'outputColumn', label: 'Output Column Name', kind: 'text', defaultValue: 'value' },
+        ];
+    } else if (id === 'widget.dropdown') {
+        fields = [
+            { key: 'options', label: 'Options (JSON array)', kind: 'textarea', defaultValue: '["Option A","Option B","Option C"]' },
+            { key: 'defaultValue', label: 'Default Selection', kind: 'text', defaultValue: 'Option A' },
+            { key: 'outputColumn', label: 'Output Column Name', kind: 'text', defaultValue: 'selected' },
+        ];
+    } else if (id === 'widget.fileupload') {
+        fields = [
+            { key: 'filePath', label: 'File Path', kind: 'file-path', required: true },
+            { key: 'accept', label: 'Accepted Types', kind: 'text', defaultValue: '.csv,.parquet,.json' },
+            { key: 'outputColumn', label: 'Output Column Name', kind: 'text', defaultValue: 'data' },
+        ];
+    } else {
+        fields = [];
+    }
+    return base(comp, [{ label: 'Widget Settings', fields }], 'none' as any);
+}
+
+function synthReport(comp: ComponentDef): ComponentManifest {
+    const id = comp.id;
+    let fields: Field[];
+    if (id === 'report.generate') {
+        fields = [
+            { key: 'title', label: 'Report Title', kind: 'text', defaultValue: 'Report' },
+            { key: 'template', label: 'HTML Template (use {{table}}, {{title}}, {{rows}})', kind: 'textarea', defaultValue: '<html><head><title>{{title}}</title></head><body><h1>{{title}}</h1><p>{{rows}} rows</p>{{table}}</body></html>' },
+            { key: 'format', label: 'Output Format', kind: 'select', options: [{ value: 'html', label: 'HTML' }], defaultValue: 'html' },
+            { key: 'outputPath', label: 'Output File Path', kind: 'file-path', required: true },
+        ];
+    } else {
+        fields = [];
+    }
+    return base(comp, [{ label: 'Report Settings', fields }], 'upstream');
+}
+
 export function synthesizeManifest(componentId: string): ComponentManifest | undefined {
     const entry = findPaletteEntry(componentId);
     if (!entry) return undefined;
@@ -5907,6 +5962,12 @@ export function synthesizeManifest(componentId: string): ComponentManifest | und
 
     // Visualize
     if (groupId === 'viz.charts') return synthViz(comp);
+
+    // Widgets
+    if (groupId === 'widget.inputs') return synthWidget(comp);
+
+    // Reports
+    if (groupId === 'report.generate') return synthReport(comp);
 
     // SaaS - treat as API sources for now
     if (groupId.startsWith('saas.')) return synthApiSource(comp);

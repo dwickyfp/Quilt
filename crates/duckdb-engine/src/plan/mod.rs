@@ -200,6 +200,14 @@ pub enum RuntimeSpec {
     CodePython(CodePythonSpec),
     /// ml.explain.shap: SHAP explanations for model predictions.
     Shap(ShapSpec),
+    /// widget.slider: emit a single-row table with a configurable numeric value.
+    WidgetSlider(WidgetSliderSpec),
+    /// widget.dropdown: emit a single-row table with a selected value.
+    WidgetDropdown(WidgetDropdownSpec),
+    /// widget.fileupload: read an uploaded file as a DataFrame.
+    WidgetFileUpload(WidgetFileUploadSpec),
+    /// report.generate: render pipeline data as HTML report.
+    ReportGenerate(ReportGenerateSpec),
 }
 
 // Connector / transform spec type definitions live in plan/specs.rs and
@@ -672,6 +680,10 @@ fn build_stage(
     let mut tm_association: Option<TmAssociationSpec> = None;
     let mut code_python: Option<CodePythonSpec> = None;
     let mut shap: Option<ShapSpec> = None;
+    let mut widget_slider: Option<WidgetSliderSpec> = None;
+    let mut widget_dropdown: Option<WidgetDropdownSpec> = None;
+    let mut widget_fileupload: Option<WidgetFileUploadSpec> = None;
+    let mut report_generate: Option<ReportGenerateSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -4064,6 +4076,53 @@ fn build_stage(
         });
         let sql = passthrough_view_sql(&node.id, from_view);
         (sql, StageKind::View, Some(from_view.to_string()))
+    } else if component_id == "widget.slider" {
+        let min = props.get("min").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let max = props.get("max").and_then(|v| v.as_f64()).unwrap_or(100.0);
+        let step = props.get("step").and_then(|v| v.as_f64()).unwrap_or(1.0);
+        let default_value = props.get("defaultValue").and_then(|v| v.as_f64()).unwrap_or(50.0);
+        let output_column = string_prop(&props, "outputColumn").unwrap_or_else(|| "value".to_string());
+        widget_slider = Some(WidgetSliderSpec { min, max, step, default_value, output_column: output_column.clone() });
+        let sql = format!("CREATE OR REPLACE VIEW {} AS SELECT CAST({} AS DOUBLE) AS {}", quote_ident(&node.id), default_value, quote_ident(&output_column));
+        (sql, StageKind::View, None)
+    } else if component_id == "widget.dropdown" {
+        let options: Vec<String> = props.get("options")
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .unwrap_or_default();
+        if options.is_empty() {
+            return Err(EngineError::Config(format!("{}: options (list of values) required", component_id)));
+        }
+        let default_value = string_prop(&props, "defaultValue")
+            .unwrap_or_else(|| options[0].clone());
+        let output_column = string_prop(&props, "outputColumn").unwrap_or_else(|| "selected".to_string());
+        widget_dropdown = Some(WidgetDropdownSpec { options, default_value: default_value.clone(), output_column: output_column.clone() });
+        let escaped = default_value.replace('\'', "''");
+        let sql = format!("CREATE OR REPLACE VIEW {} AS SELECT '{}' AS {}", quote_ident(&node.id), escaped, quote_ident(&output_column));
+        (sql, StageKind::View, None)
+    } else if component_id == "widget.fileupload" {
+        let file_path = string_prop(&props, "filePath")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: filePath required", component_id)))?;
+        let accept = string_prop(&props, "accept").unwrap_or_else(|| "*".to_string());
+        let output_column = string_prop(&props, "outputColumn").unwrap_or_else(|| "data".to_string());
+        widget_fileupload = Some(WidgetFileUploadSpec { file_path: file_path.clone(), accept, output_column });
+        let escaped_path = file_path.replace('\'', "''");
+        let sql = format!("CREATE OR REPLACE VIEW {} AS SELECT * FROM read_csv_auto('{}')", quote_ident(&node.id), escaped_path);
+        (sql, StageKind::View, None)
+    } else if component_id == "report.generate" {
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let template = string_prop(&props, "template")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: template (HTML template) required", component_id)))?;
+        let format_val = string_prop(&props, "format").unwrap_or_else(|| "html".to_string());
+        let output_path = string_prop(&props, "outputPath")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: outputPath required", component_id)))?;
+        let title = string_prop(&props, "title").unwrap_or_else(|| "Report".to_string());
+        report_generate = Some(ReportGenerateSpec { template, format: format_val, output_path, title, from_view: from_view.to_string() });
+        let sql = passthrough_view_sql(&node.id, from_view);
+        (sql, StageKind::View, Some(from_view.to_string()))
     } else {
         // the body so CSV/TSV sources can switch to the tolerant pass/reject
         // split when (and only when) the reject port is wired (issue #15).
@@ -4324,6 +4383,10 @@ fn build_stage(
         .or_else(|| tm_association.map(RuntimeSpec::TmAssociation))
         .or_else(|| code_python.map(RuntimeSpec::CodePython))
         .or_else(|| shap.map(RuntimeSpec::Shap))
+        .or_else(|| widget_slider.map(RuntimeSpec::WidgetSlider))
+        .or_else(|| widget_dropdown.map(RuntimeSpec::WidgetDropdown))
+        .or_else(|| widget_fileupload.map(RuntimeSpec::WidgetFileUpload))
+        .or_else(|| report_generate.map(RuntimeSpec::ReportGenerate))
         ;
     // Free the ATTACH alias so the next batched stage can re-ATTACH it (see
     // attach_alias above). Only stages that embed the ATTACH in their own SQL
