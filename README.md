@@ -4,7 +4,7 @@
 
 <h3>Pipelines you can see — ETL, statistics, machine learning, and deep learning on one canvas.</h3>
 
-<p><b>Quilt</b> is an open-source desktop studio for visual data work: <b>ETL / ELT plus statistics, machine learning, and deep learning</b>, all on one canvas. Drag a pipeline together, or just describe what you need in plain English to <b>Qunnie</b> — the built-in AI assistant — and execute at native speed through DuckDB. 290+ connectors, 136 transforms, in-engine statistics and 42 ML nodes, ONNX deep-learning inference, 10 inline charts, and a built-in scheduler. Ships as a ~65&nbsp;MB single-file desktop app.</p>
+<p><b>Quilt</b> is an open-source desktop studio for visual data work: <b>ETL / ELT plus statistics, machine learning, and deep learning</b>, all on one canvas. Drag a pipeline together, or just describe what you need in plain English to <b>Qunnie</b> — the built-in AI assistant — and execute at native speed through DuckDB. 290+ connectors, 136 transforms, in-engine statistics and 43 ML nodes, ONNX deep-learning inference, 12 inline charts, and a built-in scheduler. Ships as a ~65&nbsp;MB single-file desktop app.</p>
 
 <p>
 <img alt="status" src="https://img.shields.io/badge/status-beta-6366F1"/>
@@ -110,7 +110,7 @@ Quilt is more than an ETL tool. The same canvas that moves and reshapes data als
 
 1. **An AI assistant that ships in the box.** Describe the pipeline you want in English; Qunnie writes the JSON and drops it onto the canvas, no API key required.
 2. **290+ connectors at install time.** Files, lakehouses, SQL databases, warehouses, NoSQL, vector DBs, streaming brokers, SaaS REST/GraphQL APIs, even FTP and IMAP - working today, not coming-soon.
-3. **Data science on the same graph.** Statistics (summary, correlation, t-test / ANOVA / chi-square), 42 ML nodes (learners, cross-validation, feature selection, PCA, one-hot, scoring, forecasting, anomaly detection), ONNX deep-learning inference, and 10 inline charts all live in the palette next to the ETL nodes.
+3. **Data science on the same graph.** Statistics (summary, correlation, t-test / ANOVA / chi-square), 43 ML nodes (learners, cross-validation, feature selection, PCA, one-hot, scoring, forecasting, anomaly detection, SHAP interpretability), ONNX deep-learning inference, and 12 inline charts all live in the palette next to the ETL nodes.
 
 <div align="center">
 <img src="docs/assets/flow.svg" alt="Sources flow through 136 transforms into files, databases, object storage, vector stores, and AI" width="100%"/>
@@ -195,7 +195,7 @@ Because the assistant can now propose edits, it ships with layered guardrails:
 |---|---|
 | **Visual, never opaque** | The canvas compiles to SQL you can read, and every node has a live preview tab. No black box. |
 | **AI in the box** | A built-in assistant you point at OpenAI, Claude, or any OpenAI-compatible endpoint - no separate app, it lives in the canvas sidebar. |
-| **More than ETL** | Descriptive statistics, hypothesis tests, 42 ML nodes (train / cross-validate / select features / PCA / one-hot / score / forecast / anomaly detection), and ONNX deep-learning inference run on the same canvas — no Python runtime. |
+| **More than ETL** | Descriptive statistics, hypothesis tests, 43 ML nodes (train / cross-validate / select features / PCA / one-hot / score / forecast / anomaly detection / SHAP), and ONNX deep-learning inference run on the same canvas — no Python runtime. |
 | **Single-file binary, no bundled DB** | ~65 MB app (it embeds the headless runner + MCP server). DuckDB downloads on first launch with a guided step. AI engine is opt-in. |
 | **Native speed** | Execution runs through DuckDB: vectorized, columnar, local. A clean-and-export job that crawls in a spreadsheet finishes in milliseconds. |
 | **Git-friendly by design** | Pipelines, connections, contexts, and routines persist as plain files in a folder you pick. Diff them, branch them, review them. |
@@ -212,7 +212,7 @@ Quilt is in **public beta**. The visual designer, the DuckDB execution engine, t
 
 **Scope, stated plainly:** Quilt is a single-machine, embedded studio. If you outgrow one box, point Quilt's output at the system that scales (a warehouse, an object store, a lakehouse). It will not pretend to be a cluster.
 
-The component palette ships **386 nodes** so the roadmap is visible in the product itself:
+The component palette ships **405 nodes** so the roadmap is visible in the product itself:
 
 - **365 available** runs on the DuckDB engine today
 - **5 preview** is configurable in the designer (drag, wire, set properties); execution is being wired engine-by-engine
@@ -360,7 +360,7 @@ Validators split their input: passing rows continue on the main port, failures r
 | **Flow Variables** | Set / Get named flow variables between stages — extract a value upstream, inject it downstream as a single-row table (`xf.variable.set` / `xf.variable.get`) |
 | **Schedule** | Cron / interval / file-watch triggers via the orchestration crate |
 
-### Machine learning (42 available)
+### Machine learning (43 available)
 
 Train, apply, and evaluate classic ML models directly on the canvas - in-engine, no Python runtime. Learners emit a model on a dedicated **model** port; wire it into a Predictor (and feed a held-out set into a Scorer) to close the loop. Cross-validation, feature selection, and the preprocessing transforms (PCA, one-hot) run as their own nodes on the same graph.
 
@@ -373,6 +373,7 @@ Train, apply, and evaluate classic ML models directly on the canvas - in-engine,
 | **Outlier detection** | **IQR / Z-score Outlier** (flag outliers per numeric column: IQR method with 1.5× bounds or Z-score with configurable threshold; adds `{col}_outlier` 0/1 columns) |
 | **Anomaly detection** | **Isolation Forest** (ensemble of random isolation trees; anomaly scoring via path-length, contamination-based threshold for is_anomaly flag) |
 | **Export** | Model Writer (classic ML → portable JSON params + features + labels; ONNX → copies the `.onnx` file) |
+| **SHAP Values** (`ml.shap`) | Model-agnostic feature attribution via SHAP (TreeSHAP for tree models, permutation fallback for others). Emits per-row SHAP values showing each feature's contribution to the prediction — full model interpretability |
 
 ### Deep learning (2 available)
 
@@ -382,6 +383,26 @@ Run pre-trained neural networks locally via the ONNX Runtime (fetched on first u
 |---|---|
 | **ONNX Model Reader** | Load a pre-trained `.onnx` model file from disk; outputs a model on the model port |
 | **ONNX Predictor** | Run inference with a loaded ONNX model over incoming rows; maps `featureColumns` (in order) to the model inputs and appends the output column |
+
+### Text Mining
+
+Run text analysis directly in DuckDB — tokenization, TF-IDF, sentiment, and language detection. No Python, no external services.
+
+| Component | What it does |
+|---|---|
+| **Tokenize** (`tm.tokenize`) | Split a text column into individual tokens (one row per token). Configurable delimiter and lowercase option |
+| **TF-IDF** (`tm.tfidf`) | Compute TF-IDF scores per token — identifies the most distinctive terms in each document |
+| **Sentiment** (`tm.sentiment`) | Lexicon-based sentiment scoring (positive / negative / neutral) per text row |
+| **Language Detect** (`tm.langdetect`) | Detect the language of each text row using character n-gram frequency analysis |
+
+### Association Rules
+
+Discover frequent itemsets and association rules from transactional data — market-basket analysis on the canvas.
+
+| Component | What it does |
+|---|---|
+| **Apriori** (`ar.apriori`) | Classic Apriori algorithm: find frequent itemsets and generate association rules with configurable min support and confidence |
+| **FP-Growth** (`ar.fpgrowth`) | FP-Growth algorithm: faster frequent-itemset mining using a compressed FP-tree — same output as Apriori, more scalable |
 
 ### Statistics (in-engine)
 
@@ -415,6 +436,24 @@ Terminal chart nodes that aggregate upstream data and render it inline - inspect
 | **ROC Curve** | Plot true-positive vs false-positive rate over a score column — evaluate a classifier |
 | **Precision-Recall Curve** | Plot precision vs recall over a score column |
 | **Scatter Matrix (SPLOM)** | Pairwise scatter plots of 2+ numeric columns in an N×N grid |
+| **Sunburst Chart** | Hierarchical multi-level aggregation (comma-separated `x` columns like `region,category`) rendered as concentric rings — drill into any level |
+| **Parallel Coordinates** | Plot multiple numeric columns as parallel axes with an optional `series` grouping — inspect multivariate patterns |
+
+### Data apps & widgets
+
+Interactive nodes that emit runtime values — wire them into downstream transforms to build parameter-driven data apps.
+
+| Component | What it does |
+|---|---|
+| **Widget Slider** (`widget.slider`) | Numeric slider with configurable min / max / step / default — emits a single-row table with the chosen value |
+| **Widget Dropdown** (`widget.dropdown`) | Dropdown selector with a list of options — emits a single-row table with the selected value |
+| **Widget File Upload** (`widget.fileupload`) | Accept a CSV / Parquet / JSON file at runtime — parses and emits the rows as a table |
+
+### Report generation
+
+| Component | What it does |
+|---|---|
+| **Report Generate** (`report.generate`) | Render upstream data as an HTML report using a template with `{{title}}`, `{{rows}}`, and `{{table}}` placeholders. Output: a self-contained HTML file |
 
 ### Advanced settings (per-node)
 
