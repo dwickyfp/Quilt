@@ -2489,3 +2489,111 @@
             other => panic!("expected IfBranch, got {:?}", other),
         }
     }
+
+
+    // ─── v1.0.0 Text Mining tests ────────────────────────────────────
+
+    #[test]
+    fn tm_tokenize_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"t","position":{"x":0,"y":0},"data":{"label":"Tokenize","componentId":"tm.tokenize","properties":{"textColumn":"content"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"t","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "t").unwrap();
+        assert!(stage.sql.contains("regexp_split_to_table"), "expected regexp_split_to_table in SQL");
+        assert!(stage.sql.contains("token"), "expected token column in SQL");
+    }
+
+    #[test]
+    fn tm_tokenize_lowercase_false() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"t","position":{"x":0,"y":0},"data":{"label":"Tokenize","componentId":"tm.tokenize","properties":{"textColumn":"content","lowercase":false}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"t","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "t").unwrap();
+        assert!(!stage.sql.contains("LOWER"), "should not have LOWER when lowercase=false");
+    }
+
+    #[test]
+    fn tm_tfidf_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"tf","position":{"x":0,"y":0},"data":{"label":"TF-IDF","componentId":"tm.tfidf","properties":{"docColumn":"doc_id","tokenColumn":"word"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"tf","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "tf").unwrap();
+        assert!(stage.sql.contains("tfidf"), "expected tfidf column in SQL");
+        assert!(stage.sql.contains("LN("), "expected LN() for IDF in SQL");
+    }
+
+    #[test]
+    fn tm_sentiment_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"sen","position":{"x":0,"y":0},"data":{"label":"Sentiment","componentId":"tm.sentiment","properties":{"textColumn":"review","outputColumn":"score"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"sen","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "sen").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::TmSentiment(spec)) => {
+                assert_eq!(spec.text_column, "review");
+                assert_eq!(spec.output_column, "score");
+            }
+            other => panic!("expected TmSentiment, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn tm_sentiment_default_output_column() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"sen","position":{"x":0,"y":0},"data":{"label":"Sentiment","componentId":"tm.sentiment","properties":{"textColumn":"review"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"sen","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "sen").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::TmSentiment(spec)) => {
+                assert_eq!(spec.output_column, "sentiment_score");
+            }
+            other => panic!("expected TmSentiment, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn tm_langdetect_compiles() {
+        let doc = pipeline_from_json(r#"{
+            "nodes": [
+                {"id":"s","position":{"x":0,"y":0},"data":{"label":"src","componentId":"src.csv","properties":{"path":"/tmp/t.csv"}}},
+                {"id":"ld","position":{"x":0,"y":0},"data":{"label":"LangDetect","componentId":"tm.langdetect","properties":{"textColumn":"content"}}}
+            ],
+            "edges":[{"id":"e1","source":"s","target":"ld","data":{"connectionType":"main"}}]
+        }"#);
+        let plan = compile(&doc).unwrap();
+        let stage = plan.stages.iter().find(|s| s.node_id == "ld").unwrap();
+        match &stage.runtime {
+            Some(RuntimeSpec::TmLangdetect(spec)) => {
+                assert_eq!(spec.text_column, "content");
+                assert_eq!(spec.output_lang_column, "lang");
+                assert_eq!(spec.output_conf_column, "lang_confidence");
+            }
+            other => panic!("expected TmLangdetect, got {:?}", other),
+        }
+    }
+

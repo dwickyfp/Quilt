@@ -1107,6 +1107,13 @@ impl DuckdbEngine {
                         // If we reach here, the try block succeeded — pass through.
                         Ok(String::new())
                     }
+                    // ---- v1.0.0 Text Mining ----
+                    Some(RuntimeSpec::TmSentiment(spec)) => {
+                        self.run_tm_sentiment(&db_path, spec, &stage.node_id, &stage.from.as_deref().unwrap_or_default())
+                    }
+                    Some(RuntimeSpec::TmLangdetect(spec)) => {
+                        self.run_tm_langdetect(&db_path, spec, &stage.node_id, &stage.from.as_deref().unwrap_or_default())
+                    }
                     // Control-flow variants (RunJob / InstallFallback /
                     // Iterate / Foreach / Log / Warn / non-firing Die) already
                     // ran their side effect above, so they fall through here to

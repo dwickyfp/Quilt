@@ -5641,6 +5641,48 @@ function synthMl(comp: ComponentDef): ComponentManifest {
         ], 'upstream');
     }
 
+    // ─── Text Mining ─────────────────────────────────────────────────
+    if (id === 'tm.tokenize') {
+        return base(comp, [{
+            label: 'Tokenizer',
+            fields: [
+                { key: 'textColumn', label: 'Text column', kind: 'column', required: true, description: 'Column containing text to tokenize.' },
+                { key: 'lowercase', label: 'Lowercase', kind: 'bool', defaultValue: true, description: 'Convert tokens to lowercase.' },
+                { key: 'minLength', label: 'Min token length', kind: 'integer', defaultValue: 2, description: 'Discard tokens shorter than this.' },
+                { key: 'stopwords', label: 'Remove stopwords', kind: 'bool', defaultValue: true, description: 'Remove common English stopwords (the, a, is, ...).' },
+                { key: 'delimiter', label: 'Delimiter regex', kind: 'text', defaultValue: '\\s+', description: 'Regex pattern to split text (default: whitespace).' },
+            ],
+        }], 'upstream');
+    }
+    if (id === 'tm.tfidf') {
+        return base(comp, [{
+            label: 'TF-IDF',
+            fields: [
+                { key: 'tokenColumn', label: 'Token column', kind: 'text', defaultValue: 'token', description: 'Column containing tokens (from tm.tokenize).' },
+                { key: 'docColumn', label: 'Document ID column', kind: 'column', required: true, description: 'Column identifying each document.' },
+            ],
+        }], 'upstream');
+    }
+    if (id === 'tm.sentiment') {
+        return base(comp, [{
+            label: 'Sentiment Analysis (VADER)',
+            fields: [
+                { key: 'textColumn', label: 'Text column', kind: 'column', required: true, description: 'Column containing text to analyze.' },
+                { key: 'outputColumn', label: 'Output column', kind: 'text', defaultValue: 'sentiment_score', description: 'Name for the sentiment score column.' },
+            ],
+        }], 'upstream');
+    }
+    if (id === 'tm.langdetect') {
+        return base(comp, [{
+            label: 'Language Detection',
+            fields: [
+                { key: 'textColumn', label: 'Text column', kind: 'column', required: true, description: 'Column containing text to detect language.' },
+                { key: 'outputLangColumn', label: 'Language column', kind: 'text', defaultValue: 'lang', description: 'Name for the language code column (ISO 639-1).' },
+                { key: 'outputConfColumn', label: 'Confidence column', kind: 'text', defaultValue: 'lang_confidence', description: 'Name for the confidence score column.' },
+            ],
+        }], 'upstream');
+    }
+
     if (id === 'dl.onnx.reader') {
         return base(comp, [
             {

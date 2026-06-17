@@ -1598,3 +1598,21 @@ pub struct IfBranchSpec {
     /// SQL WHERE expression for the condition.
     pub condition: String,
 }
+
+/// tm.sentiment: VADER sentiment analysis on a text column.
+#[derive(Debug, Clone)]
+pub struct TmSentimentSpec {
+    pub text_column: String,
+    /// Output column name for compound score (default: "sentiment_score").
+    pub output_column: String,
+}
+
+/// tm.langdetect: language detection on a text column.
+#[derive(Debug, Clone)]
+pub struct TmLangdetectSpec {
+    pub text_column: String,
+    /// Output column name for detected language code (default: "lang").
+    pub output_lang_column: String,
+    /// Output column name for confidence score (default: "lang_confidence").
+    pub output_conf_column: String,
+}

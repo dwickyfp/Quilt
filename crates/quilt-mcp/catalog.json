@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "componentCount": 391,
+  "componentCount": 395,
   "components": [
     {
       "id": "src.csv",
@@ -45514,6 +45514,350 @@
               "id": "main",
               "label": "main",
               "type": "main"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tm.tokenize",
+      "label": "Tokenizer",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Split text column into individual tokens (one row per token). Props: textColumn (required), lowercase (default true), minLength (default 2), stopwords (default true — removes 180+ English stopwords), delimiter (default whitespace). Output: all original columns + token column.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "tm.tokenize",
+        "kind": "ml",
+        "label": "Tokenizer",
+        "description": "Split text column into individual tokens (one row per token). Props: textColumn (required), lowercase (default true), minLength (default 2), stopwords (default true — removes 180+ English stopwords), delimiter (default whitespace). Output: all original columns + token column.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Tokenizer",
+            "fields": [
+              {
+                "key": "textColumn",
+                "label": "Text column",
+                "kind": "column",
+                "required": true,
+                "description": "Column containing text to tokenize."
+              },
+              {
+                "key": "lowercase",
+                "label": "Lowercase",
+                "kind": "bool",
+                "defaultValue": true,
+                "description": "Convert tokens to lowercase."
+              },
+              {
+                "key": "minLength",
+                "label": "Min token length",
+                "kind": "integer",
+                "defaultValue": 2,
+                "description": "Discard tokens shorter than this."
+              },
+              {
+                "key": "stopwords",
+                "label": "Remove stopwords",
+                "kind": "bool",
+                "defaultValue": true,
+                "description": "Remove common English stopwords (the, a, is, ...)."
+              },
+              {
+                "key": "delimiter",
+                "label": "Delimiter regex",
+                "kind": "text",
+                "defaultValue": "\\s+",
+                "description": "Regex pattern to split text (default: whitespace)."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tm.tfidf",
+      "label": "TF-IDF",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Compute TF-IDF scores for tokenized text. Expects upstream with one row per token. Props: tokenColumn (default token), docColumn (required — document ID). Output: doc_id, token, tf, idf, tfidf (sorted by tfidf desc).",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "tm.tfidf",
+        "kind": "ml",
+        "label": "TF-IDF",
+        "description": "Compute TF-IDF scores for tokenized text. Expects upstream with one row per token. Props: tokenColumn (default token), docColumn (required — document ID). Output: doc_id, token, tf, idf, tfidf (sorted by tfidf desc).",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "TF-IDF",
+            "fields": [
+              {
+                "key": "tokenColumn",
+                "label": "Token column",
+                "kind": "text",
+                "defaultValue": "token",
+                "description": "Column containing tokens (from tm.tokenize)."
+              },
+              {
+                "key": "docColumn",
+                "label": "Document ID column",
+                "kind": "column",
+                "required": true,
+                "description": "Column identifying each document."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tm.sentiment",
+      "label": "Sentiment Analyzer",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "VADER sentiment analysis on a text column. Props: textColumn (required), outputColumn (default sentiment_score). Output: all original columns + sentiment_score in [-1.0, 1.0]. Pure Rust, no external dependencies. Handles negation (not good → negative).",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "tm.sentiment",
+        "kind": "ml",
+        "label": "Sentiment Analyzer",
+        "description": "VADER sentiment analysis on a text column. Props: textColumn (required), outputColumn (default sentiment_score). Output: all original columns + sentiment_score in [-1.0, 1.0]. Pure Rust, no external dependencies. Handles negation (not good → negative).",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Sentiment Analysis (VADER)",
+            "fields": [
+              {
+                "key": "textColumn",
+                "label": "Text column",
+                "kind": "column",
+                "required": true,
+                "description": "Column containing text to analyze."
+              },
+              {
+                "key": "outputColumn",
+                "label": "Output column",
+                "kind": "text",
+                "defaultValue": "sentiment_score",
+                "description": "Name for the sentiment score column."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tm.langdetect",
+      "label": "Language Detector",
+      "kind": "ml",
+      "availability": "available",
+      "summary": "Detect language of text using trigram model. Props: textColumn (required), outputLangColumn (default lang), outputConfColumn (default lang_confidence). Output: all original columns + ISO 639-1 language code + confidence (0.0-1.0). Supports 70+ languages.",
+      "ports": {
+        "inputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          }
+        ],
+        "outputs": [
+          {
+            "id": "main",
+            "label": "main",
+            "type": "main"
+          },
+          {
+            "id": "reject",
+            "label": "reject",
+            "type": "reject",
+            "optional": true
+          }
+        ]
+      },
+      "manifest": {
+        "id": "tm.langdetect",
+        "kind": "ml",
+        "label": "Language Detector",
+        "description": "Detect language of text using trigram model. Props: textColumn (required), outputLangColumn (default lang), outputConfColumn (default lang_confidence). Output: all original columns + ISO 639-1 language code + confidence (0.0-1.0). Supports 70+ languages.",
+        "schemaSource": "upstream",
+        "sections": [
+          {
+            "label": "Language Detection",
+            "fields": [
+              {
+                "key": "textColumn",
+                "label": "Text column",
+                "kind": "column",
+                "required": true,
+                "description": "Column containing text to detect language."
+              },
+              {
+                "key": "outputLangColumn",
+                "label": "Language column",
+                "kind": "text",
+                "defaultValue": "lang",
+                "description": "Name for the language code column (ISO 639-1)."
+              },
+              {
+                "key": "outputConfColumn",
+                "label": "Confidence column",
+                "kind": "text",
+                "defaultValue": "lang_confidence",
+                "description": "Name for the confidence score column."
+              }
+            ]
+          }
+        ],
+        "ports": {
+          "inputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            }
+          ],
+          "outputs": [
+            {
+              "id": "main",
+              "label": "main",
+              "type": "main"
+            },
+            {
+              "id": "reject",
+              "label": "reject",
+              "type": "reject",
+              "optional": true
             }
           ]
         }

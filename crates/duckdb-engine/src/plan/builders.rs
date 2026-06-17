@@ -236,6 +236,9 @@ pub(crate) fn build_view_sql(
             let upstream = inputs.main().ok_or_else(|| missing_input_msg("ctl.retry"))?;
             Ok(format!("SELECT * FROM {}", quote_ident(upstream)))
         }
+        // Text Mining — pure DuckDB SQL
+        "tm.tokenize" => build_tm_tokenize(inputs, props),
+        "tm.tfidf" => build_tm_tfidf(inputs, props),
         // Everything else isn't executable yet. Fail loudly rather than
         // silently passing data through unchanged (which would look like
         // success while doing nothing).
@@ -244,6 +247,89 @@ pub(crate) fn build_view_sql(
             other
         )),
     }
+}
+
+// ─── Text Mining builders ───────────────────────────────────────────────
+
+/// tm.tokenize: split a text column into individual tokens (one row per token).
+/// Props: textColumn (required), lowercase (default true), minLength (default 2),
+///        stopwords (default true — uses DuckDB's built-in English stopword list),
+///        delimiter (default '\\s+' — whitespace).
+fn build_tm_tokenize(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("tm.tokenize"))?;
+    let text_col = string_prop(props, "textColumn")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "tm.tokenize: textColumn required".to_string())?;
+    let lowercase = props.get("lowercase").and_then(|v| v.as_bool()).unwrap_or(true);
+    let min_len = props.get("minLength").and_then(|v| v.as_u64()).unwrap_or(2);
+    let use_stopwords = props.get("stopwords").and_then(|v| v.as_bool()).unwrap_or(true);
+    let delimiter = string_prop(props, "delimiter").unwrap_or_else(|| r"\s+".to_string());
+
+    let token_expr = if lowercase {
+        format!("LOWER(UNNEST(regexp_split_to_table({}, '{}')))", quote_ident(&text_col), delimiter)
+    } else {
+        format!("UNNEST(regexp_split_to_table({}, '{}'))", quote_ident(&text_col), delimiter)
+    };
+
+    let mut sql = format!(
+        "SELECT *, {} AS token FROM {}",
+        token_expr,
+        quote_ident(upstream)
+    );
+
+    // Filter by minimum length
+    if min_len > 0 {
+        sql = format!(
+            "SELECT * FROM ({}) _tok WHERE LENGTH(token) >= {}",
+            sql, min_len
+        );
+    }
+
+    // Remove stopwords via ANTI JOIN on a VALUES list of common English stopwords
+    if use_stopwords {
+        sql = format!(
+            "SELECT * FROM ({}) _tok WHERE token NOT IN ('the','a','an','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','shall','should','may','might','must','can','could','i','me','my','we','our','you','your','he','him','his','she','her','it','its','they','them','their','this','that','these','those','and','but','or','nor','not','so','yet','both','either','neither','each','every','all','any','few','more','most','other','some','such','no','only','own','same','than','too','very','just','because','as','until','while','of','at','by','for','with','about','against','between','through','during','before','after','above','below','to','from','up','down','in','out','on','off','over','under','again','further','then','once','here','there','when','where','why','how','what','which','who','whom','if','into')",
+            sql
+        );
+    }
+
+    Ok(sql)
+}
+
+/// tm.tfidf: compute TF-IDF scores for tokens in a document collection.
+/// Expects upstream already tokenized (one row per token with a token column).
+/// Props: tokenColumn (default 'token'), docColumn (required — document ID column).
+fn build_tm_tfidf(inputs: &NodeInputs, props: &JsonValue) -> Result<String, String> {
+    let upstream = inputs.main().ok_or_else(|| missing_input_msg("tm.tfidf"))?;
+    let token_col = string_prop(props, "tokenColumn").unwrap_or_else(|| "token".to_string());
+    let doc_col = string_prop(props, "docColumn")
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "tm.tfidf: docColumn required".to_string())?;
+
+    // TF = count of token in doc / total tokens in doc
+    // IDF = ln(total_docs / docs_containing_token)
+    // TF-IDF = TF * IDF
+    Ok(format!(
+        "WITH tf AS (\
+            SELECT {doc}, {tok}, \
+                   COUNT(*)::DOUBLE / SUM(COUNT(*)) OVER (PARTITION BY {doc}) AS tf \
+            FROM {src} GROUP BY {doc}, {tok}\
+         ), \
+         df AS (\
+            SELECT {tok}, COUNT(DISTINCT {doc})::DOUBLE AS df, \
+                   (SELECT COUNT(DISTINCT {doc}) FROM {src}) AS N \
+            FROM {src} GROUP BY {tok}\
+         ), \
+         idf AS (\
+            SELECT {tok}, LN(N / df) AS idf FROM df WHERE df > 0\
+         ) \
+         SELECT tf.{doc}, tf.{tok}, tf.tf, idf.idf, tf.tf * idf.idf AS tfidf \
+         FROM tf JOIN idf ON tf.{tok} = idf.{tok} \
+         ORDER BY tf.{doc}, tfidf DESC",
+        doc = quote_ident(&doc_col),
+        tok = quote_ident(&token_col),
+        src = quote_ident(upstream),
+    ))
 }
 
 pub(crate) fn build_passthrough_op(inputs: &NodeInputs, op: &str) -> Result<String, String> {

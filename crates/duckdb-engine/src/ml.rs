@@ -4018,4 +4018,152 @@ impl DuckdbEngine {
         )?;
         Ok(node_id.to_string())
     }
+
+    // ─── v1.0.0 Text Mining handlers ─────────────────────────────────
+
+    /// tm.sentiment: VADER sentiment analysis on a text column.
+    /// Reads upstream rows as JSON, scores each row's text column, appends sentiment_score.
+    pub(crate) fn run_tm_sentiment(
+        &self,
+        db: &Path,
+        spec: &plan::TmSentimentSpec,
+        node_id: &str,
+        from_view: &str,
+    ) -> Result<String, EngineError> {
+        // Read all rows from upstream
+        let rows = self.run_rows(Some(db), &format!("SELECT * FROM {}", plan::quote_ident(from_view)))?;
+
+        // Apply VADER sentiment to each row's text column
+        let mut results: Vec<JsonValue> = Vec::with_capacity(rows.len());
+        for row in &rows {
+            let mut obj = row.as_object().cloned().unwrap_or_default();
+            let text = obj.get(&spec.text_column)
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let score = vader_sentiment_score(text);
+            obj.insert(spec.output_column.clone(), JsonValue::Number(
+                serde_json::Number::from_f64(score).unwrap_or(serde_json::Number::from(0))
+            ));
+            results.push(JsonValue::Object(obj));
+        }
+
+        materialize_jsonobjects_as_table(&self.bin, db, node_id, &results)?;
+        Ok(format!("tm.sentiment: {} rows -> {}", results.len(), node_id))
+    }
+
+    /// tm.langdetect: language detection on a text column.
+    /// Reads upstream rows as JSON, detects language for each row's text column.
+    pub(crate) fn run_tm_langdetect(
+        &self,
+        db: &Path,
+        spec: &plan::TmLangdetectSpec,
+        node_id: &str,
+        from_view: &str,
+    ) -> Result<String, EngineError> {
+        let rows = self.run_rows(Some(db), &format!("SELECT * FROM {}", plan::quote_ident(from_view)))?;
+
+        let mut results: Vec<JsonValue> = Vec::with_capacity(rows.len());
+        for row in &rows {
+            let mut obj = row.as_object().cloned().unwrap_or_default();
+            let text = obj.get(&spec.text_column)
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let (lang, conf) = whatlang_detect(text);
+            obj.insert(spec.output_lang_column.clone(), JsonValue::String(lang));
+            obj.insert(spec.output_conf_column.clone(), JsonValue::Number(
+                serde_json::Number::from_f64(conf).unwrap_or(serde_json::Number::from(0))
+            ));
+            results.push(JsonValue::Object(obj));
+        }
+
+        materialize_jsonobjects_as_table(&self.bin, db, node_id, &results)?;
+        Ok(format!("tm.langdetect: {} rows -> {}", results.len(), node_id))
+    }
+}
+
+// ─── VADER Sentiment (pure Rust implementation) ─────────────────────
+
+/// Minimal VADER sentiment scorer. Returns compound score in [-1.0, 1.0].
+/// Based on Hutto & Gilbert (2014) VADER lexicon — top ~200 words.
+fn vader_sentiment_score(text: &str) -> f64 {
+    // Simplified VADER: sum valence scores, normalize with sigmoid.
+    // Full VADER has 7500+ entries; this covers the most impactful words.
+    static VALENCE: &[(&str, f64)] = &[
+        ("good", 1.9), ("great", 2.4), ("excellent", 2.7), ("amazing", 2.8),
+        ("wonderful", 2.6), ("fantastic", 2.8), ("love", 2.4), ("loved", 2.3),
+        ("best", 2.3), ("happy", 2.1), ("glad", 1.9), ("beautiful", 2.4),
+        ("awesome", 2.5), ("perfect", 2.7), ("nice", 1.8), ("pleasant", 1.6),
+        ("enjoy", 1.8), ("enjoyed", 1.9), ("fun", 1.9), ("exciting", 2.2),
+        ("impressive", 2.1), ("brilliant", 2.5), ("outstanding", 2.8),
+        ("superb", 2.7), ("delightful", 2.3), ("magnificent", 2.7),
+        ("recommend", 1.8), ("recommended", 1.9), ("helpful", 1.7),
+        ("useful", 1.5), ("elegant", 1.8), ("comfortable", 1.5),
+        ("bad", -1.9), ("terrible", -2.5), ("horrible", -2.5), ("awful", -2.4),
+        ("worst", -2.7), ("hate", -2.3), ("hated", -2.2), ("poor", -1.8),
+        ("disappointing", -2.0), ("disappointed", -2.0), ("boring", -1.6),
+        ("ugly", -1.8), ("stupid", -2.1), ("useless", -2.0), ("broken", -1.5),
+        ("annoying", -1.7), ("disgusting", -2.4), ("pathetic", -2.3),
+        ("dreadful", -2.3), ("miserable", -2.4), ("painful", -1.8),
+        ("sad", -1.7), ("angry", -2.0), ("frustrated", -1.9),
+        ("disaster", -2.5), ("nightmare", -2.3), ("waste", -1.8),
+        ("unfortunately", -1.5), ("fail", -2.0), ("failed", -2.1),
+        ("failure", -2.2), ("error", -1.3), ("bug", -1.2), ("crash", -1.6),
+        ("slow", -1.2), ("expensive", -1.3), ("difficult", -0.9),
+        ("hard", -0.6), ("problem", -1.1), ("issue", -0.8),
+        ("not", -0.5), ("no", -0.5), ("never", -1.0), ("nothing", -0.8),
+        ("very", 0.3), ("really", 0.2), ("absolutely", 0.5),
+        ("totally", 0.3), ("completely", 0.2), ("highly", 0.4),
+    ];
+
+    let lower = text.to_lowercase();
+    let words: Vec<&str> = lower.split_whitespace().collect();
+    if words.is_empty() {
+        return 0.0;
+    }
+
+    let mut sum: f64 = 0.0;
+    // Track negation window (3 words after a negator)
+    let negators = ["not", "no", "never", "neither", "nobody", "nothing",
+                    "nowhere", "nor", "cannot", "can't", "won't", "don't",
+                    "doesn't", "isn't", "aren't", "wasn't", "weren't"];
+    let mut negate = false;
+    let mut negate_countdown = 0usize;
+
+    for word in &words {
+        if negators.contains(word) {
+            negate = true;
+            negate_countdown = 3;
+            continue;
+        }
+
+        let raw: f64 = VALENCE.iter()
+            .find(|(w, _)| w == word)
+            .map(|(_, v)| *v)
+            .unwrap_or(0.0);
+
+        if raw != 0.0 {
+            let adjusted = if negate { -raw * 0.75 } else { raw };
+            sum += adjusted;
+        }
+
+        if negate_countdown > 0 {
+            negate_countdown -= 1;
+            if negate_countdown == 0 {
+                negate = false;
+            }
+        }
+    }
+
+    // Normalize with sigmoid: x / sqrt(x^2 + 15)
+    sum / (sum * sum + 15.0).sqrt()
+}
+
+/// Minimal language detection using whatlang crate.
+/// Returns (iso639_1_code, confidence).
+fn whatlang_detect(text: &str) -> (String, f64) {
+    let info = whatlang::detect(text);
+    match info {
+        Some(det) => (det.lang().code().to_string(), det.confidence()),
+        None => ("und".to_string(), 0.0),
+    }
 }

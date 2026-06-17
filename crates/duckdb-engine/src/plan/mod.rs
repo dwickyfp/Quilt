@@ -190,6 +190,10 @@ pub enum RuntimeSpec {
     IfBranch(IfBranchSpec),
     /// ctl.try.catch: enhanced error handling with catch block.
     TryCatch { fallback_path: String },
+    /// tm.sentiment: VADER sentiment analysis on a text column.
+    TmSentiment(TmSentimentSpec),
+    /// tm.langdetect: language detection on a text column.
+    TmLangdetect(TmLangdetectSpec),
 }
 
 // Connector / transform spec type definitions live in plan/specs.rs and
@@ -626,6 +630,8 @@ fn build_stage(
     let mut loop_chunk: Option<LoopChunkSpec> = None;
     let mut if_branch: Option<IfBranchSpec> = None;
     let mut try_catch_path: Option<String> = None;
+    let mut tm_sentiment: Option<TmSentimentSpec> = None;
+    let mut tm_langdetect: Option<TmLangdetectSpec> = None;
     let mut wait_ms: Option<u64> = None;
     // Advanced settings (universal across components, written by the
     // Properties Panel's Advanced tab). Engine honours them per stage.
@@ -3886,6 +3892,32 @@ fn build_stage(
             select_sql
         );
         (sql, StageKind::View, None)
+    } else if component_id == "tm.sentiment" {
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let text_column = string_prop(&props, "textColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: textColumn required", component_id)))?;
+        tm_sentiment = Some(TmSentimentSpec {
+            text_column,
+            output_column: string_prop(&props, "outputColumn")
+                .unwrap_or_else(|| "sentiment_score".into()),
+        });
+        let sql = passthrough_view_sql(&node.id, from_view);
+        (sql, StageKind::View, Some(from_view.to_string()))
+    } else if component_id == "tm.langdetect" {
+        let from_view = inputs.main().ok_or_else(|| missing_input(node, "main"))?;
+        let text_column = string_prop(&props, "textColumn")
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| EngineError::Config(format!("{}: textColumn required", component_id)))?;
+        tm_langdetect = Some(TmLangdetectSpec {
+            text_column,
+            output_lang_column: string_prop(&props, "outputLangColumn")
+                .unwrap_or_else(|| "lang".into()),
+            output_conf_column: string_prop(&props, "outputConfColumn")
+                .unwrap_or_else(|| "lang_confidence".into()),
+        });
+        let sql = passthrough_view_sql(&node.id, from_view);
+        (sql, StageKind::View, Some(from_view.to_string()))
     } else {
         // the body so CSV/TSV sources can switch to the tolerant pass/reject
         // split when (and only when) the reject port is wired (issue #15).
@@ -4141,6 +4173,8 @@ fn build_stage(
         .or_else(|| loop_chunk.map(RuntimeSpec::LoopChunk))
         .or_else(|| if_branch.map(RuntimeSpec::IfBranch))
         .or_else(|| try_catch_path.map(|path| RuntimeSpec::TryCatch { fallback_path: path }))
+        .or_else(|| tm_sentiment.map(RuntimeSpec::TmSentiment))
+        .or_else(|| tm_langdetect.map(RuntimeSpec::TmLangdetect))
         ;
     // Free the ATTACH alias so the next batched stage can re-ATTACH it (see
     // attach_alias above). Only stages that embed the ATTACH in their own SQL
